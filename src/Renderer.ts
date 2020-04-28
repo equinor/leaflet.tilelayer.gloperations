@@ -104,7 +104,6 @@ export default class Renderer {
           // TODO: Use glsl-rgba-to-float etc. to pack/unpack float values to RGBA if OES_texture_float not available
         }
         // TODO: Improve software rendering detection
-        // console.log(regl.limits);
         if (regl.limits.maxFragmentUniforms === 261) {
           console.log("Software rendering detected and not supported with GLOperations plugin. If you have a GPU, check if drivers are installed ok?");
         }
@@ -152,7 +151,6 @@ export default class Renderer {
 
   setMaxTextureDimension(newMaxTextureDimension: number) {
     const {
-      // maxTextureDimension,
       textureManager,
       tileSize,
       regl,
@@ -180,13 +178,6 @@ export default class Renderer {
       maxTextureDimension = 4096;
     };
 
-    // textureManager.destroy();
-
-    // Object.assign(this, {
-    //   maxTextureDimension: newMaxTextureDimension,
-    //   textureManager: new TextureManager(regl, tileSize, newMaxTextureDimension, false),
-    // });
-
     return maxTextureDimension
   }
 
@@ -211,15 +202,8 @@ export default class Renderer {
 
     let zoomdelta = _hillshadeOptions.hsSimpleZoomdelta || 0;
 
-    let offset_pixels = Math.max(0.0005, 2 ** (zoom + zoomdelta) / 2048);
+    let offset_pixels = Math.max(0.5, 2 ** (zoom + zoomdelta) / 2048);
     let offset_texcoords = offset_pixels / textureManager.texture.width;
-    // console.log(offset_pixels)
-    // console.log(offset_texcoords)
-
-    // console.log("texture.width")
-    // console.log(textureManager.texture.width)
-    // console.log("texture.height")
-    // console.log(textureManager.texture.height)
 
     if (_hillshadeOptions.hillshadeType === 'none') {
       this.drawTile({
@@ -232,17 +216,6 @@ export default class Renderer {
         enableSimpleHillshade: false,
       });
     } else if (_hillshadeOptions.hillshadeType === 'simple') {
-      // console.log(" ")
-      // console.log("textureBounds")
-      // console.log(textureBounds)
-      // console.log("azimuth")
-      // console.log(_hillshadeOptions.hsSimpleAzimuth)
-      // console.log("altitude")
-      // console.log(_hillshadeOptions.hsSimpleAltitude)
-      // console.log("slopescale")
-      // console.log(_hillshadeOptions.hsSimpleSlopescale)
-      // console.log("getTexCoordVertices")
-      // console.log(util.getTexCoordVertices(textureBounds))
       this.drawTileHsSimple({
         colorScale: util.convertColorScale(colorScale),
         sentinelValues: util.convertColorScale(sentinelValues),
@@ -1113,11 +1086,6 @@ export default class Renderer {
 
       let offset_pixels = Math.max(0.5, 2 ** (zoom + zoomdelta) / 2048);
       let offset_texcoords = offset_pixels / textureManager.texture.width;
-      // console.log(offset_pixels)
-      // console.log(offset_texcoords)
-
-      // console.log("tileSize")
-      // console.log(tileSize)
 
       if (_hillshadeOptions.hillshadeType === 'none') {
         this.drawTile(chunk.map(({ canvasCoords }, index) => ({
