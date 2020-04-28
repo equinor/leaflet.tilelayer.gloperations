@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "lib": ["dom", "es2016"],
+    "moduleResolution": "node",
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "removeComments": true,
+    "sourceMap": true,
+    "strictNullChecks": true,
+    "target": "es5"
+  },
+  "files": ["./src/declarations.d.ts", "./src/index.ts"]
+}
