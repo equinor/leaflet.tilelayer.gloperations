@@ -21,5 +21,5 @@
 - Initial release
 
 [unreleased]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/0.1.1...0.2.0
-[0.1.1]: https://github.com/equinor/leaflet.tilelayer.gloperations/releases/tag/0.1.1
+[0.2.0]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/equinor/leaflet.tilelayer.gloperations/releases/tag/v0.1.1
