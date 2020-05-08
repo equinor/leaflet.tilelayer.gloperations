@@ -30,6 +30,7 @@ import {
   DrawTileMultiAnalyze6,
   DrawTileDiff,
   CalcTileDiff,
+  ConvolutionSmooth,
   Pair,
   calcResult,
   TileCoordinates,
@@ -53,6 +54,7 @@ export default class Renderer {
   textureManagerD: TextureManager;
   textureManagerE: TextureManager;
   textureManagerF: TextureManager;
+  // textureManagerConvolution: TextureManager;
   textureManagerHillshade: TextureManager;
   tileSize: number;
   fboTile: Framebuffer2D;
@@ -79,6 +81,10 @@ export default class Renderer {
   drawTileMultiAnalyze5: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze5.Props>;
   calcTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze6.Props>;
   drawTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze6.Props>;
+  convolutionSmooth: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
+  // convolutionSmooth5: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
+  // convolutionSmooth7: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
+  // convolutionSmooth9: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
 
   constructor(tileSize: number, nodataValue: number) {
     const canvas = L.DomUtil.create('canvas') as HTMLCanvasElement;
@@ -86,6 +92,7 @@ export default class Renderer {
 
     const regl = REGL({
       canvas: canvas,
+      // only guarantees reading from float texture, not writing to.
       optionalExtensions: ["OES_texture_float"],
       onDone: function (err: Error, regl: REGL.Regl) {
         if (err) {
@@ -102,6 +109,7 @@ export default class Renderer {
         }
         if (!regl.hasExtension('OES_texture_float')) {
           // TODO: Use glsl-rgba-to-float etc. to pack/unpack float values to RGBA if OES_texture_float not available
+          console.log("OES_texture_float not supported")
         }
         // TODO: Improve software rendering detection
         if (regl.limits.maxFragmentUniforms === 261) {
@@ -146,6 +154,10 @@ export default class Renderer {
       drawTileMultiAnalyze6: commands.createDrawTileMultiAnalyze6Command(regl, commonDrawConfig),
       drawTileDiff: commands.createDrawTileDiffCommand(regl, commonDrawConfig),
       calcTileDiff: commands.createCalcTileDiffCommand(regl, commonDrawConfig),
+      convolutionSmooth: commands.createConvolutionSmoothCommand(regl, commonDrawConfig),
+      // convolutionSmooth5: commands.createConvolutionSmooth5Command(regl, commonDrawConfig),
+      // convolutionSmooth7: commands.createConvolutionSmooth7Command(regl, commonDrawConfig),
+      // convolutionSmooth9: commands.createConvolutionSmooth9Command(regl, commonDrawConfig),
     });
   }
 
@@ -365,6 +377,49 @@ export default class Renderer {
 
     // Since the tile will fill the whole canvas, the offset is simply [0, 0].
     return [0, 0, resultEncodedPixels];
+  }
+
+  renderConvolutionSmooth(
+    inputData: Uint8Array,
+    width: number,
+    height: number,
+    kernelSize: number,
+  ): Float32Array {
+    const {
+      regl,
+    } = this;
+    this.setCanvasSize(width, height);
+
+    const texture = regl.texture({
+      data: inputData,
+      width: width,
+      height: height,
+      flipY: false,
+    });
+
+    let fboSmoothed = regl.framebuffer({
+      width: width,
+      height: height,
+      depth: false,
+      colorFormat: 'rgba',
+      colorType: "float"
+    });
+
+    let resultEncodedPixels = new Float32Array(width * height * 4);
+
+    fboSmoothed.use(() => {
+      this.convolutionSmooth({
+        texture: texture,
+        //TODO: case with width != height?
+        textureSize: width,
+        kernelSize: kernelSize,
+      });
+      regl.read({data: resultEncodedPixels});
+    });
+
+    fboSmoothed.destroy();
+
+    return resultEncodedPixels;
   }
 
   renderTileMulti1(
