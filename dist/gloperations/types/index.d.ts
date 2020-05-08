@@ -65,7 +65,9 @@ export interface Options extends L.GridLayerOptions {
     _hillshadeOptions?: HillshadeOptions;
     contourCanvas?: HTMLCanvasElement;
     contourType?: string;
-    contourSmooth: boolean;
+    contourSmoothLines: boolean;
+    contourSmoothInput: boolean;
+    contourSmoothInputKernel: number;
     contourScaleFactor: number;
     contourInterval: number;
     contourIndexInterval: number;
@@ -167,7 +169,9 @@ declare const defaultOptions: {
         hillshadeType: string;
     };
     contourType: string;
-    contourSmooth: boolean;
+    contourSmoothLines: boolean;
+    contourSmoothInput: boolean;
+    contourSmoothInputKernel: number;
     contourScaleFactor: number;
     contourInterval: number;
     contourIndexInterval: number;
@@ -251,7 +255,9 @@ export default class GLOperations extends L.GridLayer {
             hillshadeType: string;
         };
         contourType: string;
-        contourSmooth: boolean;
+        contourSmoothLines: boolean;
+        contourSmoothInput: boolean;
+        contourSmoothInputKernel: number;
         contourScaleFactor: number;
         contourInterval: number;
         contourIndexInterval: number;
@@ -312,6 +318,7 @@ export default class GLOperations extends L.GridLayer {
     protected _getActivetilesBounds(): Promise<ActiveTilesBounds>;
     protected _mergePixelData(activeTilesBounds: ActiveTilesBounds, tileSize: number): Promise<void>;
     protected _maybeUpdateMergedArrayAndDrawContours(): Promise<void>;
+    protected _smoothContourInput(): Promise<void>;
     protected _calculateAndDrawContours(): Promise<void>;
     protected _addlabel(context: CanvasRenderingContext2D, label: ContourLabel, labelColor: string, labelFont: string): void;
     protected _calculateContours(): Promise<void>;

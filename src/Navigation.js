@@ -134,11 +134,13 @@ let optionsContours = {
   glOperation: 'none',
   contourType: 'lines',
   contourScaleFactor: -1,
-  // contourInterval: 25,
+  contourInterval: 10,
   // contourIndexInterval: 100,
   // contourLineColor: '#000000',
   // contourLineWeight: 0.5,
   contourLineIndexWeight: 2.5,
+  contourSmoothInput: true,
+  contourSmoothInputKernel: 15,
   // contourLabelDistance: 250,
   contourHypsoColors: ["#dddddd", "#e5d9c9" ,"#486341"],
   contourHypsoDomain: [-1450, -1550, -1700],
@@ -214,7 +216,7 @@ const Navigation = ({tileLayer}) => {
   const [colorscale, setColorscale] = useState(DEFAULT_SCALE);
   const [surfaceUrl, setSurfaceUrl] = useState(`./tiles/top/topupperreek/{z}/{x}/{y}.png`);
   const [transitions, setTransitions] = useState(true);
-  const [hillshadeSlopescaleDisabled, setHillshadeSlopescaleDisabled] = useState(false);
+  const [hillshadeSlopescaleDisabled, setHillshadeSlopescaleDisabled] = useState(true);
   const [scaleMinMax, setScaleMinMax] = useState(surfaceMinMax.top);
   const [showColorscalePicker, setShowColorscalePicker] = useState(false);
   const [reverseScale, setReverseScale] = useState(false);
@@ -225,7 +227,7 @@ const Navigation = ({tileLayer}) => {
   const [contourHypsometric, setContourHypsometric] = useState(false);
   const [contourBathymetric, setContourBathymetric] = useState(false);
   const [contourLabels, setContourLabels] = useState(false);
-  const [contourSmooth, setContourSmooth] = useState(false);
+  const [contourSmooth, setContourSmooth] = useState(true);
   const [contourLineColor, setContourLineColor] = useState('#000000');
 
   // Update tileLayer with new colorscale
@@ -304,7 +306,7 @@ const Navigation = ({tileLayer}) => {
   }
   function handleContourSmoothChange() {
     setContourSmooth (!contourSmooth);
-    tileLayer.updateOptions({contourSmooth: !contourSmooth})
+    tileLayer.updateOptions({contourSmoothInput: !contourSmooth})
   }
   function slopescaleChange(value) {
     tileLayer.updateOptions({hsSimpleSlopescale: value})
@@ -320,6 +322,9 @@ const Navigation = ({tileLayer}) => {
   }
   function contourLineSizeChange(value) {
     tileLayer.updateOptions({contourLineWeight: parseFloat(value)})
+  }
+  function contourSmoothKernelChange(value) {
+    tileLayer.updateOptions({contourSmoothInputKernel: parseFloat(value)})
   }
   function contourLineIndexSizeChange(value) {
     tileLayer.updateOptions({contourLineIndexWeight: parseFloat(value)})
@@ -404,7 +409,7 @@ const Navigation = ({tileLayer}) => {
 
   return (
     <div>
-      <div style={{margin: 5}}><span className='title'>{`Leaflet.TileLayer.GLOperations demo`}</span></div>
+      <div style={{margin: 5}}><span className='title'><a href="https://github.com/equinor/leaflet.tilelayer.gloperations">{`Leaflet.TileLayer.GLOperations demo`}</a></span></div>
       <Collapse accordion onChange={accordionCallback}>
         <Panel header="Colorscale" key="colorscale">
           <p>Basic usage. Change the tileUrl and the colorscale.</p>
@@ -501,7 +506,7 @@ const Navigation = ({tileLayer}) => {
           Bathymetric tint: <Switch size="small" checked={contourBathymetric} onChange={handleBathymetricChange} />
           <br></br><br></br>
           Countour interval:
-          <Slider defaultValue={25} min={5} max={250} step={5} onAfterChange={contourIntervalChange}/>
+          <Slider defaultValue={10} min={5} max={250} step={5} onAfterChange={contourIntervalChange}/>
           Index interval:
           <Slider defaultValue={100} min={0} max={200} step={5} disabled={contourIlluminated} onAfterChange={contourIndexIntervalChange}/>
           {/* Smooth contours: <Switch size="small" checked={contourSmooth} onChange={handleContourSmoothChange} />*/}
@@ -509,6 +514,11 @@ const Navigation = ({tileLayer}) => {
           <Slider defaultValue={0.5} min={0.1} max={3} step={0.1} disabled={contourIlluminated} onAfterChange={contourLineSizeChange}/>
           Index line size:
           <Slider defaultValue={2.5} min={0.1} max={5} step={0.1} disabled={contourIlluminated} onAfterChange={contourLineIndexSizeChange}/>
+          <br></br>
+          Smooth contour input data: <Switch size="small" checked={contourSmooth} onChange={handleContourSmoothChange} />
+          <br></br>
+          Smoothing convolution kernel size:
+          <Slider defaultValue={15} min={1} max={41} step={2} disabled={!contourSmooth} onAfterChange={contourSmoothKernelChange}/>
           Contour line color:
           <GithubPicker color={contourLineColor} triangle={'hide'} colors={['#000000', '#ABB8C3', '#EB144C', '#FCCB00', '#FF8A65', '#795548', '#5300EB']} onChangeComplete={ handleContourLineColor } />
           <br></br>

@@ -1,6 +1,6 @@
 import REGL, { Framebuffer2D } from 'regl';
 import TextureManager from './TextureManager';
-import { DrawTile, DrawTileHsSimple, DrawTileHsPregen, DrawTileInterpolateColor, DrawTileInterpolateColorOnly, DrawTileInterpolateValue, CalcTileMultiAnalyze1, DrawTileMultiAnalyze1, CalcTileMultiAnalyze2, DrawTileMultiAnalyze2, CalcTileMultiAnalyze3, DrawTileMultiAnalyze3, CalcTileMultiAnalyze4, DrawTileMultiAnalyze4, CalcTileMultiAnalyze5, DrawTileMultiAnalyze5, CalcTileMultiAnalyze6, DrawTileMultiAnalyze6, DrawTileDiff, CalcTileDiff, Pair, calcResult, TileCoordinates, TileDatum, HillshadeOptions } from './types';
+import { DrawTile, DrawTileHsSimple, DrawTileHsPregen, DrawTileInterpolateColor, DrawTileInterpolateColorOnly, DrawTileInterpolateValue, CalcTileMultiAnalyze1, DrawTileMultiAnalyze1, CalcTileMultiAnalyze2, DrawTileMultiAnalyze2, CalcTileMultiAnalyze3, DrawTileMultiAnalyze3, CalcTileMultiAnalyze4, DrawTileMultiAnalyze4, CalcTileMultiAnalyze5, DrawTileMultiAnalyze5, CalcTileMultiAnalyze6, DrawTileMultiAnalyze6, DrawTileDiff, CalcTileDiff, ConvolutionSmooth, Pair, calcResult, TileCoordinates, TileDatum, HillshadeOptions } from './types';
 import { Color, SentinelValue } from './types';
 export default class Renderer {
     canvas: HTMLCanvasElement;
@@ -36,6 +36,7 @@ export default class Renderer {
     drawTileMultiAnalyze5: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze5.Props>;
     calcTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze6.Props>;
     drawTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze6.Props>;
+    convolutionSmooth: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
     constructor(tileSize: number, nodataValue: number);
     setMaxTextureDimension(newMaxTextureDimension: number): void;
     findMaxTextureDimension(): number;
@@ -43,6 +44,7 @@ export default class Renderer {
     renderTileHsPregen(tileDatum: TileDatum, tileDatumHs: TileDatum, colorScale: Color[], sentinelValues: SentinelValue[], _hillshadeOptions: HillshadeOptions): Pair<number>;
     flipReadPixels(width: number, height: number, pixels: Float32Array): Float32Array;
     renderTileDiff(tileDatumA: TileDatum, tileDatumB: TileDatum, colorScale: Color[], sentinelValues: SentinelValue[]): calcResult;
+    renderConvolutionSmooth(inputData: Uint8Array, width: number, height: number, kernelSize: number): Float32Array;
     renderTileMulti1(tileDatumA: TileDatum, colorScale: Color[], sentinelValues: SentinelValue[], filterLowA: number, filterHighA: number, multiplierA: number): calcResult;
     renderTileMulti2(tileDatumA: TileDatum, tileDatumB: TileDatum, colorScale: Color[], sentinelValues: SentinelValue[], filterLowA: number, filterHighA: number, filterLowB: number, filterHighB: number, multiplierA: number, multiplierB: number): calcResult;
     renderTileMulti3(tileDatumA: TileDatum, tileDatumB: TileDatum, tileDatumC: TileDatum, colorScale: Color[], sentinelValues: SentinelValue[], filterLowA: number, filterHighA: number, filterLowB: number, filterHighB: number, filterLowC: number, filterHighC: number, multiplierA: number, multiplierB: number, multiplierC: number): calcResult;

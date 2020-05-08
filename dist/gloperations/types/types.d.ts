@@ -82,13 +82,10 @@ export interface TileEvent {
 
 export interface ContourData {
   mergedTileArray?: number[];
+  smoothedTileArray?: number[];
   width?: number;
   height?: number;
-  // contour?: Contours;
   contoursGeoData?: ContourMultiPolygon[];
-  // prevZoom?: number;
-  // pixelOrigin?: Point;
-  // tilePos?: Point;
 }
 
 export interface ActiveTilesBounds {
@@ -850,6 +847,25 @@ export namespace DrawTileDiff {
     // texCoord: REGL.Vec2[];
     texCoordA: REGL.Vec2[];
     texCoordB: REGL.Vec2[];
+  }
+}
+
+export namespace ConvolutionSmooth {
+  export interface Props {
+    texture: REGL.Texture2D;
+    textureSize: number;
+    kernelSize: number;
+    nodataValue: number;
+    littleEndian: boolean;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    texture: REGL.Texture2D;
+    textureSize: number;
+    kernelSize: number;
+  }
+  export interface Attributes {
+    texCoord: number[];
+    position: number[];
   }
 }
 
