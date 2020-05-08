@@ -2,6 +2,7 @@
 [![Build Status](https://travis-ci.org/equinor/leaflet.tilelayer.gloperations.svg?branch=master)](https://travis-ci.org/github/equinor/leaflet.tilelayer.gloperations)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/equinor/leaflet.tilelayer.gloperations.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/equinor/leaflet.tilelayer.gloperations/alerts/)
 [![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/equinor/leaflet.tilelayer.gloperations.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/equinor/leaflet.tilelayer.gloperations/context:javascript)
+[![Known Vulnerabilities](https://snyk.io/test/github/equinor/leaflet.tilelayer.gloperations/badge.svg?targetFile=package.json)](https://snyk.io/test/github/equinor/leaflet.tilelayer.gloperations?targetFile=package.json)
 
 # Leaflet.TileLayer.GLOperations
 
