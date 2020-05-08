@@ -36,7 +36,6 @@ uniform float altitude;
 float getTexelValue(vec2 pos) {
   vec4 texelRgba = texture2D(texture, pos);
   float texelFloat = rgbaToFloat(texelRgba, littleEndian);
-
   return texelFloat;
 }
 

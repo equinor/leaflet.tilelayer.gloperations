@@ -2,6 +2,7 @@
 [![Build Status](https://travis-ci.org/equinor/leaflet.tilelayer.gloperations.svg?branch=master)](https://travis-ci.org/github/equinor/leaflet.tilelayer.gloperations)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/equinor/leaflet.tilelayer.gloperations.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/equinor/leaflet.tilelayer.gloperations/alerts/)
 [![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/equinor/leaflet.tilelayer.gloperations.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/equinor/leaflet.tilelayer.gloperations/context:javascript)
+[![Known Vulnerabilities](https://snyk.io/test/github/equinor/leaflet.tilelayer.gloperations/badge.svg?targetFile=package.json)](https://snyk.io/test/github/equinor/leaflet.tilelayer.gloperations?targetFile=package.json)
 
 # Leaflet.TileLayer.GLOperations
 
@@ -28,7 +29,11 @@ Try it out [here](https://equinor.github.io/leaflet.tilelayer.gloperations/). Yo
   - Lines and index lines with optional labels
   - Illuminated lines
   - Hypsometric and bathymetric tint
+  - Smooth input data with WebGL
 
+
+Caveats:
+- Not working properly on mobile devices at the moment.
 
 
 ## Accessing the plugin
@@ -165,6 +170,8 @@ Work in progress. Can set the contour interval and show as simple or illuminated
 
 Hypsometric tint can be applied for entire layer or above a certain depth (typically above sea level). Bathymetric tin can be applied below a certain depth (typically below sea level).
 
+Can optionally smooth the input data with WebGL. Can set the size of the convolution kernel to use (size of area around each texel used for smoothing).
+
 Caveats:
 - Currently only working properly with noDataValue=default (-999999)
 - Have to merge active tiles to a single canvas and is not using WebGL to draw the contours. Hence the contour option is quite slow to use.
@@ -243,7 +250,9 @@ This TileLayer accepts all the same options as `Leaflet.GridLayer` and `Leaflet.
 | hsSimpleAltitude        | Number          | 70        | Sun altitude in degrees
 | hsPregenUrl             | String          | ''        | Url to pre-generated hillshading tiles
 | contourType             | String          | 'none'    | none, lines or illuminated
-| contourSmooth           | Boolean         | false     | Smooth contour lines (not input array, but generated contour lines)
+| contourSmoothInput      | Boolean         | false     | Smooth contour input data (recommended way to smooth)
+| contourSmoothInputKernel| Number          | 7         | Convolution kernel size. E.g. a value of 7 will use a 7x7 matrix to average values around each texel.
+| contourSmoothLines      | Boolean         | false     | Smooth contour lines (not input array, but generated contour lines)
 | contourScaleFactor      | Number          | 1         | Scale values from layer before generating contours. E.g. if your are using illuminated lines and your values are depth, not height, use `-1`.
 | contourInterval         | Number          | 25        | Interval to create contours
 | contourIndexInterval    | Number          | 100       | Interval to create index contours with different line thickness. Have to be a multiple of `contourInterval`.

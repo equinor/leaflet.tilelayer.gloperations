@@ -6,6 +6,7 @@ import vertMulti3 from './shaders/multi3.vs';
 import vertMulti4 from './shaders/multi4.vs';
 import vertMulti5 from './shaders/multi5.vs';
 import vertMulti6 from './shaders/multi6.vs';
+import vertSmooth from './shaders/smooth.vs';
 
 import fragInterpolateColor from './shaders/interpolateColor.fs';
 import fragInterpolateColorOnly from './shaders/interpolateColorOnly.fs';
@@ -26,6 +27,7 @@ import fragMulti6Calc from './shaders/multiAnalyze6Calc.fs';
 import fragMulti6Draw from './shaders/multiAnalyze6Draw.fs';
 import fragDiffCalc from './shaders/diffCalc.fs';
 import fragDiffDraw from './shaders/diffDraw.fs';
+import fragConvolutionSmooth from './shaders/convolutionSmooth.fs';
 
 import {
   DEFAULT_COLOR_STOP,
@@ -54,6 +56,7 @@ import {
   DrawTileMultiAnalyze6,
   CalcTileDiff,
   DrawTileDiff,
+  ConvolutionSmooth,
 } from './types';
 import * as util from './util';
 
@@ -87,8 +90,6 @@ export function getCommonDrawConfiguration(
     },
     attributes: {
       position: (_, { canvasCoordinates }) => {
-        // console.log("canvasCoordinates")
-        // console.log(canvasCoordinates)
         const [left, top] = canvasCoordinates;
         const [right, bottom] = [left + tileSize, top + tileSize];
         return [
@@ -139,12 +140,6 @@ export function createDrawTileCommand(
       deg2rad: deg2rad,
       slopeFactor: slopeFactor,
       tileSize: 0,
-      // textureSize: ({ viewportWidth, viewportHeight }) => (
-      //   [viewportWidth, viewportHeight]
-      // ),
-      // textureSize: ({ viewportWidth, viewportHeight }) => (
-      //   [viewportWidth, viewportHeight]
-      // ),
       textureSize: 0,
       textureBounds: [0, 0, 0, 0],
     },
@@ -176,21 +171,12 @@ export function createDrawTileHsSimpleCommand(
       sentinelValuesLength: (_, { sentinelValues }) => sentinelValues.length,
       texture: (_, { texture }) => texture,
       enableSimpleHillshade: (_, { enableSimpleHillshade }) => enableSimpleHillshade,
-      // enablePregenHillshade: (_, { enablePregenHillshade }) => enablePregenHillshade,
       azimuth: (_, { azimuth }) => azimuth,
       altitude: (_, { altitude }) => altitude,
       slopescale: (_, { slopescale }) => slopescale,
       deg2rad: deg2rad,
       slopeFactor: slopeFactor,
       offset: (_, { offset }) => offset,
-      // textureSize: [256, 256],
-      // textureSize: 256,
-      // textureSize: ({ viewportWidth }) => (
-      //   viewportWidth
-      // ),
-      // textureSize: ({ drawingBufferWidth }) => (
-      //   drawingBufferWidth
-      // ),
       textureBounds: (_, { textureBounds }) => {
         return [
           [textureBounds[0].x],
@@ -201,9 +187,6 @@ export function createDrawTileHsSimpleCommand(
       },
       textureSize: (_, { textureSize }) => textureSize,
       tileSize: (_, { tileSize }) => tileSize,
-      // textureSize: ({ viewportWidth, viewportHeight }) => (
-      //   [viewportWidth, viewportHeight]
-      // ),
       // u_slopescale: 0.5 * slopeFactor,
       // u_azimuthrad: azimuth * deg2rad,
       // u_altituderad: altitude * deg2rad,
@@ -865,13 +848,11 @@ export function createDrawTileDiffCommand(
       ...sentinelValuesUniforms,
       colorScaleLength: (_, { colorScale }) => colorScale.length,
       sentinelValuesLength: (_, { sentinelValues }) => sentinelValues.length,
-      // texture: (_, { texture }) => texture,
       textureA: regl.prop<DrawTileDiff.Props, 'textureA'>("textureA"),
       textureB: regl.prop<DrawTileDiff.Props, 'textureB'>("textureB"),
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      // texCoord: (_, { textureBounds }) => util.getTexCoordVertices(textureBounds),
       texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
       texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
     },
@@ -950,5 +931,32 @@ export function createDrawTileInterpolateColorOnlyCommand(
       ...commonConfig.attributes as DrawCommon.Attributes,
       texCoord: (_, { textureBounds }) => util.getTexCoordVertices(textureBounds),
     },
+  });
+}
+
+/**
+ * The resulting Regl DrawCommand is for using a convolution kernel to smooth the input data.
+ * Currently hard-coded the kernel and positions in the shader to reduce number of uniforms.
+ */
+export function createConvolutionSmoothCommand(
+  regl: REGL.Regl,
+  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
+) {
+  return regl<ConvolutionSmooth.Uniforms, ConvolutionSmooth.Attributes, ConvolutionSmooth.Props>({
+    vert: vertSmooth,
+    frag: util.defineMacros(fragConvolutionSmooth, fragMacros),
+    uniforms: {
+      ...commonConfig.uniforms as DrawCommon.Uniforms,
+      texture: regl.prop<ConvolutionSmooth.Props, 'texture'>("texture"),
+      textureSize: regl.prop<ConvolutionSmooth.Props, 'textureSize'>("textureSize"),
+      kernelSize: regl.prop<ConvolutionSmooth.Props, 'kernelSize'>("kernelSize"),
+    },
+    attributes: {
+      texCoord: [0, 1, 1, 1, 0, 0, 1, 0],
+      position: [-1, 1, 1, 1, -1, -1, 1, -1],
+    },
+    depth: { enable: false },
+    primitive: 'triangle strip',
+    count: 4,
   });
 }
