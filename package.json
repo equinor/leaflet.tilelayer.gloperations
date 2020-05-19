@@ -76,6 +76,7 @@
     "d3-request": "^1.0.6",
     "d3-scale": "^3.2.1",
     "d3-selection": "^1.4.1",
+    "glsl-float-to-rgba": "^1.0.0",
     "glsl-rgba-to-float": "^1.0.0",
     "lodash-es": "^4.17.14",
     "native-promise-only": "^0.8.1",

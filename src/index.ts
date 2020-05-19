@@ -6,10 +6,7 @@ import {
   pickBy,
   values,
   zipWith,
-  // isEqual,
 } from 'lodash-es';
-
-// import equal from 'fast-deep-equal';
 
 import './index.css';
 
@@ -44,7 +41,6 @@ import { contours } from "d3-contour";
 import { json } from "d3-request";
 import { min, max, scan, range } from "d3-array";
 import { interpolateHcl } from "d3-interpolate";
-// import { arc } from 'd3-shape'
 const d3 = { select, selectAll, scaleLinear, geoPath, contours, interpolateHcl,
   event, json, min, max, scan, range }
 
@@ -230,12 +226,12 @@ const defaultOptions = {
   multiplierF: 1,
 
   // Hillshading default options
-  hillshadeType: 'none', // none, simple, advanced or pregen
+  hillshadeType: 'none', // none, simple or pregen
   hsElevationScale: 1.0,
   hsSimpleZoomdelta: 0,
   hsSimpleSlopescale: 3.0,
-  hsSimpleAzimuth: 315, //225
-  hsSimpleAltitude: 70, //45
+  hsSimpleAzimuth: 315,
+  hsSimpleAltitude: 70,
   hsAdvSoftIterations: 128,
   hsAdvAmbientIterations: 40,
   hsAdvSunRadiusMultiplier: 100,
@@ -532,10 +528,6 @@ export default class GLOperations extends L.GridLayer {
         this.options.contourLabelDistance !== prevContourLabelDistance
       ) {
         this._drawContours();
-        // this._map.fire('contourDrawing', {status: true});
-        // setTimeout(() => {
-        //   this._drawContours();
-        // }, 50);
       }
     } else if (this.options.contourType !== prevContourType && this.options.contourType === 'none') {
       this._clearContours();
@@ -739,12 +731,7 @@ export default class GLOperations extends L.GridLayer {
           sentinelValues,
         );
 
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels.length; x += 4) {
-          newArr.push(resultEncodedPixels[x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tileCanvas.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tileCanvas.pixelData = <Uint8Array>resultEncodedPixels;
         tileCanvas.pixelDataA = pixelDataA;
         tileCanvas.pixelDataB = pixelDataB;
 
@@ -769,12 +756,7 @@ export default class GLOperations extends L.GridLayer {
         );
 
         // Copy pixel data to a property on tile canvas element (for later retrieval).
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels.length; x += 4) {
-          newArr.push(resultEncodedPixels[x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tileCanvas.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tileCanvas.pixelData = <Uint8Array>resultEncodedPixels;
         tileCanvas.pixelDataA = pixelDataA;
 
         // Copy contents to tileCanvas.
@@ -804,12 +786,7 @@ export default class GLOperations extends L.GridLayer {
         );
 
         // Copy pixel data to a property on tile canvas element (for later retrieval).
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels.length; x += 4) {
-          newArr.push(resultEncodedPixels[x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tileCanvas.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tileCanvas.pixelData = <Uint8Array>resultEncodedPixels;
         tileCanvas.pixelDataA = pixelDataA;
         tileCanvas.pixelDataB = pixelDataB;
 
@@ -846,12 +823,7 @@ export default class GLOperations extends L.GridLayer {
         );
 
         // Copy pixel data to a property on tile canvas element (for later retrieval).
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels.length; x += 4) {
-          newArr.push(resultEncodedPixels[x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tileCanvas.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tileCanvas.pixelData = <Uint8Array>resultEncodedPixels;
         tileCanvas.pixelDataA = pixelDataA;
         tileCanvas.pixelDataB = pixelDataB;
         tileCanvas.pixelDataC = pixelDataC;
@@ -895,12 +867,7 @@ export default class GLOperations extends L.GridLayer {
         );
 
         // Copy pixel data to a property on tile canvas element (for later retrieval).
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels.length; x += 4) {
-          newArr.push(resultEncodedPixels[x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tileCanvas.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tileCanvas.pixelData = <Uint8Array>resultEncodedPixels;
         tileCanvas.pixelDataA = pixelDataA;
         tileCanvas.pixelDataB = pixelDataB;
         tileCanvas.pixelDataC = pixelDataC;
@@ -951,12 +918,7 @@ export default class GLOperations extends L.GridLayer {
         );
 
         // Copy pixel data to a property on tile canvas element (for later retrieval).
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels.length; x += 4) {
-          newArr.push(resultEncodedPixels[x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tileCanvas.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tileCanvas.pixelData = <Uint8Array>resultEncodedPixels;
         tileCanvas.pixelDataA = pixelDataA;
         tileCanvas.pixelDataB = pixelDataB;
         tileCanvas.pixelDataC = pixelDataC;
@@ -1014,12 +976,7 @@ export default class GLOperations extends L.GridLayer {
         );
 
         // Copy pixel data to a property on tile canvas element (for later retrieval).
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels.length; x += 4) {
-          newArr.push(resultEncodedPixels[x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tileCanvas.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tileCanvas.pixelData = <Uint8Array>resultEncodedPixels;
         tileCanvas.pixelDataA = pixelDataA;
         tileCanvas.pixelDataB = pixelDataB;
         tileCanvas.pixelDataC = pixelDataC;
@@ -1106,7 +1063,7 @@ export default class GLOperations extends L.GridLayer {
     const { colorScale, sentinelValues = [] } = this.options;
 
     // Render using the new data.
-    let canvasCoordinates: Array<Pair<number>> = [[0, 0]];
+    let canvasCoordinates: Array<Pair<number>>;
     let tilesDataHs: TileDatum[];
     if (this.options._hillshadeOptions.hillshadeType === 'pregen') {
       tilesDataHs = await this._getTilesData(activeTiles, this.options.hsPregenUrl);
@@ -1406,7 +1363,7 @@ export default class GLOperations extends L.GridLayer {
         });
       };
 
-      let resultEncodedPixels: Float32Array[];
+      let resultEncodedPixels: Uint8Array[];
       resultEncodedPixels = this._renderer.renderTilesWithDiff(
         tilesA,
         tilesB,
@@ -1417,16 +1374,7 @@ export default class GLOperations extends L.GridLayer {
 
       // Copy result pixel data to tiles to use for mouseEvents.
       activeTiles.forEach((tile, index) => {
-        // readPixels returns the float values in each RGBA channel.
-        // Extract one channel
-        // TODO: Pull request to regl to update readPixels to also accept formats: gl.RGB and gl.ALPHA?
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels[index].length; x += 4) {
-          newArr.push(resultEncodedPixels[index][x]);
-        }
-
-        let newFloatArrayTest = new Float32Array(newArr);
-        tile.el.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tile.el.pixelData = resultEncodedPixels[index];
       });
     }
   }
@@ -1507,7 +1455,7 @@ export default class GLOperations extends L.GridLayer {
       };
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
-      let resultEncodedPixels: Float32Array[] = this._renderer.renderTilesWithMultiAnalyze1(
+      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze1(
         tilesA,
         newColorScale,
         newSentinelValues,
@@ -1519,15 +1467,7 @@ export default class GLOperations extends L.GridLayer {
 
       // Copy result pixel data to tiles to use for mouseEvents.
       activeTiles.forEach((tile, index) => {
-        // readPixels returns the (identical) float values in each RGBA channel.
-        // Extract one channel to Float32Array
-        // TODO: Pull request to regl to update readPixels to also accept formats: gl.RGB and gl.ALPHA?
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels[index].length; x += 4) {
-          newArr.push(resultEncodedPixels[index][x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tile.el.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tile.el.pixelData = resultEncodedPixels[index];
       });
     }
   }
@@ -1633,7 +1573,7 @@ export default class GLOperations extends L.GridLayer {
       };
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
-      let resultEncodedPixels: Float32Array[] = this._renderer.renderTilesWithMultiAnalyze2(
+      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze2(
         tilesA,
         tilesB,
         newColorScale,
@@ -1649,15 +1589,7 @@ export default class GLOperations extends L.GridLayer {
 
       // Copy result pixel data to tiles to use for mouseEvents.
       activeTiles.forEach((tile, index) => {
-        // readPixels returns the (identical) float values in each RGBA channel.
-        // Extract one channel to Float32Array
-        // TODO: Pull request to regl to update readPixels to also accept formats: gl.RGB and gl.ALPHA?
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels[index].length; x += 4) {
-          newArr.push(resultEncodedPixels[index][x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tile.el.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tile.el.pixelData = resultEncodedPixels[index];
       });
     }
   }
@@ -1788,7 +1720,7 @@ export default class GLOperations extends L.GridLayer {
       };
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
-      let resultEncodedPixels: Float32Array[] = this._renderer.renderTilesWithMultiAnalyze3(
+      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze3(
         tilesA,
         tilesB,
         tilesC,
@@ -1808,15 +1740,7 @@ export default class GLOperations extends L.GridLayer {
 
       // Copy result pixel data to tiles to use for mouseEvents.
       activeTiles.forEach((tile, index) => {
-        // readPixels returns the (identical) float values in each RGBA channel.
-        // Extract one channel to Float32Array
-        // TODO: Pull request to regl to update readPixels to also accept formats: gl.RGB and gl.ALPHA?
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels[index].length; x += 4) {
-          newArr.push(resultEncodedPixels[index][x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tile.el.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tile.el.pixelData = resultEncodedPixels[index];
       });
     }
   }
@@ -1971,7 +1895,8 @@ export default class GLOperations extends L.GridLayer {
       };
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
-      let resultEncodedPixels: Float32Array[] = this._renderer.renderTilesWithMultiAnalyze4(
+      // let resultEncodedPixels: Float32Array[] = this._renderer.renderTilesWithMultiAnalyze4(
+      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze4(
         tilesA,
         tilesB,
         tilesC,
@@ -1995,15 +1920,7 @@ export default class GLOperations extends L.GridLayer {
 
       // Copy result pixel data to tiles to use for mouseEvents.
       activeTiles.forEach((tile, index) => {
-        // readPixels returns the (identical) float values in each RGBA channel.
-        // Extract one channel to Float32Array
-        // TODO: Pull request to regl to update readPixels to also accept formats: gl.RGB and gl.ALPHA?
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels[index].length; x += 4) {
-          newArr.push(resultEncodedPixels[index][x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tile.el.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tile.el.pixelData = resultEncodedPixels[index];
       });
     }
   }
@@ -2183,7 +2100,7 @@ export default class GLOperations extends L.GridLayer {
       };
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
-      let resultEncodedPixels: Float32Array[] = this._renderer.renderTilesWithMultiAnalyze5(
+      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze5(
         tilesA,
         tilesB,
         tilesC,
@@ -2211,15 +2128,7 @@ export default class GLOperations extends L.GridLayer {
 
       // Copy result pixel data to tiles to use for mouseEvents.
       activeTiles.forEach((tile, index) => {
-        // readPixels returns the (identical) float values in each RGBA channel.
-        // Extract one channel to Float32Array
-        // TODO: Pull request to regl to update readPixels to also accept formats: gl.RGB and gl.ALPHA?
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels[index].length; x += 4) {
-          newArr.push(resultEncodedPixels[index][x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tile.el.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tile.el.pixelData = resultEncodedPixels[index];
       });
     }
   }
@@ -2426,7 +2335,7 @@ export default class GLOperations extends L.GridLayer {
       };
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
-      let resultEncodedPixels: Float32Array[] = this._renderer.renderTilesWithMultiAnalyze6(
+      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze6(
         tilesA,
         tilesB,
         tilesC,
@@ -2458,15 +2367,7 @@ export default class GLOperations extends L.GridLayer {
 
       // Copy result pixel data to tiles to use for mouseEvents.
       activeTiles.forEach((tile, index) => {
-        // readPixels returns the (identical) float values in each RGBA channel.
-        // Extract one channel to Float32Array
-        // TODO: Pull request to regl to update readPixels to also accept formats: gl.RGB and gl.ALPHA?
-        let newArr = [];
-        for(let x = 0; x < resultEncodedPixels[index].length; x += 4) {
-          newArr.push(resultEncodedPixels[index][x]);
-        }
-        let newFloatArrayTest = new Float32Array(newArr);
-        tile.el.pixelData = new Uint8Array(newFloatArrayTest.buffer);
+        tile.el.pixelData = resultEncodedPixels[index];
       });
     }
   }
@@ -2737,10 +2638,11 @@ export default class GLOperations extends L.GridLayer {
     mergedPixelData = mergedPixelData.map(function(item) {
       // TODO: Assuming noDataValue is set to default (-999999). Need to fix.
       if(item < -900000) {
+      // if(item === this.options.nodataValue) {
         item = NaN;
       }
       return item;
-    });
+    }, this);
 
     let mergedPixelArray: number[] = Array.from(mergedPixelData);
 
@@ -2785,7 +2687,7 @@ export default class GLOperations extends L.GridLayer {
    * Calculate new contours and draw on seperate canvas
    */
   protected async _smoothContourInput() {
-    if (this.options.debug) console.log("_smoothContourInput()")
+    if (this.options.debug) console.log("_smoothContourInput()");
     let valuesNan = <number[]>this._contourData.mergedTileArray;
     let valuesNoNan = valuesNan.map(function(item) {
       //TODO: fix for other noDataValues
@@ -2806,9 +2708,9 @@ export default class GLOperations extends L.GridLayer {
     //TODO fix for nodataValue other than default
     //Replace nodata with NaN
     let newArr = [];
-    for(let x = 0; x < resultEncodedPixels.length; x += 4) {
+    for(let x = 0; x < resultEncodedPixels.length; x += 1) {
       let value = resultEncodedPixels[x];
-      if(value < -900000) {
+      if(value === this.options.nodataValue) {
         value = NaN;
       }
       newArr.push(value);
@@ -2869,9 +2771,8 @@ export default class GLOperations extends L.GridLayer {
 
     if (this.options.debug) {console.log("valuesArray"); console.log(values)};
 
-    //TODO: Assuming noDataValue is set to default (-999999). Need to fix.
-    let max = <number>d3.max(values);
-    let min = <number>d3.min(values, d => d >= -900000 ? d : NaN);
+    let max = <number>d3.max(values, d => d !== this.options.nodataValue ? d : NaN);
+    let min = <number>d3.min(values, d => d !== this.options.nodataValue ? d : NaN);
     max = Math.ceil(max/this.options.contourInterval) * this.options.contourInterval;
     min = Math.floor(min/this.options.contourInterval) * this.options.contourInterval;
     if (this.options.debug) {console.log("Contours: max"); console.log(max)};
