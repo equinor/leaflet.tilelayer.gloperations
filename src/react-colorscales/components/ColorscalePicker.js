@@ -349,7 +349,7 @@ export default class ColorscalePicker extends Component {
         className={colorscalePickerContainerClassnames}
         style={{width: this.props.width || '300px'}}
       >
-        <div className="colorscalePickerTopContainer">
+        {/* <div className="colorscalePickerTopContainer">
           <Select
             options={colorscaleOptions}
             value={this.state.colorscaleType}
@@ -359,7 +359,7 @@ export default class ColorscalePicker extends Component {
             clearable={false}
             searchable={false}
           />
-        </div>
+        </div> */}
 
         <ColorscalePaletteSelector
           colorscaleType={

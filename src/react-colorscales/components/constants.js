@@ -2,11 +2,11 @@ import chroma from "chroma-js";
 
 export const COLORSCALE_TYPES = [
   "sequential",
-  "divergent",
+  // "divergent",
   // "categorical",
   // "cyclical",
   // "cubehelix",
-  "cmocean",
+  // "cmocean",
   // "custom"
 ];
 
@@ -82,7 +82,7 @@ export const BUILTINS = {
   sequential: {
     Viridis: [
       "#440154",
-      "#482878",
+      // "#482878",
       "#3e4989",
       "#31688e",
       "#26828e",
@@ -92,31 +92,31 @@ export const BUILTINS = {
       "#b5de2b",
       "#fde725"
     ],
-    'Parula': [
-      "#352a87",
-      "#343eaf",
-      "#1957d8",
-      "#046ce0",
-      "#1079da",
-      "#1487d3",
-      "#0a97d1",
-      "#06a4ca",
-      "#0cadbc",
-      "#22b4ab",
-      "#43bb97",
-      "#69be84",
-      "#8fbf74",
-      "#aebe67",
-      "#cabb5c",
-      "#e6b94f",
-      "#fdbe3e",
-      "#fbcf2c",
-      "#f5e11f",
-      "#f9fb0e"
-    ],
+    // 'Parula': [
+    //   "#352a87",
+    //   "#343eaf",
+    //   "#1957d8",
+    //   "#046ce0",
+    //   "#1079da",
+    //   "#1487d3",
+    //   "#0a97d1",
+    //   "#06a4ca",
+    //   "#0cadbc",
+    //   "#22b4ab",
+    //   "#43bb97",
+    //   "#69be84",
+    //   "#8fbf74",
+    //   "#aebe67",
+    //   "#cabb5c",
+    //   "#e6b94f",
+    //   "#fdbe3e",
+    //   "#fbcf2c",
+    //   "#f5e11f",
+    //   "#f9fb0e"
+    // ],
     Cividis: [
       "#00224e",
-      "#123570",
+      // "#123570",
       "#3b496c",
       "#575d6d",
       "#707173",
@@ -129,7 +129,7 @@ export const BUILTINS = {
 
     Inferno: [
       "#000004",
-      "#1b0c41",
+      // "#1b0c41",
       "#4a0c6b",
       "#781c6d",
       "#a52c60",
@@ -141,7 +141,7 @@ export const BUILTINS = {
     ],
     Magma: [
       "#000004",
-      "#180f3d",
+      // "#180f3d",
       "#440f76",
       "#721f81",
       "#9e2f7f",
@@ -153,7 +153,7 @@ export const BUILTINS = {
     ],
     Plasma: [
       "#0d0887",
-      "#46039f",
+      // "#46039f",
       "#7201a8",
       "#9c179e",
       "#bd3786",

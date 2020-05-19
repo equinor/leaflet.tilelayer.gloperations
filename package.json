@@ -4,7 +4,7 @@
   "description": "Try it out [here](https://equinor.github.io/leaflet.tilelayer.gloperations/). You can find the demo code in the `gh-pages` branch.",
   "main": "index.js",
   "scripts": {
-    "dev": "webpack-serve",
+    "dev": "webpack-serve --host 0.0.0.0",
     "build": "webpack --mode production"
   },
   "author": "Thorbjorn Horgen",
@@ -37,6 +37,7 @@
     "rc-slider": "^9.2.4",
     "rc-tooltip": "^4.0.3",
     "react": "^16.13.1",
+    "react-burger-menu": "^2.6.13",
     "react-color": "^2.18.0",
     "react-colorscales": "^0.7.3",
     "react-dom": "^16.13.1",

@@ -409,7 +409,7 @@ const Navigation = ({tileLayer}) => {
 
   return (
     <div>
-      <div style={{margin: 5}}><span className='title'><a href="https://github.com/equinor/leaflet.tilelayer.gloperations">{`Leaflet.TileLayer.GLOperations demo`}</a></span></div>
+      {/* <div style={{margin: 5}}><span className='title'><a href="https://github.com/equinor/leaflet.tilelayer.gloperations">{`Leaflet.TileLayer.GLOperations demo`}</a></span></div> */}
       <Collapse accordion onChange={accordionCallback}>
         <Panel header="Colorscale" key="colorscale">
           <p>Basic usage. Change the tileUrl and the colorscale.</p>
@@ -465,13 +465,10 @@ const Navigation = ({tileLayer}) => {
               width={282}
               fixSwatches={true}
               disableSwatchControls={false}
-              nSwatches={16}
+              nSwatches={10}
               scaleLength={5}
             />
           )}
-        </Panel>
-        <Panel header="Sentinel values" key="sentinels">
-            <p>In addition to linear color scales, it's possible to specify "sentinel values," which map discrete values to colors. You can set a label for each value which will be returned in mouseEvents. The example here shows reservoir facies at a certain depth.</p>
         </Panel>
         <Panel header="Transitions" key="transitions">
           <p>{'This tile layer supports animated transitions when changing either the URL or the color scale. You can specify the transition time (in milliseconds) with the Options property transitionTimeMs. If you do not want transitions, you can turn them off by setting { transitions: false } in the Options object. Transitions are currently only implemented with glOperation="none".'}</p>
@@ -486,6 +483,9 @@ const Navigation = ({tileLayer}) => {
           Transitions: <Switch size="small" checked={transitions} onChange={handleTransitionChange} />
           <br></br>
           Transition time: <Input style={{ width: '85px' }} size="small" step={100} type={`number`} defaultValue="1500" disabled={!transitions} onChange={handleTransitionTimeChange} /> ms
+        </Panel>
+        <Panel header="Sentinel values" key="sentinels">
+            <p>In addition to linear color scales, it's possible to specify "sentinel values," which map discrete values to colors. You can set a label for each value which will be returned in mouseEvents. The example here shows reservoir facies at a certain depth.</p>
         </Panel>
         <Panel header="Contours" key="contours">
           <p>{`Contours is a work in progress. It is not using WebGL and the tiles have to be merged to a single canvas before calculating contours. This means it is slower than the other operations of this plugin. Contours are currently only implemented with glOperation="none". Labels are only implemented for contourType='lines'. Index interval needs to be a multiple of countour interval.`}</p>

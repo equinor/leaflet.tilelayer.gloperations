@@ -37,7 +37,7 @@ export default class Renderer {
     calcTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze6.Props>;
     drawTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze6.Props>;
     convolutionSmooth: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
-    constructor(tileSize: number, nodataValue: number);
+    constructor(tileSize: number, nodataValue: number, colorscaleMaxLength: number, sentinelMaxLength: number);
     setMaxTextureDimension(newMaxTextureDimension: number): void;
     findMaxTextureDimension(): number;
     renderTile({ coords, pixelData }: TileDatum, colorScale: Color[], sentinelValues: SentinelValue[], _hillshadeOptions: HillshadeOptions, zoom?: number): Pair<number>;

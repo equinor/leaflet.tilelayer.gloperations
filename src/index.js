@@ -10,6 +10,13 @@ import './leaflet-messagebox.js';
 
 import Navigation from './Navigation.js'
 
+window.onload = function() {
+  document.getElementById('burger').addEventListener('click', function (e) {
+    document.getElementById("nav").classList.toggle('menuClosed');
+  })
+};
+
+
 // Show this many places after the decimal when displaying pixel value.
 var VALUE_DISPLAY_PRECISION = 2;
 
@@ -56,6 +63,8 @@ window.tileLayer = new GLOperations({
   nodataValue: -999999,
   noWrap: true,
   transitions: false,
+  colorscaleMaxLength: 10,
+  sentinelMaxLength: 3,
   hillshadeType: 'none',
   hsElevationScale: 1,
   hsSimpleSlopescale: 3,

@@ -20,6 +20,8 @@ export interface Options extends L.GridLayerOptions {
     colorScale?: Color[];
     sentinelValues?: SentinelValue[];
     extraPixelLayers?: number;
+    colorscaleMaxLength?: number;
+    sentinelMaxLength?: number;
     preloadUrl?: string;
     glOperation?: string;
     multiLayers?: number;
@@ -118,6 +120,8 @@ declare const defaultOptions: {
     transitionTimeMs: number;
     debug: boolean;
     extraPixelLayers: number;
+    colorscaleMaxLength: number;
+    sentinelMaxLength: number;
     minZoom: number;
     maxZoom: number;
     subdomains: string;
@@ -195,8 +199,6 @@ declare const defaultOptions: {
 };
 export declare type InternalOptions = Options & typeof defaultOptions;
 export default class GLOperations extends L.GridLayer {
-    static readonly SCALE_MAX_LENGTH: number;
-    static readonly SENTINEL_MAX_LENGTH: number;
     static readonly defaultOptions: {
         colorScale: never[];
         sentinelValues: never[];
@@ -204,6 +206,8 @@ export default class GLOperations extends L.GridLayer {
         transitionTimeMs: number;
         debug: boolean;
         extraPixelLayers: number;
+        colorscaleMaxLength: number;
+        sentinelMaxLength: number;
         minZoom: number;
         maxZoom: number;
         subdomains: string;
