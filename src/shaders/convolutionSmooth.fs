@@ -6,6 +6,7 @@ precision mediump float;
 #endif
 
 #pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
+#pragma glslify: floatToRgba = require(glsl-float-to-rgba)
 #pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
 
 uniform sampler2D texture;
@@ -49,10 +50,12 @@ float runConvKernel(vec2 pos, vec2 onePixel) {
 void main() {
   float texelFloat = getTexelValue(vTexCoord);
   if (isCloseEnough(texelFloat, nodataValue)) {
-    gl_FragColor = vec4(nodataValue);
+    // gl_FragColor = vec4(nodataValue);
+    gl_FragColor = floatToRgba(nodataValue, littleEndian);
   } else {
     vec2 onePixel = vec2(1.0, 1.0) / textureSize;
     float texelFloatSmoothed = runConvKernel(vTexCoord, onePixel);
-    gl_FragColor = vec4(texelFloatSmoothed);
+    // gl_FragColor = vec4(texelFloatSmoothed);
+    gl_FragColor = floatToRgba(texelFloatSmoothed, littleEndian);
   }
 }

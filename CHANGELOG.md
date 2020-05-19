@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Workaround to remove dependency on 'OES_texture_float' extension.
+
 ## [0.2.0]
 
 ### Added

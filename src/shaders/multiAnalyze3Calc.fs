@@ -1,13 +1,13 @@
-// #ifdef GL_FRAGMENT_PRECISION_HIGH
-// precision highp float;
-// #else
-// precision mediump float;
-// #endif
-
+#ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
+#else
+precision mediump float;
+#endif
+
 precision highp sampler2D;
 
 #pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
+#pragma glslify: floatToRgba = require(glsl-float-to-rgba)
 #pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
 
 uniform sampler2D textureA;
@@ -48,9 +48,9 @@ void main() {
       texelFloatB < filterLowB || texelFloatB > filterHighB ||
       texelFloatC < filterLowC || texelFloatC > filterHighC
       ) {
-    gl_FragColor = vec4(nodataValue);
+    gl_FragColor = floatToRgba(nodataValue, littleEndian);
   } else {
     float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC;
-    gl_FragColor = vec4(texelFloatFinal);
+    gl_FragColor = floatToRgba(texelFloatFinal, littleEndian);
   }
 }

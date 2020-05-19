@@ -54,7 +54,6 @@ export default class Renderer {
   textureManagerD: TextureManager;
   textureManagerE: TextureManager;
   textureManagerF: TextureManager;
-  // textureManagerConvolution: TextureManager;
   textureManagerHillshade: TextureManager;
   tileSize: number;
   fboTile: Framebuffer2D;
@@ -82,9 +81,6 @@ export default class Renderer {
   calcTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze6.Props>;
   drawTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze6.Props>;
   convolutionSmooth: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
-  // convolutionSmooth5: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
-  // convolutionSmooth7: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
-  // convolutionSmooth9: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
 
   constructor(tileSize: number, nodataValue: number) {
     const canvas = L.DomUtil.create('canvas') as HTMLCanvasElement;
@@ -92,8 +88,6 @@ export default class Renderer {
 
     const regl = REGL({
       canvas: canvas,
-      // only guarantees reading from float texture, not writing to.
-      optionalExtensions: ["OES_texture_float"],
       onDone: function (err: Error, regl: REGL.Regl) {
         if (err) {
           console.log(err)
@@ -106,10 +100,6 @@ export default class Renderer {
           } else if (regl.limits.maxTextureSize > 4096) {
             maxTextureDimension = 4096;
           };
-        }
-        if (!regl.hasExtension('OES_texture_float')) {
-          // TODO: Use glsl-rgba-to-float etc. to pack/unpack float values to RGBA if OES_texture_float not available
-          console.log("OES_texture_float not supported")
         }
         // TODO: Improve software rendering detection
         if (regl.limits.maxFragmentUniforms === 261) {
@@ -155,9 +145,6 @@ export default class Renderer {
       drawTileDiff: commands.createDrawTileDiffCommand(regl, commonDrawConfig),
       calcTileDiff: commands.createCalcTileDiffCommand(regl, commonDrawConfig),
       convolutionSmooth: commands.createConvolutionSmoothCommand(regl, commonDrawConfig),
-      // convolutionSmooth5: commands.createConvolutionSmooth5Command(regl, commonDrawConfig),
-      // convolutionSmooth7: commands.createConvolutionSmooth7Command(regl, commonDrawConfig),
-      // convolutionSmooth9: commands.createConvolutionSmooth9Command(regl, commonDrawConfig),
     });
   }
 
@@ -205,7 +192,6 @@ export default class Renderer {
       textureManager,
       tileSize,
     } = this;
-    // Set canvas size.
     this.setCanvasSize(tileSize, tileSize);
     // Add image to the texture and retrieve its texture coordinates.
     const textureBounds = textureManager.addTile(coords, pixelData);
@@ -237,7 +223,6 @@ export default class Renderer {
         texture: textureManager.texture,
         textureSize: textureManager.texture.width,
         tileSize: tileSize,
-        // TODO: Fix offset to work for global zoom. Custom for my map atm...
         offset: offset_texcoords,
         enableSimpleHillshade: true,
         // elevationScale: _hillshadeOptions.hsElevationScale,
@@ -264,7 +249,6 @@ export default class Renderer {
       textureManagerHillshade,
       tileSize,
     } = this;
-    // Set canvas size.
     this.setCanvasSize(tileSize, tileSize);
     // Add image to the texture and retrieve its texture coordinates.
     const textureBounds = textureManager.addTile(tileDatum.coords, tileDatum.pixelData);
@@ -289,9 +273,10 @@ export default class Renderer {
 
 
   // TODO: Render to a fbo using a texture with flipY and this should not be necessary?
-  flipReadPixels(
+  flipReadPixelsFloat(
     width: number,
     height: number,
+    // pixels: Float32Array | Uint8Array,
     pixels: Float32Array,
   ) {
     let halfHeight = height / 2 | 0;  // the | 0 keeps the result an int
@@ -312,12 +297,37 @@ export default class Renderer {
     return pixels
   }
 
+  /**
+   * WebGL uses [0,0] coordinate at top, not bottom. Use this function to flip readPixel results.
+   */
+  flipReadPixelsUint(
+    width: number,
+    height: number,
+    pixels: Uint8Array,
+  ) {
+    let halfHeight = height / 2 | 0;  // the | 0 keeps the result an int
+    let bytesPerRow = width * 4;
+
+    // make a temp buffer to hold one row
+    var temp = new Uint8Array(width * 4);
+    for (var y = 0; y < halfHeight; ++y) {
+      var topOffset = y * bytesPerRow;
+      var bottomOffset = (height - y - 1) * bytesPerRow;
+      // make copy of a row on the top half
+      temp.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
+      // copy a row from the bottom half to the top
+      pixels.copyWithin(topOffset, bottomOffset, bottomOffset + bytesPerRow);
+      // copy the copy of the top half row to the bottom half
+      pixels.set(temp, bottomOffset);
+    }
+    return pixels
+  }
+
   renderTileDiff(
     tileDatumA: TileDatum,
     tileDatumB: TileDatum,
     colorScale: Color[],
     sentinelValues: SentinelValue[],
-    // enableHillshade: boolean,
   ): calcResult {
     const {
       regl,
@@ -325,7 +335,6 @@ export default class Renderer {
       textureManagerB,
       tileSize,
     } = this;
-    // Set canvas size.
     this.setCanvasSize(tileSize, tileSize);
 
     // Add image to the texture and retrieve its texture coordinates.
@@ -337,11 +346,10 @@ export default class Renderer {
       height: tileSize,
       depth: false,
       colorFormat: 'rgba',
-      // colorType: "uint8"
-      colorType: "float"
+      colorType: 'uint8',
     });
 
-    let resultEncodedPixels = new Float32Array(tileSize * tileSize * 4);
+    let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
     fboTile.use(() => {
       this.calcTileDiff({
@@ -358,15 +366,13 @@ export default class Renderer {
     });
 
     // Flip readPixels result
-    resultEncodedPixels = this.flipReadPixels(tileSize, tileSize, resultEncodedPixels);
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     this.drawTileDiff({
       colorScale: util.convertColorScale(colorScale),
       sentinelValues: util.convertColorScale(sentinelValues),
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
-      // texture: fboTile,
-      // textureBounds: textureBoundsA,
       textureA: textureManagerA.texture,
       textureB: textureManagerB.texture,
       textureBoundsA: textureBoundsA,
@@ -402,10 +408,10 @@ export default class Renderer {
       height: height,
       depth: false,
       colorFormat: 'rgba',
-      colorType: "float"
+      colorType: 'uint8'
     });
 
-    let resultEncodedPixels = new Float32Array(width * height * 4);
+    let resultEncodedPixels: Uint8Array | Float32Array = new Uint8Array(width * height * 4);
 
     fboSmoothed.use(() => {
       this.convolutionSmooth({
@@ -416,6 +422,8 @@ export default class Renderer {
       });
       regl.read({data: resultEncodedPixels});
     });
+
+    resultEncodedPixels = new Float32Array(resultEncodedPixels.buffer);
 
     fboSmoothed.destroy();
 
@@ -446,11 +454,10 @@ export default class Renderer {
       height: tileSize,
       depth: false,
       colorFormat: 'rgba',
-      // colorType: "uint8"
-      colorType: "float"
+      colorType: 'uint8'
     });
 
-    let resultEncodedPixels = new Float32Array(tileSize * tileSize * 4);
+    let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
     fboTile.use(() => {
       this.calcTileMultiAnalyze1({
@@ -468,7 +475,7 @@ export default class Renderer {
     });
 
     // Flip readPixels result
-    resultEncodedPixels = this.flipReadPixels(tileSize, tileSize, resultEncodedPixels);
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     // draw result.
     this.drawTileMultiAnalyze1({
@@ -519,11 +526,10 @@ export default class Renderer {
       height: tileSize,
       depth: false,
       colorFormat: 'rgba',
-      // colorType: "uint8"
-      colorType: "float"
+      colorType: 'uint8'
     });
 
-    let resultEncodedPixels = new Float32Array(tileSize * tileSize * 4);
+    let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
     fboTile.use(() => {
       this.calcTileMultiAnalyze2({
@@ -546,7 +552,7 @@ export default class Renderer {
     });
 
     // Flip readPixels result
-    resultEncodedPixels = this.flipReadPixels(tileSize, tileSize, resultEncodedPixels);
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     // draw result.
     this.drawTileMultiAnalyze2({
@@ -609,11 +615,10 @@ export default class Renderer {
       height: tileSize,
       depth: false,
       colorFormat: 'rgba',
-      // colorType: "uint8"
-      colorType: "float"
+      colorType: 'uint8'
     });
 
-    let resultEncodedPixels = new Float32Array(tileSize * tileSize * 4);
+    let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
     fboTile.use(() => {
       this.calcTileMultiAnalyze3({
@@ -641,7 +646,7 @@ export default class Renderer {
     });
 
     // Flip readPixels result
-    resultEncodedPixels = this.flipReadPixels(tileSize, tileSize, resultEncodedPixels);
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     // draw result.
     this.drawTileMultiAnalyze3({
@@ -714,11 +719,10 @@ export default class Renderer {
       height: tileSize,
       depth: false,
       colorFormat: 'rgba',
-      // colorType: "uint8"
-      colorType: "float"
+      colorType: 'uint8'
     });
 
-    let resultEncodedPixels = new Float32Array(tileSize * tileSize * 4);
+    let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
     fboTile.use(() => {
       this.calcTileMultiAnalyze4({
@@ -751,7 +755,7 @@ export default class Renderer {
     });
 
     // Flip readPixels result
-    resultEncodedPixels = this.flipReadPixels(tileSize, tileSize, resultEncodedPixels);
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     // draw result.
     this.drawTileMultiAnalyze4({
@@ -835,11 +839,10 @@ export default class Renderer {
       height: tileSize,
       depth: false,
       colorFormat: 'rgba',
-      // colorType: "uint8"
-      colorType: "float"
+      colorType: 'uint8'
     });
 
-    let resultEncodedPixels = new Float32Array(tileSize * tileSize * 4);
+    let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
     fboTile.use(() => {
       this.calcTileMultiAnalyze5({
@@ -877,7 +880,7 @@ export default class Renderer {
     });
 
     // Flip readPixels result
-    resultEncodedPixels = this.flipReadPixels(tileSize, tileSize, resultEncodedPixels);
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     this.drawTileMultiAnalyze5({
       colorScale: util.convertColorScale(colorScale),
@@ -971,11 +974,10 @@ export default class Renderer {
       height: tileSize,
       depth: false,
       colorFormat: 'rgba',
-      // colorType: "uint8"
-      colorType: "float"
+      colorType: 'uint8'
     });
 
-    let resultEncodedPixels = new Float32Array(tileSize * tileSize * 4);
+    let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
     fboTile.use(() => {
       this.calcTileMultiAnalyze6({
@@ -1018,7 +1020,7 @@ export default class Renderer {
     });
 
     // Flip readPixels result
-    resultEncodedPixels = this.flipReadPixels(tileSize, tileSize, resultEncodedPixels);
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     this.drawTileMultiAnalyze6({
       colorScale: util.convertColorScale(colorScale),
@@ -1070,11 +1072,6 @@ export default class Renderer {
     sentinelValues: SentinelValue[],
     _hillshadeOptions: HillshadeOptions,
     zoom: number = 0,
-    // enableHillshade: boolean,
-    // azimuth: number,
-    // altitude: number,
-    // slopescale: number,
-    // textureSize: REGL.Vec2[],
   ): Array<Pair<number>> {
     const {
       regl,
@@ -1125,20 +1122,6 @@ export default class Renderer {
         ({ coords, pixelData }) => textureManager.addTile(coords, pixelData),
       );
 
-      // Render each tile.
-      // this.drawTile(chunk.map(({ canvasCoords }, index) => ({
-      //   colorScale: webGLColorScale,
-      //   sentinelValues: webGLSentinelValues,
-      //   canvasSize,
-      //   canvasCoordinates: canvasCoords,
-      //   textureBounds: textureBounds[index],
-      //   texture: textureManager.texture,
-      //   enableHillshade: enableHillshade,
-      //   azimuth: azimuth,
-      //   altitude: altitude,
-      //   slopescale: slopescale,
-      // })));
-
       let offset_pixels = Math.max(0.5, 2 ** (zoom + zoomdelta) / 2048);
       let offset_texcoords = offset_pixels / textureManager.texture.width;
 
@@ -1185,7 +1168,6 @@ export default class Renderer {
       regl,
       textureManager,
       textureManagerHillshade,
-      // tileSize,
     } = this;
 
     // Compute required canvas dimensions, then resize the canvas.
@@ -1194,8 +1176,6 @@ export default class Renderer {
 
     // Compute the coordinates at which each tile will be rendered in the canvas.
     const canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tiles.length);
-
-    // type TileWithCanvasCoords = TileDatum & { canvasCoords: Pair<number> };
 
     interface TilesWithCanvasCoords {
       canvasCoords: Pair<number>;
@@ -1252,18 +1232,13 @@ export default class Renderer {
         textureBounds: textureBounds[index],
         textureBoundsHs: textureBoundsHs[index],
         texture: textureManager.texture,
-        // enableSimpleHillshade: false,
         hillshadePregenTexture: textureManagerHillshade.texture,
       })));
     }
 
-    // this.textureManagerHillshade.destroy();
-    // this.textureManagerHillshade = new TextureManager(regl, tileSize, MAX_TEXTURE_DIMENSION, false);
-
     return canvasCoordinates;
   }
 
-  // async renderTilesWithDiff(
   renderTilesWithDiff(
     tilesA: TileDatum[],
     tilesB: TileDatum[],
@@ -1310,7 +1285,8 @@ export default class Renderer {
     const webGLColorScale = util.convertColorScale(colorScale);
     const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
-    let resultEncodedPixels: Float32Array[] = [];
+    // let resultEncodedPixels: Float32Array[] = [];
+    let resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -1338,11 +1314,10 @@ export default class Renderer {
             height: tileSize,
             depth: false,
             colorFormat: 'rgba',
-            // colorType: "uint8"
-            colorType: "float"
+            colorType: 'uint8',
           });
 
-          let resultEncodedPixelsTile = new Float32Array(tileSize * tileSize * 4);
+          let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
           fboTile.use(() => {
             this.calcTileDiff({
@@ -1357,7 +1332,7 @@ export default class Renderer {
           });
 
           // Flip readPixels result
-          resultEncodedPixelsTile = this.flipReadPixels(tileSize, tileSize, resultEncodedPixelsTile);
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
@@ -1367,8 +1342,6 @@ export default class Renderer {
             sentinelValues: webGLSentinelValues,
             canvasSize,
             canvasCoordinates: canvasCoords,
-            // texture: fboTile,
-            // textureBounds: tilesABounds[index],
             textureA: textureManagerA.texture,
             textureB: textureManagerB.texture,
             textureBoundsA: tilesABounds[index],
@@ -1438,7 +1411,7 @@ export default class Renderer {
     const webGLColorScale = util.convertColorScale(colorScale);
     const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
-    let resultEncodedPixels: Float32Array[] = [];
+    let resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -1463,11 +1436,10 @@ export default class Renderer {
             height: tileSize,
             depth: false,
             colorFormat: 'rgba',
-            // colorType: "uint8"
-            colorType: "float"
+            colorType: 'uint8'
           });
 
-          let resultEncodedPixelsTile = new Float32Array(tileSize * tileSize * 4);
+          let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
           fboTile.use(() => {
             this.calcTileMultiAnalyze1({
@@ -1486,7 +1458,7 @@ export default class Renderer {
 
 
           // Flip readPixels result
-          resultEncodedPixelsTile = this.flipReadPixels(tileSize, tileSize, resultEncodedPixelsTile);
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
@@ -1572,7 +1544,7 @@ export default class Renderer {
     const webGLColorScale = util.convertColorScale(colorScale);
     const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
-    let resultEncodedPixels: Float32Array[] = [];
+    let resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -1600,11 +1572,10 @@ export default class Renderer {
             height: tileSize,
             depth: false,
             colorFormat: 'rgba',
-            // colorType: "uint8"
-            colorType: "float"
+            colorType: 'uint8'
           });
 
-          let resultEncodedPixelsTile = new Float32Array(tileSize * tileSize * 4);
+          let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
           fboTile.use(() => {
             this.calcTileMultiAnalyze2({
@@ -1628,7 +1599,7 @@ export default class Renderer {
 
 
           // Flip readPixels result
-          resultEncodedPixelsTile = this.flipReadPixels(tileSize, tileSize, resultEncodedPixelsTile);
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
@@ -1730,7 +1701,7 @@ export default class Renderer {
     const webGLColorScale = util.convertColorScale(colorScale);
     const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
-    let resultEncodedPixels: Float32Array[] = [];
+    let resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -1761,11 +1732,10 @@ export default class Renderer {
             height: tileSize,
             depth: false,
             colorFormat: 'rgba',
-            // colorType: "uint8"
-            colorType: "float"
+            colorType: 'uint8'
           });
 
-          let resultEncodedPixelsTile = new Float32Array(tileSize * tileSize * 4);
+          let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
           fboTile.use(() => {
             this.calcTileMultiAnalyze3({
@@ -1794,7 +1764,7 @@ export default class Renderer {
 
 
           // Flip readPixels result
-          resultEncodedPixelsTile = this.flipReadPixels(tileSize, tileSize, resultEncodedPixelsTile);
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
@@ -1911,7 +1881,7 @@ export default class Renderer {
     const webGLColorScale = util.convertColorScale(colorScale);
     const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
-    let resultEncodedPixels: Float32Array[] = [];
+    let resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -1945,11 +1915,10 @@ export default class Renderer {
             height: tileSize,
             depth: false,
             colorFormat: 'rgba',
-            // colorType: "uint8"
-            colorType: "float"
+            colorType: 'uint8'
           });
 
-          let resultEncodedPixelsTile = new Float32Array(tileSize * tileSize * 4);
+          let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
           fboTile.use(() => {
             this.calcTileMultiAnalyze4({
@@ -1982,7 +1951,7 @@ export default class Renderer {
           });
 
           // Flip readPixels result
-          resultEncodedPixelsTile = this.flipReadPixels(tileSize, tileSize, resultEncodedPixelsTile);
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
@@ -2113,7 +2082,7 @@ export default class Renderer {
     const webGLColorScale = util.convertColorScale(colorScale);
     const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
-    let resultEncodedPixels: Float32Array[] = [];
+    let resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -2150,11 +2119,10 @@ export default class Renderer {
             height: tileSize,
             depth: false,
             colorFormat: 'rgba',
-            // colorType: "uint8"
-            colorType: "float"
+            colorType: 'uint8'
           });
 
-          let resultEncodedPixelsTile = new Float32Array(tileSize * tileSize * 4);
+          let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
           fboTile.use(() => {
             this.calcTileMultiAnalyze5({
@@ -2192,7 +2160,7 @@ export default class Renderer {
           });
 
           // Flip readPixels result
-          resultEncodedPixelsTile = this.flipReadPixels(tileSize, tileSize, resultEncodedPixelsTile);
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
@@ -2338,7 +2306,7 @@ export default class Renderer {
     const webGLColorScale = util.convertColorScale(colorScale);
     const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
-    let resultEncodedPixels: Float32Array[] = [];
+    let resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -2378,11 +2346,10 @@ export default class Renderer {
             height: tileSize,
             depth: false,
             colorFormat: 'rgba',
-            // colorType: "uint8"
-            colorType: "float"
+            colorType: 'uint8'
           });
 
-          let resultEncodedPixelsTile = new Float32Array(tileSize * tileSize * 4);
+          let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
           fboTile.use(() => {
             this.calcTileMultiAnalyze6({
@@ -2425,7 +2392,7 @@ export default class Renderer {
           });
 
           // Flip readPixels result
-          resultEncodedPixelsTile = this.flipReadPixels(tileSize, tileSize, resultEncodedPixelsTile);
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
