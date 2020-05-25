@@ -115,7 +115,7 @@ const colorScale = [
 const tileLayer = new GLOperations({ colorScale, /* ... */ });
 ```
 
-This tells the renderer to color pixels with value 0 (or less) red and value 1 (or greater) blue. Pixels with values between 0 and 1 will get a blend of red and blue, because colors are linearly interpolated between each pair of adjacent stops. You can have as few as two or as many as `GLOperations.SCALE_MAX_LENGTH` color stops in a color scale.
+This tells the renderer to color pixels with value 0 (or less) red and value 1 (or greater) blue. Pixels with values between 0 and 1 will get a blend of red and blue, because colors are linearly interpolated between each pair of adjacent stops. You can have as few as two or as many as `colorscaleMaxLength` color stops in a color scale.
 
 ## Sentinel values
 
@@ -130,7 +130,7 @@ const sentinelValues = [
 const tileLayer = new GLOperations({ sentinelValues, /* ... */ });
 ```
 
-Now pixels whose values are _exactly_ 0 will be colored red and pixels whose values are _exactly_ 1 will be colored blue. We haven't specified what to do for values other than 0 or 1, so the behavior for such values would be undefined in this case. Sentinel values only match the precise value specified (within a tiny margin of error). The maximum number of sentinel values the component will accept can be accessed via `GLOperations.SENTINEL_MAX_LENGTH`.
+Now pixels whose values are _exactly_ 0 will be colored red and pixels whose values are _exactly_ 1 will be colored blue. We haven't specified what to do for values other than 0 or 1, so the behavior for such values would be undefined in this case. Sentinel values only match the precise value specified (within a tiny margin of error). The maximum number of sentinel values the component will accept can be accessed/set via `sentinelMaxLength`.
 
 ## No-data value
 
@@ -212,6 +212,8 @@ This TileLayer accepts all the same options as `Leaflet.GridLayer` and `Leaflet.
 | ----------------    | --------------- | --------- | ----------- |
 | url                 | String          | undefined | tile URL
 | nodataValue         | Number          | undefined | pixel value to interpret as no-data
+| colorscaleMaxLength | Number          | 16        | max length of `colorScale` array
+| sentinelMaxLength   | Number          | 16        | max length of `sentinelValues` array
 | colorScale          | Color[]         | []        | array of color stops used for linear interpolation
 | sentinelValues      | SentinelValue[] | []        | array of fixed values to be matched exactly
 | preloadUrl          | String          | undefined | tile URL to preload in the background

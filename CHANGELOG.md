@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- New options to specify max length of color scale and sentinels:
+  - `colorscaleMaxLength` (default: 16)
+  - `sentinelMaxLength` (default: 16)
+
 ### Changed
 
 - Workaround to remove dependency on 'OES_texture_float' extension.
