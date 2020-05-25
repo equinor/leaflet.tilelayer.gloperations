@@ -10,10 +10,6 @@ import {
 
 import './index.css';
 
-import {
-  SCALE_MAX_LENGTH,
-  SENTINEL_MAX_LENGTH,
-} from './constants';
 import Renderer from './Renderer';
 import {
   GridLayerTile,
@@ -78,6 +74,8 @@ export interface Options extends L.GridLayerOptions {
   colorScale?: Color[];
   sentinelValues?: SentinelValue[];
   extraPixelLayers?: number;
+  colorscaleMaxLength?: number,
+  sentinelMaxLength?: number,
   preloadUrl?: string;
   glOperation?: string;
   multiLayers?: number;
@@ -185,6 +183,8 @@ const defaultOptions = {
   transitionTimeMs: 800,
   debug: false,
   extraPixelLayers: 0,
+  colorscaleMaxLength: 16,
+  sentinelMaxLength: 16,
 
   // default TileLayer options
   minZoom: 0,
@@ -275,8 +275,6 @@ const defaultOptions = {
 export type InternalOptions = Options & typeof defaultOptions;
 
 export default class GLOperations extends L.GridLayer {
-  static readonly SCALE_MAX_LENGTH: number = SCALE_MAX_LENGTH;
-  static readonly SENTINEL_MAX_LENGTH: number = SENTINEL_MAX_LENGTH;
   static readonly defaultOptions = defaultOptions;
 
   options: InternalOptions;
@@ -304,7 +302,7 @@ export default class GLOperations extends L.GridLayer {
     } = this.options;
 
     const tileSize: number = this._tileSizeAsNumber();
-    const renderer = new Renderer(tileSize, nodataValue);
+    const renderer = new Renderer(tileSize, nodataValue, this.options.colorscaleMaxLength, this.options.sentinelMaxLength);
 
     // Set instance properties.
     Object.assign(this, {
@@ -391,8 +389,23 @@ export default class GLOperations extends L.GridLayer {
       contourIndexLabels: prevContourIndexLabels,
       contourLabelFont: prevContourLabelFont,
       contourLabelDistance: prevContourLabelDistance,
+      colorscaleMaxLength: prevScaleMaxLength,
+      sentinelMaxLength: prevSentinelMaxLength,
     } = this.options;
     L.Util.setOptions(this, options);
+    // create new renderer of max length of sentinels or colorscale changes
+    if (this.options.colorscaleMaxLength !== prevScaleMaxLength || this.options.sentinelMaxLength !== prevSentinelMaxLength) {
+      if (this.options.debug) console.log("Creating new renderer");
+      const tileSize: number = this._tileSizeAsNumber();
+      const renderer = new Renderer(tileSize, this.options.nodataValue, this.options.colorscaleMaxLength, this.options.sentinelMaxLength);
+
+      this._renderer.regl.destroy()
+      delete this._renderer;
+
+      Object.assign(this, {
+        _renderer: renderer
+      });
+    }
     this._checkColorScaleAndSentinels();
     this._maybePreload(this.options.preloadUrl);
     this.options._hillshadeOptions = {
@@ -409,6 +422,8 @@ export default class GLOperations extends L.GridLayer {
       hsAdvFinalAmbientMultiplier: this.options.hsAdvFinalAmbientMultiplier,
       hsPregenUrl: this.options.hsPregenUrl,
     };
+
+    
 
     if (this.options.extraPixelLayers > 0 && this.options.glOperation === 'none') {
       this._maybeLoadExtraLayers(prevUrlA, prevUrlB, prevUrlC, prevUrlD);
@@ -1000,18 +1015,20 @@ export default class GLOperations extends L.GridLayer {
     const {
       colorScale,
       sentinelValues,
+      colorscaleMaxLength,
+      sentinelMaxLength,
     } = this.options;
     if (colorScale.length === 0 && sentinelValues.length === 0) {
       throw new Error('Either `colorScale` or `sentinelValues` must be of non-zero length.');
     }
-    if (colorScale.length > SCALE_MAX_LENGTH) {
+    if (colorScale.length > colorscaleMaxLength) {
       throw new Error(
-        `Color scale length ${colorScale.length} exceeds the maximum, ${SCALE_MAX_LENGTH}.`,
+        `Color scale length ${colorScale.length} exceeds the maximum, ${colorscaleMaxLength}.`,
       );
     }
-    if (sentinelValues.length > SENTINEL_MAX_LENGTH) {
+    if (sentinelValues.length > sentinelMaxLength) {
       throw new Error(
-        `Sentinel values length ${sentinelValues.length} exceeds the maximum, ${SENTINEL_MAX_LENGTH}.`,
+        `Sentinel values length ${sentinelValues.length} exceeds the maximum, ${sentinelMaxLength}.`,
       );
     }
   }

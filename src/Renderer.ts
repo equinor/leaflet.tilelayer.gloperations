@@ -7,6 +7,7 @@ import {
 import REGL, { Framebuffer2D } from 'regl';
 
 import { CLEAR_COLOR, MAX_TEXTURE_DIMENSION } from './constants';
+
 import * as commands from './regl-commands';
 import TextureManager from './TextureManager';
 import {
@@ -82,12 +83,18 @@ export default class Renderer {
   drawTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze6.Props>;
   convolutionSmooth: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
 
-  constructor(tileSize: number, nodataValue: number) {
+  constructor(
+    tileSize: number,
+    nodataValue: number,
+    colorscaleMaxLength: number,
+    sentinelMaxLength: number,
+  ) {
     const canvas = L.DomUtil.create('canvas') as HTMLCanvasElement;
     let maxTextureDimension = MAX_TEXTURE_DIMENSION;
 
     const regl = REGL({
       canvas: canvas,
+      // profile: true,
       onDone: function (err: Error, regl: REGL.Regl) {
         if (err) {
           console.log(err)
@@ -109,6 +116,9 @@ export default class Renderer {
     });
 
     const commonDrawConfig = commands.getCommonDrawConfiguration(tileSize, nodataValue);
+    const commonDrawColors = commands.getColorStructArray('colorScale', colorscaleMaxLength, 'sentinelValues', sentinelMaxLength);
+    const interpolateDrawColorsA = commands.getColorStructArray('colorScaleA', colorscaleMaxLength, 'sentinelValuesA', sentinelMaxLength);
+    const interpolateDrawColorsB = commands.getColorStructArray('colorScaleB', colorscaleMaxLength, 'sentinelValuesB', sentinelMaxLength);
 
     // Assign object "instance" properties.
     Object.assign(this, {
@@ -124,25 +134,25 @@ export default class Renderer {
       textureManagerE: new TextureManager(regl, tileSize, maxTextureDimension, false),
       textureManagerF: new TextureManager(regl, tileSize, maxTextureDimension, false),
       textureManagerHillshade: new TextureManager(regl, tileSize, maxTextureDimension, false),
-      drawTile: commands.createDrawTileCommand(regl, commonDrawConfig),
-      drawTileHsSimple: commands.createDrawTileHsSimpleCommand(regl, commonDrawConfig),
-      drawTileHsPregen: commands.createDrawTileHsPregenCommand(regl, commonDrawConfig),
-      drawTileInterpolateColor: commands.createDrawTileInterpolateColorCommand(regl, commonDrawConfig),
-      drawTileInterpolateColorOnly: commands.createDrawTileInterpolateColorOnlyCommand(regl, commonDrawConfig),
-      drawTileInterpolateValue: commands.createDrawTileInterpolateValueCommand(regl, commonDrawConfig),
+      drawTile: commands.createDrawTileCommand(regl, commonDrawConfig, commonDrawColors),
+      drawTileHsSimple: commands.createDrawTileHsSimpleCommand(regl, commonDrawConfig, commonDrawColors),
+      drawTileHsPregen: commands.createDrawTileHsPregenCommand(regl, commonDrawConfig, commonDrawColors),
+      drawTileInterpolateColor: commands.createDrawTileInterpolateColorCommand(regl, commonDrawConfig, interpolateDrawColorsA, interpolateDrawColorsB),
+      drawTileInterpolateColorOnly: commands.createDrawTileInterpolateColorOnlyCommand(regl, commonDrawConfig, interpolateDrawColorsA, interpolateDrawColorsB),
+      drawTileInterpolateValue: commands.createDrawTileInterpolateValueCommand(regl, commonDrawConfig, commonDrawColors),
       calcTileMultiAnalyze1: commands.createCalcTileMultiAnalyze1Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze1: commands.createDrawTileMultiAnalyze1Command(regl, commonDrawConfig),
+      drawTileMultiAnalyze1: commands.createDrawTileMultiAnalyze1Command(regl, commonDrawConfig, commonDrawColors),
       calcTileMultiAnalyze2: commands.createCalcTileMultiAnalyze2Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze2: commands.createDrawTileMultiAnalyze2Command(regl, commonDrawConfig),
+      drawTileMultiAnalyze2: commands.createDrawTileMultiAnalyze2Command(regl, commonDrawConfig, commonDrawColors),
       calcTileMultiAnalyze3: commands.createCalcTileMultiAnalyze3Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze3: commands.createDrawTileMultiAnalyze3Command(regl, commonDrawConfig),
+      drawTileMultiAnalyze3: commands.createDrawTileMultiAnalyze3Command(regl, commonDrawConfig, commonDrawColors),
       calcTileMultiAnalyze4: commands.createCalcTileMultiAnalyze4Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze4: commands.createDrawTileMultiAnalyze4Command(regl, commonDrawConfig),
+      drawTileMultiAnalyze4: commands.createDrawTileMultiAnalyze4Command(regl, commonDrawConfig, commonDrawColors),
       calcTileMultiAnalyze5: commands.createCalcTileMultiAnalyze5Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze5: commands.createDrawTileMultiAnalyze5Command(regl, commonDrawConfig),
+      drawTileMultiAnalyze5: commands.createDrawTileMultiAnalyze5Command(regl, commonDrawConfig, commonDrawColors),
       calcTileMultiAnalyze6: commands.createCalcTileMultiAnalyze6Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze6: commands.createDrawTileMultiAnalyze6Command(regl, commonDrawConfig),
-      drawTileDiff: commands.createDrawTileDiffCommand(regl, commonDrawConfig),
+      drawTileMultiAnalyze6: commands.createDrawTileMultiAnalyze6Command(regl, commonDrawConfig, commonDrawColors),
+      drawTileDiff: commands.createDrawTileDiffCommand(regl, commonDrawConfig, commonDrawColors),
       calcTileDiff: commands.createCalcTileDiffCommand(regl, commonDrawConfig),
       convolutionSmooth: commands.createConvolutionSmoothCommand(regl, commonDrawConfig),
     });
@@ -276,7 +286,6 @@ export default class Renderer {
   flipReadPixelsFloat(
     width: number,
     height: number,
-    // pixels: Float32Array | Uint8Array,
     pixels: Float32Array,
   ) {
     let halfHeight = height / 2 | 0;  // the | 0 keeps the result an int
