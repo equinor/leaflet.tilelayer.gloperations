@@ -2,11 +2,14 @@
 
 ## [Unreleased]
 
+## [0.3.0]
+
 ### Added
 
 - New options to specify max length of color scale and sentinels:
   - `colorscaleMaxLength` (default: 16)
   - `sentinelMaxLength` (default: 16)
+- New option required when using contours: `contourPane` specifies Leaflet pane containing the contour canvas. Necessary addition to fix positioning of canvas when using fractional zoom.
 
 ### Changed
 
@@ -30,6 +33,7 @@
 
 - Initial release
 
-[unreleased]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/equinor/leaflet.tilelayer.gloperations/releases/tag/v0.1.1
