@@ -251,6 +251,8 @@ This TileLayer accepts all the same options as `Leaflet.GridLayer` and `Leaflet.
 | hsSimpleAzimuth         | Number          | 315       | Sun direction in degrees
 | hsSimpleAltitude        | Number          | 70        | Sun altitude in degrees
 | hsPregenUrl             | String          | ''        | Url to pre-generated hillshading tiles
+| contourPane             | HTMLElement     | undefined | Leaflet pane containing the contour canvas. Required if using contours.
+| contourCanvas           | HTMLCanvasElement | undefined | Canvas to draw the contours on. Required if using contours.
 | contourType             | String          | 'none'    | none, lines or illuminated
 | contourSmoothInput      | Boolean         | false     | Smooth contour input data (recommended way to smooth)
 | contourSmoothInputKernel| Number          | 7         | Convolution kernel size. E.g. a value of 7 will use a 7x7 matrix to average values around each texel.

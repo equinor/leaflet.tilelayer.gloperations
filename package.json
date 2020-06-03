@@ -1,6 +1,6 @@
 {
   "name": "leaflet.tilelayer.gloperations",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Custom Leaflet TileLayer using WebGL to do operations on the tiles.",
   "main": "dist/index.js",
   "module": "dist/index.es.js",
@@ -37,7 +37,8 @@
     "animation",
     "operation",
     "contours",
-    "hillshading"
+    "hillshading",
+    "relief"
   ],
   "devDependencies": {
     "@types/d3-array": "^2.0.0",
@@ -53,8 +54,6 @@
     "@types/upng-js": "~2.1.1",
     "acorn": ">=5.7.4",
     "autoprefixer": "~9.4.2",
-    "fast-deep-equal": "^3.1.1",
-    "glsl-read-float": "^1.1.0",
     "glslify": "~7.0.0",
     "leaflet": "~1.4.0",
     "minimist": ">=0.2.1",

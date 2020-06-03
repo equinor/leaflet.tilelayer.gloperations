@@ -27,6 +27,7 @@ import {
   SentinelValue,
   ContourLabel,
   ContourData,
+  Dictionary,
 } from './types';
 import { ContourMultiPolygon } from 'd3-contour';
 import * as util from './util';
@@ -51,9 +52,11 @@ declare module 'leaflet' {
   interface GridLayer {
     _globalTileRange: L.Bounds;
     _getTilePos(coords: L.Point): L.Point;
+    _keyToTileCoords(key: string): L.Point;
     _pruneTiles(): void;
     _removeAllTiles(): void;
     _update(): void;
+    _level: Dictionary<any>;
   }
 }
 
@@ -123,6 +126,7 @@ export interface Options extends L.GridLayerOptions {
   _hillshadeOptions?: HillshadeOptions;
 
   // Contours
+  contourPane?: HTMLElement;
   contourCanvas?: HTMLCanvasElement;
   contourType?: string;
   contourSmoothLines: boolean;
@@ -241,7 +245,6 @@ const defaultOptions = {
   _hillshadeOptions: { hillshadeType: 'none' },
 
   // Contours default options
-  // contourCanvas: undefined,
   contourType: 'none', // none, lines or illuminated
   contourSmoothLines: false,
   contourSmoothInput: false,
@@ -321,9 +324,18 @@ export default class GLOperations extends L.GridLayer {
       this._maybeUpdateMergedArrayAndDrawContours();
       // delay due to: https://github.com/Leaflet/Leaflet/blob/master/src/map/Map.js#L1696
     }, 300));
+
+    // Listen for zoom changes. Necessary when using fractional zoom levels.
+    setTimeout(() => {
+      this._map.on('zoomend', _ => setTimeout(async () => {
+        if (this.options.contourType !== 'none') {
+          if (this.options.debug) console.log("zoom changed. Moving contour canvas.")
+          let activeTilesBounds: ActiveTilesBounds = await this._getActivetilesBounds();
+          this._moveContourCanvas(activeTilesBounds);
+        }
+      }, 50));
+    }, 300);
   }
-
-
 
   /**
    * The GLTileLayerComponent exposes a declarative interface. Changes should be triggered by
@@ -399,7 +411,7 @@ export default class GLOperations extends L.GridLayer {
       const tileSize: number = this._tileSizeAsNumber();
       const renderer = new Renderer(tileSize, this.options.nodataValue, this.options.colorscaleMaxLength, this.options.sentinelMaxLength);
 
-      this._renderer.regl.destroy()
+      this._renderer.regl.destroy();
       delete this._renderer;
 
       Object.assign(this, {
@@ -422,8 +434,6 @@ export default class GLOperations extends L.GridLayer {
       hsAdvFinalAmbientMultiplier: this.options.hsAdvFinalAmbientMultiplier,
       hsPregenUrl: this.options.hsPregenUrl,
     };
-
-    
 
     if (this.options.extraPixelLayers > 0 && this.options.glOperation === 'none') {
       this._maybeLoadExtraLayers(prevUrlA, prevUrlB, prevUrlC, prevUrlD);
@@ -2670,6 +2680,16 @@ export default class GLOperations extends L.GridLayer {
     }
     if (this.options.debug) {console.log("sum mergedPixelArray"); console.log(arrSum(mergedPixelArray));}
 
+    let contourCanvas: HTMLCanvasElement;
+    if (this.options.contourCanvas) {
+      contourCanvas = this.options.contourCanvas;
+      contourCanvas.width = this._contourData.width;
+      contourCanvas.height = this._contourData.height;
+    } else {
+      console.log("Error: contourCanvas not specified.")
+      return
+    }
+
     this._contourData.mergedTileArray = mergedPixelArray;
     this._contourData.smoothedTileArray = undefined;
 
@@ -2696,7 +2716,7 @@ export default class GLOperations extends L.GridLayer {
         await this._smoothContourInput();
       }
       await this._calculateAndDrawContours();
-      await this._moveContourCanvas(activeTilesBounds, tileSize);
+      await this._moveContourCanvas(activeTilesBounds);
     }, 50);
   }
 
@@ -2839,7 +2859,7 @@ export default class GLOperations extends L.GridLayer {
   /**
    * Move contours canvas to fit active tiles
    */
-  protected async _moveContourCanvas(activeTilesBounds: ActiveTilesBounds, tileSize: number) {
+  protected async _moveContourCanvas(activeTilesBounds: ActiveTilesBounds) {
     if (this.options.debug) console.log("_moveContourCanvas()")
 
     let contourCanvas: HTMLCanvasElement;
@@ -2850,18 +2870,22 @@ export default class GLOperations extends L.GridLayer {
       return
     }
 
-    let width = <number>this._contourData.width
-    let height = <number>this._contourData.height
-    contourCanvas.width = width;
-    contourCanvas.height = height;
+    let contourPane: HTMLElement;
+    if (this.options.contourPane) {
+      contourPane = this.options.contourPane;
+    } else {
+      console.log("Error: contourPane not specified.")
+      return
+    }
 
+    let scale = this._map.getZoomScale(this._map.getZoom(), this._level.zoom);
     let pixelOrigin = this._map.getPixelOrigin();
+    let transformPane = this._level.origin.multiplyBy(scale)
+                        .subtract(pixelOrigin);
+    let activeTilesPos = this._getTilePos(this._keyToTileCoords(`${activeTilesBounds.xMin}:${activeTilesBounds.yMin}:${this._level.zoom}`));
 
-    let layerPos = new L.Point(
-      pixelOrigin.x * -1 + (tileSize * activeTilesBounds.xMin),
-      pixelOrigin.y * -1 + (tileSize * activeTilesBounds.yMin)
-    )
-    L.DomUtil.setTransform(contourCanvas, layerPos);
+    L.DomUtil.setTransform(contourPane, transformPane, scale);
+    L.DomUtil.setTransform(contourCanvas, activeTilesPos);
   }
 
   /**
