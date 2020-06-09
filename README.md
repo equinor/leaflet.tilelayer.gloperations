@@ -242,6 +242,8 @@ This TileLayer accepts all the same options as `Leaflet.GridLayer` and `Leaflet.
 | hsSimpleAzimuth         | Number          | 315       | Sun direction in degrees
 | hsSimpleAltitude        | Number          | 70        | Sun altitude in degrees
 | hsPregenUrl             | String          | ''        | Url to pre-generated hillshading tiles
+| contourPane             | HTMLElement     | undefined | Leaflet pane containing the contour canvas
+| contourCanvas           | HTMLCanvasElement | undefined | Canvas to draw the contours on
 | contourType             | String          | 'none'    | none, lines or illuminated
 | contourSmooth           | Boolean         | false     | Smooth contour lines (not input array, but generated contour lines)
 | contourScaleFactor      | Number          | 1         | Scale values from layer before generating contours. E.g. if your are using illuminated lines and your values are depth, not height, use `-1`.

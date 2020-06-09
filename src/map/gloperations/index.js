@@ -1408,7 +1408,6 @@ var Renderer = (function () {
         var maxTextureDimension = MAX_TEXTURE_DIMENSION;
         var regl = REGL({
             canvas: canvas,
-            profile: true,
             onDone: function (err, regl) {
                 if (err) {
                     console.log(err);
@@ -3182,7 +3181,7 @@ var defaultOptions = {
     debug: false,
     extraPixelLayers: 0,
     colorscaleMaxLength: 16,
-    sentinelMaxLength: 3,
+    sentinelMaxLength: 16,
     minZoom: 0,
     maxZoom: 18,
     subdomains: 'abc',
@@ -3276,6 +3275,25 @@ var GLOperations = (function (_super) {
                 console.log("all tiles loaded. Updating contours if enabled.");
             _this._maybeUpdateMergedArrayAndDrawContours();
         }, 300); });
+        setTimeout(function () {
+            _this._map.on('zoomend', function (_) { return setTimeout(function () { return __awaiter(_this, void 0, void 0, function () {
+                var activeTilesBounds;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            if (!(this.options.contourType !== 'none')) return [3, 2];
+                            if (this.options.debug)
+                                console.log("zoom changed. Moving contour canvas.");
+                            return [4, this._getActivetilesBounds()];
+                        case 1:
+                            activeTilesBounds = _a.sent();
+                            this._moveContourCanvas(activeTilesBounds);
+                            _a.label = 2;
+                        case 2: return [2];
+                    }
+                });
+            }); }, 50); });
+        }, 300);
         return _this;
     }
     GLOperations.prototype.updateOptions = function (options) {
@@ -4927,7 +4945,7 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype._mergePixelData = function (activeTilesBounds, tileSize) {
         return __awaiter(this, void 0, void 0, function () {
-            var z, canvasMerged, ctx, nodataTile, i, x, j, y, uint8, element, uac, uac2, idata, imageData, mergedPixelData, mergedPixelArray, arrSum;
+            var z, canvasMerged, ctx, nodataTile, i, x, j, y, uint8, element, uac, uac2, idata, imageData, mergedPixelData, mergedPixelArray, arrSum, contourCanvas, width, height;
             return __generator(this, function (_a) {
                 if (this.options.debug)
                     console.log("_mergePixelData()");
@@ -4975,6 +4993,17 @@ var GLOperations = (function (_super) {
                     console.log("sum mergedPixelArray");
                     console.log(arrSum(mergedPixelArray));
                 }
+                if (this.options.contourCanvas) {
+                    contourCanvas = this.options.contourCanvas;
+                }
+                else {
+                    console.log("Error: contourCanvas not specified.");
+                    return [2];
+                }
+                width = this._contourData.width;
+                height = this._contourData.height;
+                contourCanvas.width = width;
+                contourCanvas.height = height;
                 this._contourData.mergedTileArray = mergedPixelArray;
                 this._contourData.smoothedTileArray = undefined;
                 return [2];
@@ -5014,7 +5043,7 @@ var GLOperations = (function (_super) {
                                     case 4: return [4, this._calculateAndDrawContours()];
                                     case 5:
                                         _a.sent();
-                                        return [4, this._moveContourCanvas(activeTilesBounds, tileSize)];
+                                        return [4, this._moveContourCanvas(activeTilesBounds)];
                                     case 6:
                                         _a.sent();
                                         return [2];
@@ -5164,9 +5193,9 @@ var GLOperations = (function (_super) {
             });
         });
     };
-    GLOperations.prototype._moveContourCanvas = function (activeTilesBounds, tileSize) {
+    GLOperations.prototype._moveContourCanvas = function (activeTilesBounds) {
         return __awaiter(this, void 0, void 0, function () {
-            var contourCanvas, width, height, pixelOrigin, layerPos;
+            var contourCanvas, contourPane, scale, pixelOrigin, transformPane, activeTilesPos;
             return __generator(this, function (_a) {
                 if (this.options.debug)
                     console.log("_moveContourCanvas()");
@@ -5177,13 +5206,20 @@ var GLOperations = (function (_super) {
                     console.log("Error: contourCanvas not specified.");
                     return [2];
                 }
-                width = this._contourData.width;
-                height = this._contourData.height;
-                contourCanvas.width = width;
-                contourCanvas.height = height;
+                if (this.options.contourPane) {
+                    contourPane = this.options.contourPane;
+                }
+                else {
+                    console.log("Error: contourPane not specified.");
+                    return [2];
+                }
+                scale = this._map.getZoomScale(this._map.getZoom(), this._level.zoom);
                 pixelOrigin = this._map.getPixelOrigin();
-                layerPos = new L.Point(pixelOrigin.x * -1 + (tileSize * activeTilesBounds.xMin), pixelOrigin.y * -1 + (tileSize * activeTilesBounds.yMin));
-                L.DomUtil.setTransform(contourCanvas, layerPos);
+                transformPane = this._level.origin.multiplyBy(scale)
+                    .subtract(pixelOrigin);
+                activeTilesPos = this._getTilePos(this._keyToTileCoords(activeTilesBounds.xMin + ":" + activeTilesBounds.yMin + ":" + this._level.zoom));
+                L.DomUtil.setTransform(contourPane, transformPane, scale);
+                L.DomUtil.setTransform(contourCanvas, activeTilesPos);
                 return [2];
             });
         });

@@ -1,14 +1,16 @@
 import * as L from 'leaflet';
 import './index.css';
 import Renderer from './Renderer';
-import { GridLayerTile, PreloadTileCache, TileCoordinates, TileDatum, TileElement, TileEvent, PixelValues, HillshadeOptions, ActiveTilesBounds, Color, SentinelValue, ContourLabel, ContourData } from './types';
+import { GridLayerTile, PreloadTileCache, TileCoordinates, TileDatum, TileElement, TileEvent, PixelValues, HillshadeOptions, ActiveTilesBounds, Color, SentinelValue, ContourLabel, ContourData, Dictionary } from './types';
 declare module 'leaflet' {
     interface GridLayer {
         _globalTileRange: L.Bounds;
         _getTilePos(coords: L.Point): L.Point;
+        _keyToTileCoords(key: string): L.Point;
         _pruneTiles(): void;
         _removeAllTiles(): void;
         _update(): void;
+        _level: Dictionary<any>;
     }
 }
 export interface MouseEvent extends L.LeafletMouseEvent {
@@ -65,6 +67,7 @@ export interface Options extends L.GridLayerOptions {
     hsAdvFinalAmbientMultiplier?: number;
     hsPregenUrl?: string;
     _hillshadeOptions?: HillshadeOptions;
+    contourPane?: HTMLElement;
     contourCanvas?: HTMLCanvasElement;
     contourType?: string;
     contourSmoothLines: boolean;
@@ -327,7 +330,7 @@ export default class GLOperations extends L.GridLayer {
     protected _addlabel(context: CanvasRenderingContext2D, label: ContourLabel, labelColor: string, labelFont: string): void;
     protected _calculateContours(): Promise<void>;
     protected _clearContours(): Promise<void>;
-    protected _moveContourCanvas(activeTilesBounds: ActiveTilesBounds, tileSize: number): Promise<void>;
+    protected _moveContourCanvas(activeTilesBounds: ActiveTilesBounds): Promise<void>;
     protected _drawContours(): Promise<void>;
     protected _wrapMouseEventHandler(handler: (event: MouseEvent) => void): (event: L.LeafletMouseEvent) => void;
     protected _getTileContainingPoint(point: L.Point): GridLayerTile | undefined;

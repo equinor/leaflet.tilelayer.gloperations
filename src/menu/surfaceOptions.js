@@ -1,0 +1,213 @@
+let surfaceMinMax = {
+  top: [1600, 1800],
+  oil_20000101: [0, 3],
+  oil_20030101: [0, 3],
+  poro: [0, 0.25],
+  permx: [0, 3000],
+  iso: [0, 3],
+  pressure_20000101: [265, 310],
+  pressure_20030101: [265, 310],
+  stoiip: [0, 3],
+}
+
+let surfaceUrls = {
+  top: './tiles/top/topupperreek/{z}/{x}/{y}.png',
+  oil_20000101: './tiles/oil-thickness/20000101/{z}/{x}/{y}.png',
+  oil_20030101: './tiles/oil-thickness/20030101/{z}/{x}/{y}.png',
+  pressure_20000101: './tiles/pressure/20000101/{z}/{x}/{y}.png',
+  pressure_20030101: './tiles/pressure/20030101/{z}/{x}/{y}.png',
+  poro: './tiles/poro/none/{z}/{x}/{y}.png',
+  permx: './tiles/permx/none/{z}/{x}/{y}.png',
+  iso: './tiles/iso/upperreek/{z}/{x}/{y}.png',
+  stoiip: './tiles/stoiip/upperreek/{z}/{x}/{y}.png',
+}
+
+let optionsColorscale = {
+  url: './tiles/top/topupperreek/{z}/{x}/{y}.png',
+  colorScale: [
+    {color: "rgb(250, 250, 110)", offset: 1600},
+    {color: "rgb(189, 234, 117)", offset: 1625},
+    {color: "rgb(134, 215, 128)", offset: 1650},
+    {color: "rgb(84, 193, 138)", offset: 1675},
+    {color: "rgb(35, 170, 143)", offset: 1700},
+    {color: "rgb(0, 145, 141)", offset: 1725},
+    {color: "rgb(0, 120, 130)", offset: 1750},
+    {color: "rgb(31, 95, 112)", offset: 1775},
+    {color: "rgb(42, 72, 88)", offset: 1800},
+  ],
+  sentinelValues: [],
+  extraPixelLayers: 0,
+  hillshadeType: 'none',
+  glOperation: 'none',
+  contourType: 'none',
+  transitions: false,
+}
+
+let optionsSentinels = {
+  url: './tiles/facies/none/{z}/{x}/{y}.png',
+  colorScale: [],
+  sentinelValues: [
+    {color: "rgb(35, 170, 143)", offset: 1, label: 'Background' },
+    {color: "rgb(250, 250, 110)", offset: 2, label: 'Channel' },
+    {color: "rgb(42, 72, 88)", offset: 3, label: 'Crevasse' },
+  ],
+  extraPixelLayers: 0,
+  hillshadeType: 'none',
+  glOperation: 'none',
+  contourType: 'none',
+  transitions: false,
+}
+
+let optionsTransitions = {
+  url: './tiles/pressure/20030101/{z}/{x}/{y}.png',
+  colorScale: [
+    {color: "rgb(250, 250, 110)", offset: 265},
+    {color: "rgb(189, 234, 117)", offset: 270.625},
+    {color: "rgb(134, 215, 128)", offset: 276.25},
+    {color: "rgb(84, 193, 138)", offset: 281.875},
+    {color: "rgb(35, 170, 143)", offset: 287.5},
+    {color: "rgb(0, 145, 141)", offset: 293.125},
+    {color: "rgb(0, 120, 130)", offset: 298.75},
+    {color: "rgb(31, 95, 112)", offset: 304.375},
+    {color: "rgb(42, 72, 88)", offset: 310},
+  ],
+  sentinelValues: [],
+  extraPixelLayers: 0,
+  hillshadeType: 'none',
+  glOperation: 'none',
+  contourType: 'none',
+  transitions: true,
+  transitionTimeMs: 1500,
+}
+
+let optionsHillshading = {
+  url: './tiles/top/topupperreek/{z}/{x}/{y}.png',
+  colorScale: [
+    {color: "rgb(250, 250, 110)", offset: 1600},
+    {color: "rgb(189, 234, 117)", offset: 1625},
+    {color: "rgb(134, 215, 128)", offset: 1650},
+    {color: "rgb(84, 193, 138)", offset: 1675},
+    {color: "rgb(35, 170, 143)", offset: 1700},
+    {color: "rgb(0, 145, 141)", offset: 1725},
+    {color: "rgb(0, 120, 130)", offset: 1750},
+    {color: "rgb(31, 95, 112)", offset: 1775},
+    {color: "rgb(42, 72, 88)", offset: 1800},
+  ],
+  sentinelValues: [],
+  extraPixelLayers: 0,
+  hillshadeType: 'pregen',
+  hsElevationScale: 1,
+  hsPregenUrl: './tiles/hillshade/top/topupperreek/{z}/{x}/{y}.png',
+  hsSimpleSlopescale: 5,
+  hsSimpleZoomdelta: 10,
+  glOperation: 'none',
+  contourType: 'none',
+  transitions: false,
+}
+
+let optionsContours = {
+  url: './tiles/top/topupperreek/{z}/{x}/{y}.png',
+  colorScale: [
+    {color: "rgb(250, 250, 110)", offset: 1600},
+    {color: "rgb(189, 234, 117)", offset: 1625},
+    {color: "rgb(134, 215, 128)", offset: 1650},
+    {color: "rgb(84, 193, 138)", offset: 1675},
+    {color: "rgb(35, 170, 143)", offset: 1700},
+    {color: "rgb(0, 145, 141)", offset: 1725},
+    {color: "rgb(0, 120, 130)", offset: 1750},
+    {color: "rgb(31, 95, 112)", offset: 1775},
+    {color: "rgb(42, 72, 88)", offset: 1800},
+  ],
+  sentinelValues: [],
+  extraPixelLayers: 0,
+  hillshadeType: 'none',
+  glOperation: 'none',
+  contourType: 'lines',
+  contourScaleFactor: -1,
+  contourInterval: 10,
+  // contourIndexInterval: 100,
+  // contourLineColor: '#000000',
+  // contourLineWeight: 0.5,
+  contourLineIndexWeight: 2.5,
+  contourSmoothInput: true,
+  contourSmoothInputKernel: 15,
+  // contourLabelDistance: 250,
+  contourHypsoColors: ["#dddddd", "#e5d9c9" ,"#486341"],
+  contourHypsoDomain: [-1450, -1550, -1700],
+  contourBathyDomain: [-2000, -1700],
+  // contourIndexLabels: false,
+  // contourHypso: false,
+  // contourBathy: false,
+  transitions: false,
+}
+
+let optionsMulti = {
+  url: '',
+  operationUrlA: './tiles/oil-thickness/20030101/{z}/{x}/{y}.png',
+  operationUrlB: './tiles/stoiip/upperreek/{z}/{x}/{y}.png',
+  operationUrlC: './tiles/poro/none/{z}/{x}/{y}.png',
+  operationUrlD: './tiles/permx/none/{z}/{x}/{y}.png',
+  filterLowA: 0,
+  filterHighA: 5.7,
+  filterLowB: 0,
+  filterHighB: 3.75,
+  filterLowC: 0,
+  filterHighC: 0.35,
+  filterLowD: 0,
+  filterHighD: 6700,
+  multiplierA: 1,
+  multiplierB: 1,
+  multiplierC: 1,
+  multiplierD: 1,
+  colorScale: [
+    {color: "rgb(194, 4, 36)", offset: 0},
+    {color: "rgb(255, 255, 191)", offset: 5},
+    {color: "rgb(222, 100, 175)", offset: 50},
+    {color: "rgb(132, 54, 168)",  offset: 500},
+    {color: "rgb(255, 0, 0)", offset: 5000},
+  ],
+  sentinelValues: [],
+  hillshadeType: 'none',
+  glOperation: 'multi',
+  multiLayers: 4,
+  extraPixelLayers: 4,
+  contourType: 'none',
+  transitions: false,
+}
+
+let optionsDiff = {
+  url: '',
+  operationUrlA: './tiles/pressure/20000101/{z}/{x}/{y}.png',
+  operationUrlB: './tiles/pressure/20030101/{z}/{x}/{y}.png',
+  colorScale: [
+    {color: "rgb(194, 4, 36)", offset: -40},
+    {color: "rgb(255, 255, 191)", offset: -30},
+    {color: "rgb(222, 100, 175)", offset: -20},
+    {color: "rgb(132, 54, 168)",  offset: -10},
+    {color: "rgb(132, 54, 168)", offset: 0},
+  ],
+  sentinelValues: [],
+  hillshadeType: 'none',
+  glOperation: 'diff',
+  extraPixelLayers: 2,
+  contourType: 'none',
+  transitions: false,
+}
+
+let accordionOptions = {
+  colorscale: optionsColorscale,
+  sentinels: optionsSentinels,
+  diff: optionsDiff,
+  hillshading: optionsHillshading,
+  multi: optionsMulti,
+  contours: optionsContours,
+  transitions: optionsTransitions,
+}
+
+let surfaceOptions = {
+  accordion: accordionOptions,
+  urls: surfaceUrls,
+  minmax: surfaceMinMax,
+}
+
+export default surfaceOptions;

@@ -133,12 +133,6 @@ export interface DrawCommonColors {
   colorScaleUniforms: Dictionary<any>;
   sentinelValuesUniforms: Dictionary<any>;
 }
-// export namespace DrawCommonColors {
-//   export interface Uniforms {
-//     colorScaleUniforms: Dictionary<any>;
-//     sentinelValuesUniforms: Dictionary<any>;
-//   }
-// }
 
 export namespace DrawCommon {
   export interface Props {
