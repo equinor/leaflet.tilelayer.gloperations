@@ -91,7 +91,7 @@ const Contours = ({tilelayer}) => {
 
   return (
     <div>
-      <p>{`Contours is a work in progress. It is not using WebGL and the tiles have to be merged to a single canvas before calculating contours. This means it is slower than the other operations of this plugin. Contours are currently only implemented with glOperation="none". Labels are only implemented for contourType='lines'. Index interval needs to be a multiple of countour interval.`}</p>
+      <p>{`Contours is a work in progress. It is not using WebGL and the tiles have to be merged to a single canvas before calculating contours. This means it is slower than the other operations of this plugin. Contours are currently only implemented with glOperation="none". Labels are only implemented for contourType='lines'. Index interval needs to be a multiple of contour interval.`}</p>
       <Radio.Group onChange={contourRadioChange} value={contourType}>
         <Radio style={radioStyle} value='none'>
           None
@@ -108,11 +108,11 @@ const Contours = ({tilelayer}) => {
       <br></br>
       Bathymetric tint: <Switch size="small" checked={contourBathymetric} onChange={handleBathymetricChange} />
       <br></br><br></br>
-      Countour interval:
+      Contour interval:
       <Slider defaultValue={10} min={5} max={250} step={5} onAfterChange={contourIntervalChange}/>
       Index interval:
       <Slider defaultValue={100} min={0} max={200} step={5} disabled={contourIlluminated} onAfterChange={contourIndexIntervalChange}/>
-      Countour line size:
+      Contour line size:
       <Slider defaultValue={0.5} min={0.1} max={3} step={0.1} disabled={contourIlluminated} onAfterChange={contourLineSizeChange}/>
       Index line size:
       <Slider defaultValue={2.5} min={0.1} max={5} step={0.1} disabled={contourIlluminated} onAfterChange={contourLineIndexSizeChange}/>
