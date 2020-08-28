@@ -2969,7 +2969,11 @@ export default class GLOperations extends L.GridLayer {
             const threshold = c.value
 
             if (c.value % this.options.contourIndexInterval == 0) {
+              // TODO: New TS errors occuring. Figure out why
+              // Property 'coordinates' does not exist on type 'ContourMultiPolygon'.
+              //@ts-ignore
               c.coordinates.forEach(polygon =>
+                //@ts-ignore
                 polygon.forEach((ring, j) => {
                   const p = ring.slice(1, Infinity),
                     // best number of steps to divide ring.length
@@ -2978,9 +2982,11 @@ export default class GLOperations extends L.GridLayer {
                     n = possibilities[<number>d3.scan(scores)],
                     // best starting point: bottom for first rings, top for holes
                     start =
+                      //@ts-ignore
                       1 + (<number>d3.scan(p.map(xy => (j === 0 ? -1 : 1) * xy[1])) % n),
                     margin = 10;
 
+                  //@ts-ignore
                   p.forEach((xy, i) => {
                     if (
                       i % n === start &&
@@ -2997,6 +3003,7 @@ export default class GLOperations extends L.GridLayer {
 
                       labels.push({
                         threshold,
+                        //@ts-ignore
                         xy: xy.map(d => 1.0 * d),
                         angle: Math.atan2(dy, dx),
                         text: `${c.value}`
