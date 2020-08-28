@@ -2,7 +2,7 @@ import { DomUtil, Util, GridLayer, Browser, point, bounds } from 'leaflet';
 import { memoize, isEmpty, flatMap, zipWith, chunk, pickBy, isUndefined, mapValues, noop, values } from 'lodash-es';
 import REGL from 'regl';
 import { decode } from 'upng-js';
-import { select, selectAll } from 'd3-selection';
+import { select, selectAll, event } from 'd3-selection';
 import { scaleLinear } from 'd3-scale';
 import { geoPath } from 'd3-geo';
 import { contours } from 'd3-contour';
@@ -115,8 +115,8 @@ function styleInject(css, ref) {
   }
 }
 
-var css_248z = ".gl-tilelayer-tile {\n  -ms-interpolation-mode: nearest-neighbor;\n      image-rendering: -moz-crisp-edges;\n      image-rendering: pixelated;\n  image-rendering: crisp-edges;\n}\n";
-styleInject(css_248z);
+var css = ".gl-tilelayer-tile {\n  -ms-interpolation-mode: nearest-neighbor;\n      image-rendering: -moz-crisp-edges;\n      image-rendering: pixelated;\n  image-rendering: crisp-edges;\n}\n";
+styleInject(css);
 
 var CLEAR_COLOR = [0, 0, 0, 0];
 var DEFAULT_COLOR_STOP = {
@@ -3167,7 +3167,7 @@ var Renderer = (function () {
 }());
 
 var d3 = { select: select, selectAll: selectAll, scaleLinear: scaleLinear, geoPath: geoPath, contours: contours, interpolateHcl: interpolateHcl,
-    json: json, min: min, max: max, scan: scan, range: range$1 };
+    event: event, json: json, min: min, max: max, scan: scan, range: range$1 };
 var BYTES_PER_WORD = 4;
 var littleEndian$1 = machineIsLittleEndian();
 var defaultOptions = {

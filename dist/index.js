@@ -1,14 +1,20 @@
-import { DomUtil, Util, GridLayer, Browser, point, bounds } from 'leaflet';
-import { memoize, isEmpty, flatMap, zipWith, chunk, pickBy, isUndefined, mapValues, noop, values } from 'lodash-es';
-import REGL from 'regl';
-import { decode } from 'upng-js';
-import { select, selectAll } from 'd3-selection';
-import { scaleLinear } from 'd3-scale';
-import { geoPath } from 'd3-geo';
-import { contours } from 'd3-contour';
-import { json } from 'd3-request';
-import { min, max, scan, range as range$1 } from 'd3-array';
-import { interpolateHcl } from 'd3-interpolate';
+'use strict';
+
+var L = require('leaflet');
+var lodashEs = require('lodash-es');
+var REGL = require('regl');
+var upngJs = require('upng-js');
+var d3Selection = require('d3-selection');
+var d3Scale = require('d3-scale');
+var d3Geo = require('d3-geo');
+var d3Contour = require('d3-contour');
+var d3Request = require('d3-request');
+var d3Array = require('d3-array');
+var d3Interpolate = require('d3-interpolate');
+
+function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
+
+var REGL__default = /*#__PURE__*/_interopDefaultLegacy(REGL);
 
 /*! *****************************************************************************
 Copyright (c) Microsoft Corporation.
@@ -115,8 +121,8 @@ function styleInject(css, ref) {
   }
 }
 
-var css_248z = ".gl-tilelayer-tile {\n  -ms-interpolation-mode: nearest-neighbor;\n      image-rendering: -moz-crisp-edges;\n      image-rendering: pixelated;\n  image-rendering: crisp-edges;\n}\n";
-styleInject(css_248z);
+var css = ".gl-tilelayer-tile {\n  -ms-interpolation-mode: nearest-neighbor;\n      image-rendering: -moz-crisp-edges;\n      image-rendering: pixelated;\n  image-rendering: crisp-edges;\n}\n";
+styleInject(css);
 
 var CLEAR_COLOR = [0, 0, 0, 0];
 var DEFAULT_COLOR_STOP = {
@@ -261,7 +267,7 @@ function fetchPNGData(url, nodataValue, tileDimension) {
                     xhr.addEventListener('error', reject);
                     xhr.send(null);
                 }).then(function (data) {
-                    return new Uint8Array(decode(data).data);
+                    return new Uint8Array(upngJs.decode(data).data);
                 }).catch(function () { return createNoDataTile(nodataValue, tileDimension); })];
         });
     });
@@ -308,7 +314,7 @@ function sameTiles(a, b) {
     return (a.length === b.length
         && a.every(function (tileA, index) { return compareTileCoordinates(tileA, b[index]) === 0; }));
 }
-var createNoDataTile = memoize(function (nodataValue, tileDimension) {
+var createNoDataTile = lodashEs.memoize(function (nodataValue, tileDimension) {
     if (tileDimension === void 0) { tileDimension = 256; }
     var float32Tile = new Float32Array(tileDimension * tileDimension);
     float32Tile.fill(nodataValue);
@@ -1337,7 +1343,7 @@ var TextureManager = (function () {
             contents.set(hashKey, textureCoordinates_1);
             return this.formatOutputTextureCoordinates(textureCoordinates_1);
         }
-        if (isEmpty(available)) {
+        if (lodashEs.isEmpty(available)) {
             var firstInsertedKey = contents.keys().next().value;
             this.removeByHashKey(firstInsertedKey);
         }
@@ -1389,7 +1395,7 @@ var TextureManager = (function () {
         return x + ":" + y + ":" + z;
     };
     TextureManager.prototype.allTextureCoordinates = function (tilesAcross, tileSize) {
-        return flatMap(range(tilesAcross), function (x) {
+        return lodashEs.flatMap(range(tilesAcross), function (x) {
             return range(tilesAcross).map(function (y) { return ({
                 x: x * tileSize,
                 y: y * tileSize,
@@ -1401,9 +1407,9 @@ var TextureManager = (function () {
 
 var Renderer = (function () {
     function Renderer(tileSize, nodataValue, colorscaleMaxLength, sentinelMaxLength) {
-        var canvas = DomUtil.create('canvas');
+        var canvas = L.DomUtil.create('canvas');
         var maxTextureDimension = MAX_TEXTURE_DIMENSION;
-        var regl = REGL({
+        var regl = REGL__default['default']({
             canvas: canvas,
             onDone: function (err, regl) {
                 if (err) {
@@ -2046,13 +2052,13 @@ var Renderer = (function () {
         var _b = this.computeRequiredCanvasDimensions(tiles.length), canvasWidth = _b[0], canvasHeight = _b[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
         var canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tiles.length);
-        var tilesWithCanvasCoordinates = zipWith(tiles, canvasCoordinates, function (tile, canvasCoords) { return (__assign(__assign({}, tile), { canvasCoords: canvasCoords })); });
+        var tilesWithCanvasCoordinates = lodashEs.zipWith(tiles, canvasCoordinates, function (tile, canvasCoords) { return (__assign(__assign({}, tile), { canvasCoords: canvasCoords })); });
         var webGLColorScale = convertColorScale(colorScale);
         var webGLSentinelValues = convertColorScale(sentinelValues);
         var canvasSize = [canvasWidth, canvasHeight];
         textureManager.clearTiles();
         regl.clear({ color: CLEAR_COLOR });
-        var chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
+        var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
         var zoomdelta = _hillshadeOptions.hsSimpleZoomdelta || 0;
         var _loop_1 = function (chunk_1) {
             var textureBounds = chunk_1.map(function (_a) {
@@ -2108,7 +2114,7 @@ var Renderer = (function () {
         var _b = this.computeRequiredCanvasDimensions(tiles.length), canvasWidth = _b[0], canvasHeight = _b[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
         var canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tiles.length);
-        var tilesWithCanvasCoordinates = zipWith(tiles, tilesHs, canvasCoordinates, function (tiles, tilesHs, canvasCoords) { return ({
+        var tilesWithCanvasCoordinates = lodashEs.zipWith(tiles, tilesHs, canvasCoordinates, function (tiles, tilesHs, canvasCoords) { return ({
             coords: tiles.coords,
             tilesPixelData: tiles.pixelData,
             tilesHsPixelData: tilesHs.pixelData,
@@ -2120,7 +2126,7 @@ var Renderer = (function () {
         textureManager.clearTiles();
         textureManagerHillshade.clearTiles();
         regl.clear({ color: CLEAR_COLOR });
-        var chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
+        var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
         var _loop_2 = function (chunk_2) {
             var textureBounds = chunk_2.map(function (_a) {
                 var coords = _a.coords, tilesPixelData = _a.tilesPixelData;
@@ -2158,7 +2164,7 @@ var Renderer = (function () {
         var canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
         var canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tilesA.length);
-        var tilesWithCanvasCoordinates = zipWith(tilesA, tilesB, canvasCoordinates, function (tilesA, tilesB, canvasCoords) { return ({
+        var tilesWithCanvasCoordinates = lodashEs.zipWith(tilesA, tilesB, canvasCoordinates, function (tilesA, tilesB, canvasCoords) { return ({
             coords: tilesA.coords,
             tilesAPixelData: tilesA.pixelData,
             tilesBPixelData: tilesB.pixelData,
@@ -2168,7 +2174,7 @@ var Renderer = (function () {
         var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
-            var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
+            var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
             regl.clear({ color: CLEAR_COLOR });
             var tileIndex = 0;
             var _loop_3 = function (chunk_3) {
@@ -2237,7 +2243,7 @@ var Renderer = (function () {
         var canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
         var canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tilesA.length);
-        var tilesWithCanvasCoordinates = zipWith(tilesA, canvasCoordinates, function (tilesA, canvasCoords) { return ({
+        var tilesWithCanvasCoordinates = lodashEs.zipWith(tilesA, canvasCoordinates, function (tilesA, canvasCoords) { return ({
             coords: tilesA.coords,
             tilesAPixelData: tilesA.pixelData,
             canvasCoords: canvasCoords,
@@ -2246,7 +2252,7 @@ var Renderer = (function () {
         var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
-            var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
+            var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
             regl.clear({ color: CLEAR_COLOR });
             var tileIndex = 0;
             var _loop_4 = function (chunk_4) {
@@ -2311,7 +2317,7 @@ var Renderer = (function () {
         var canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
         var canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tilesA.length);
-        var tilesWithCanvasCoordinates = zipWith(tilesA, tilesB, canvasCoordinates, function (tilesA, tilesB, canvasCoords) { return ({
+        var tilesWithCanvasCoordinates = lodashEs.zipWith(tilesA, tilesB, canvasCoordinates, function (tilesA, tilesB, canvasCoords) { return ({
             coords: tilesA.coords,
             tilesAPixelData: tilesA.pixelData,
             tilesBPixelData: tilesB.pixelData,
@@ -2321,7 +2327,7 @@ var Renderer = (function () {
         var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
-            var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
+            var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
             regl.clear({ color: CLEAR_COLOR });
             var tileIndex = 0;
             var _loop_5 = function (chunk_5) {
@@ -2402,7 +2408,7 @@ var Renderer = (function () {
         var canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
         var canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tilesA.length);
-        var tilesWithCanvasCoordinates = zipWith(tilesA, tilesB, tilesC, canvasCoordinates, function (tilesA, tilesB, tilesC, canvasCoords) { return ({
+        var tilesWithCanvasCoordinates = lodashEs.zipWith(tilesA, tilesB, tilesC, canvasCoordinates, function (tilesA, tilesB, tilesC, canvasCoords) { return ({
             coords: tilesA.coords,
             tilesAPixelData: tilesA.pixelData,
             tilesBPixelData: tilesB.pixelData,
@@ -2413,7 +2419,7 @@ var Renderer = (function () {
         var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
-            var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
+            var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
             regl.clear({ color: CLEAR_COLOR });
             var tileIndex = 0;
             var _loop_6 = function (chunk_6) {
@@ -2510,7 +2516,7 @@ var Renderer = (function () {
         var canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
         var canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tilesA.length);
-        var tilesWithCanvasCoordinates = zipWith(tilesA, tilesB, tilesC, tilesD, canvasCoordinates, function (tilesA, tilesB, tilesC, tilesD, canvasCoords) { return ({
+        var tilesWithCanvasCoordinates = lodashEs.zipWith(tilesA, tilesB, tilesC, tilesD, canvasCoordinates, function (tilesA, tilesB, tilesC, tilesD, canvasCoords) { return ({
             coords: tilesA.coords,
             tilesAPixelData: tilesA.pixelData,
             tilesBPixelData: tilesB.pixelData,
@@ -2522,7 +2528,7 @@ var Renderer = (function () {
         var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
-            var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
+            var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
             regl.clear({ color: CLEAR_COLOR });
             var tileIndex = 0;
             var _loop_7 = function (chunk_7) {
@@ -2635,7 +2641,7 @@ var Renderer = (function () {
         var canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
         var canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tilesA.length);
-        var tilesWithCanvasCoordinates = zipWith(tilesA, tilesB, tilesC, tilesD, tilesE, canvasCoordinates, function (tilesA, tilesB, tilesC, tilesD, tilesE, canvasCoords) { return ({
+        var tilesWithCanvasCoordinates = lodashEs.zipWith(tilesA, tilesB, tilesC, tilesD, tilesE, canvasCoordinates, function (tilesA, tilesB, tilesC, tilesD, tilesE, canvasCoords) { return ({
             coords: tilesA.coords,
             tilesAPixelData: tilesA.pixelData,
             tilesBPixelData: tilesB.pixelData,
@@ -2648,7 +2654,7 @@ var Renderer = (function () {
         var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
-            var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
+            var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
             regl.clear({ color: CLEAR_COLOR });
             var tileIndex = 0;
             var _loop_8 = function (chunk_8) {
@@ -2777,7 +2783,7 @@ var Renderer = (function () {
         var canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
         var canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tilesA.length);
-        var tilesWithCanvasCoordinates = zipWith(tilesA, tilesB, tilesC, tilesD, tilesE, tilesF, canvasCoordinates, function (tilesA, tilesB, tilesC, tilesD, tilesE, tilesF, canvasCoords) { return ({
+        var tilesWithCanvasCoordinates = lodashEs.zipWith(tilesA, tilesB, tilesC, tilesD, tilesE, tilesF, canvasCoordinates, function (tilesA, tilesB, tilesC, tilesD, tilesE, tilesF, canvasCoords) { return ({
             coords: tilesA.coords,
             tilesAPixelData: tilesA.pixelData,
             tilesBPixelData: tilesB.pixelData,
@@ -2791,7 +2797,7 @@ var Renderer = (function () {
         var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
-            var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
+            var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
             regl.clear({ color: CLEAR_COLOR });
             var tileIndex = 0;
             var _loop_9 = function (chunk_9) {
@@ -2941,7 +2947,7 @@ var Renderer = (function () {
                         canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
                         this.setCanvasSize(canvasWidth, canvasHeight);
                         canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, oldTiles.length);
-                        tilesWithCanvasCoordinates = zipWith(oldTiles, newTiles, canvasCoordinates, function (oldTile, newTile, canvasCoords) { return ({
+                        tilesWithCanvasCoordinates = lodashEs.zipWith(oldTiles, newTiles, canvasCoordinates, function (oldTile, newTile, canvasCoords) { return ({
                             coords: oldTile.coords,
                             oldPixelData: oldTile.pixelData,
                             newPixelData: newTile.pixelData,
@@ -2952,7 +2958,7 @@ var Renderer = (function () {
                         webGLSentinelValues = convertColorScale(sentinelValues);
                         transitionStart = regl.now();
                         renderFrame = function (interpolationFraction) {
-                            var chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
+                            var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
                             regl.clear({ color: CLEAR_COLOR });
                             var _loop_10 = function (chunk_10) {
                                 var oldTextureBounds = chunk_10.map(function (_a) {
@@ -3014,7 +3020,7 @@ var Renderer = (function () {
                         canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
                         this.setCanvasSize(canvasWidth, canvasHeight);
                         canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, oldTiles.length);
-                        tilesWithCanvasCoordinates = zipWith(oldTiles, newTiles, canvasCoordinates, function (oldTile, newTile, canvasCoords) { return ({
+                        tilesWithCanvasCoordinates = lodashEs.zipWith(oldTiles, newTiles, canvasCoordinates, function (oldTile, newTile, canvasCoords) { return ({
                             coords: oldTile.coords,
                             oldPixelData: oldTile.pixelData,
                             newPixelData: newTile.pixelData,
@@ -3027,7 +3033,7 @@ var Renderer = (function () {
                         sentinelValuesB = convertColorScale(newSentinelValues);
                         transitionStart = regl.now();
                         renderFrame = function (interpolationFraction) {
-                            var chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
+                            var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
                             regl.clear({ color: CLEAR_COLOR });
                             var _loop_11 = function (chunk_11) {
                                 var oldTextureBounds = chunk_11.map(function (_a) {
@@ -3091,7 +3097,7 @@ var Renderer = (function () {
                         canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
                         this.setCanvasSize(canvasWidth, canvasHeight);
                         canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tiles.length);
-                        tilesWithCanvasCoordinates = zipWith(tiles, canvasCoordinates, function (tile, canvasCoords) { return (__assign(__assign({}, tile), { canvasCoords: canvasCoords })); });
+                        tilesWithCanvasCoordinates = lodashEs.zipWith(tiles, canvasCoordinates, function (tile, canvasCoords) { return (__assign(__assign({}, tile), { canvasCoords: canvasCoords })); });
                         newTextureManager = new TextureManager(regl, tileSize, maxTextureDimension, false);
                         colorScaleA = convertColorScale(oldColorScale);
                         colorScaleB = convertColorScale(newColorScale);
@@ -3099,7 +3105,7 @@ var Renderer = (function () {
                         sentinelValuesB = convertColorScale(newSentinelValues);
                         transitionStart = regl.now();
                         renderFrame = function (interpolationFraction) {
-                            var chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
+                            var chunks = lodashEs.chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
                             regl.clear({ color: CLEAR_COLOR });
                             var _loop_12 = function (chunk_12) {
                                 var textureBounds = chunk_12.map(function (_a) {
@@ -3159,15 +3165,15 @@ var Renderer = (function () {
     };
     Renderer.prototype.getCanvasCoordinates = function (canvasWidth, canvasHeight, numTiles) {
         var tileSize = this.tileSize;
-        return flatMap(range(0, canvasHeight, tileSize), function (y) {
+        return lodashEs.flatMap(range(0, canvasHeight, tileSize), function (y) {
             return range(0, canvasWidth, tileSize).map(function (x) { return [x, y]; });
         }).slice(0, numTiles);
     };
     return Renderer;
 }());
 
-var d3 = { select: select, selectAll: selectAll, scaleLinear: scaleLinear, geoPath: geoPath, contours: contours, interpolateHcl: interpolateHcl,
-    json: json, min: min, max: max, scan: scan, range: range$1 };
+var d3 = { select: d3Selection.select, selectAll: d3Selection.selectAll, scaleLinear: d3Scale.scaleLinear, geoPath: d3Geo.geoPath, contours: d3Contour.contours, interpolateHcl: d3Interpolate.interpolateHcl,
+    event: d3Selection.event, json: d3Request.json, min: d3Array.min, max: d3Array.max, scan: d3Array.scan, range: d3Array.range };
 var BYTES_PER_WORD = 4;
 var littleEndian$1 = machineIsLittleEndian();
 var defaultOptions = {
@@ -3296,7 +3302,7 @@ var GLOperations = (function (_super) {
     GLOperations.prototype.updateOptions = function (options) {
         var _this = this;
         var _a = this.options, prevUrl = _a.url, prevGlOperation = _a.glOperation, prevUrlA = _a.operationUrlA, prevUrlB = _a.operationUrlB, prevUrlC = _a.operationUrlC, prevUrlD = _a.operationUrlD, prevUrlE = _a.operationUrlE, prevUrlF = _a.operationUrlF, prevColorScale = _a.colorScale, prevSentinelValues = _a.sentinelValues, prevFilterLowA = _a.filterLowA, prevFilterHighA = _a.filterHighA, prevFilterLowB = _a.filterLowB, prevFilterHighB = _a.filterHighB, prevFilterLowC = _a.filterLowC, prevFilterHighC = _a.filterHighC, prevFilterLowD = _a.filterLowD, prevFilterHighD = _a.filterHighD, prevFilterLowE = _a.filterLowE, prevFilterHighE = _a.filterHighE, prevFilterLowF = _a.filterLowF, prevFilterHighF = _a.filterHighF, prevMultiplierA = _a.multiplierA, prevMultiplierB = _a.multiplierB, prevMultiplierC = _a.multiplierC, prevMultiplierD = _a.multiplierD, prevMultiplierE = _a.multiplierE, prevMultiplierF = _a.multiplierF, prevMultiLayers = _a.multiLayers, prevHsPregenUrl = _a.hsPregenUrl, prevHillshadeType = _a.hillshadeType, prevHsSimpleSlopescale = _a.hsSimpleSlopescale, prevContourInterval = _a.contourInterval, prevContourIndexInterval = _a.contourIndexInterval, prevContourLineColor = _a.contourLineColor, prevContourLineWeight = _a.contourLineWeight, prevContourLineIndexWeight = _a.contourLineIndexWeight, prevContourType = _a.contourType, prevContourSmoothLines = _a.contourSmoothLines, prevContourSmoothInput = _a.contourSmoothInput, prevContourSmoothInputKernel = _a.contourSmoothInputKernel, prevContourIlluminatedHighlightColor = _a.contourIlluminatedHighlightColor, prevContourIlluminatedShadowColor = _a.contourIlluminatedShadowColor, prevContourIlluminatedShadowSize = _a.contourIlluminatedShadowSize, prevContourHypso = _a.contourHypso, prevContourHypsoDomain = _a.contourHypsoDomain, prevContourHypsoColors = _a.contourHypsoColors, prevContourBathy = _a.contourBathy, prevContourBathyDomain = _a.contourBathyDomain, prevContourBathyColors = _a.contourBathyColors, prevContourBathyShadowColor = _a.contourBathyShadowColor, prevContourBathyHighlightColor = _a.contourBathyHighlightColor, prevContourIndexLabels = _a.contourIndexLabels, prevContourLabelFont = _a.contourLabelFont, prevContourLabelDistance = _a.contourLabelDistance, prevScaleMaxLength = _a.colorscaleMaxLength, prevSentinelMaxLength = _a.sentinelMaxLength;
-        Util.setOptions(this, options);
+        L.Util.setOptions(this, options);
         if (this.options.colorscaleMaxLength !== prevScaleMaxLength || this.options.sentinelMaxLength !== prevSentinelMaxLength) {
             if (this.options.debug)
                 console.log("Creating new renderer");
@@ -3455,7 +3461,7 @@ var GLOperations = (function (_super) {
     GLOperations.prototype.getEvents = function () {
         var _this = this;
         var _a = this.options, click = _a.onclick, dblclick = _a.ondblclick, mousedown = _a.onmousedown, mouseup = _a.onmouseup, mouseover = _a.onmouseover, mouseout = _a.onmouseout, mousemove = _a.onmousemove, contextmenu = _a.oncontextmenu;
-        var definedHandlers = pickBy({
+        var definedHandlers = lodashEs.pickBy({
             click: click,
             dblclick: dblclick,
             mousedown: mousedown,
@@ -3464,12 +3470,12 @@ var GLOperations = (function (_super) {
             mouseout: mouseout,
             mousemove: mousemove,
             contextmenu: contextmenu,
-        }, function (handler) { return !isUndefined(handler); });
-        return __assign(__assign({}, GridLayer.prototype.getEvents.call(this)), mapValues(definedHandlers, function (val) { return val && _this._wrapMouseEventHandler(val); }));
+        }, function (handler) { return !lodashEs.isUndefined(handler); });
+        return __assign(__assign({}, L.GridLayer.prototype.getEvents.call(this)), lodashEs.mapValues(definedHandlers, function (val) { return val && _this._wrapMouseEventHandler(val); }));
     };
     GLOperations.prototype.getTileUrl = function (coords, url) {
         var data = {
-            r: Browser.retina ? '@2x' : '',
+            r: L.Browser.retina ? '@2x' : '',
             s: this._getSubdomain(coords),
             x: coords.x,
             y: coords.y,
@@ -3482,7 +3488,7 @@ var GLOperations = (function (_super) {
             }
             data['-y'] = invertedY;
         }
-        return Util.template(url, Util.extend(data, this.options));
+        return L.Util.template(url, L.Util.extend(data, this.options));
     };
     GLOperations.prototype.redraw = function () {
         if (this._map) {
@@ -3498,7 +3504,7 @@ var GLOperations = (function (_super) {
         var _a = this.options, colorScale = _a.colorScale, sentinelValues = _a.sentinelValues, extraPixelLayers = _a.extraPixelLayers, tileSize = _a.tileSize, url = _a.url, hsPregenUrl = _a.hsPregenUrl, operationUrlA = _a.operationUrlA, operationUrlB = _a.operationUrlB, operationUrlC = _a.operationUrlC, operationUrlD = _a.operationUrlD, operationUrlE = _a.operationUrlE, operationUrlF = _a.operationUrlF, filterLowA = _a.filterLowA, filterHighA = _a.filterHighA, filterLowB = _a.filterLowB, filterHighB = _a.filterHighB, filterLowC = _a.filterLowC, filterHighC = _a.filterHighC, filterLowD = _a.filterLowD, filterHighD = _a.filterHighD, filterLowE = _a.filterLowE, filterHighE = _a.filterHighE, filterLowF = _a.filterLowF, filterHighF = _a.filterHighF, multiplierA = _a.multiplierA, multiplierB = _a.multiplierB, multiplierC = _a.multiplierC, multiplierD = _a.multiplierD, multiplierE = _a.multiplierE, multiplierF = _a.multiplierF;
         if (this.options.debug)
             console.log("createTile");
-        var tileCanvas = DomUtil.create('canvas');
+        var tileCanvas = L.DomUtil.create('canvas');
         Object.assign(tileCanvas, {
             className: 'gl-tilelayer-tile',
             width: tileSize,
@@ -3713,8 +3719,8 @@ var GLOperations = (function (_super) {
         var coords = _a.coords, tile = _a.tile;
         if (this.options.debug)
             console.log("_onTileRemove()");
-        if (!Browser.android) {
-            tile.onload = noop;
+        if (!L.Browser.android) {
+            tile.onload = lodashEs.noop;
         }
         this._renderer.removeTile(coords);
     };
@@ -4828,7 +4834,7 @@ var GLOperations = (function (_super) {
             console.log("_getActiveTiles()");
         this._pruneTiles();
         var tiles = staticCast(this._tiles);
-        return values(tiles).sort(function (a, b) { return compareTileCoordinates(a.coords, b.coords); });
+        return lodashEs.values(tiles).sort(function (a, b) { return compareTileCoordinates(a.coords, b.coords); });
     };
     GLOperations.prototype._getTilesData = function (tiles, url) {
         if (url === void 0) { url = this.options.url; }
@@ -4871,7 +4877,7 @@ var GLOperations = (function (_super) {
                         if (this.options.debug)
                             console.log("_fetchTilesData() with url:" + url);
                         this.fire('load', { url: url });
-                        return [2, zipWith(tiles, pixelData, function (_a, data) {
+                        return [2, lodashEs.zipWith(tiles, pixelData, function (_a, data) {
                                 var coords = _a.coords;
                                 return ({
                                     coords: coords,
@@ -5212,8 +5218,8 @@ var GLOperations = (function (_super) {
                 transformPane = this._level.origin.multiplyBy(scale)
                     .subtract(pixelOrigin);
                 activeTilesPos = this._getTilePos(this._keyToTileCoords(activeTilesBounds.xMin + ":" + activeTilesBounds.yMin + ":" + this._level.zoom));
-                DomUtil.setTransform(contourPane, transformPane, scale);
-                DomUtil.setTransform(contourCanvas, activeTilesPos);
+                L.DomUtil.setTransform(contourPane, transformPane, scale);
+                L.DomUtil.setTransform(contourCanvas, activeTilesPos);
                 return [2];
             });
         });
@@ -5434,21 +5440,21 @@ var GLOperations = (function (_super) {
     GLOperations.prototype._getTileContainingPoint = function (point) {
         var _this = this;
         var tiles = staticCast(this._tiles);
-        return values(tiles).find(function (tile) {
+        return lodashEs.values(tiles).find(function (tile) {
             return tile.coords.z === _this._tileZoom && _this._tileBounds(tile).contains(point);
         });
     };
     GLOperations.prototype._tileBounds = function (tile) {
         var _a = tile.coords, x = _a.x, y = _a.y;
         var tileSize = this._tileSizeAsNumber();
-        var topLeft = point(x * tileSize, y * tileSize);
-        var bottomRight = point(topLeft.x + (tileSize - 1), topLeft.y + (tileSize - 1));
-        return bounds(topLeft, bottomRight);
+        var topLeft = L.point(x * tileSize, y * tileSize);
+        var bottomRight = L.point(topLeft.x + (tileSize - 1), topLeft.y + (tileSize - 1));
+        return L.bounds(topLeft, bottomRight);
     };
     GLOperations.prototype._getCoordsInTile = function (tile, pixelCoords) {
         var _a = tile.coords, tileX = _a.x, tileY = _a.y;
         var tileSize = this._tileSizeAsNumber();
-        return point(pixelCoords.x - (tileX * tileSize), pixelCoords.y - (tileY * tileSize));
+        return L.point(pixelCoords.x - (tileX * tileSize), pixelCoords.y - (tileY * tileSize));
     };
     GLOperations.prototype._getPixelValue = function (pixelData, byteIndex) {
         if (!pixelData) {
@@ -5468,7 +5474,7 @@ var GLOperations = (function (_super) {
     };
     GLOperations.defaultOptions = defaultOptions;
     return GLOperations;
-}(GridLayer));
+}(L.GridLayer));
 
-export default GLOperations;
-//# sourceMappingURL=index.es.js.map
+module.exports = GLOperations;
+//# sourceMappingURL=index.js.map

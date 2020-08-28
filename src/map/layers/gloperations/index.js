@@ -1,10 +1,8 @@
 'use strict';
 
-function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
-
 var L = require('leaflet');
 var lodashEs = require('lodash-es');
-var REGL = _interopDefault(require('regl'));
+var REGL = require('regl');
 var upngJs = require('upng-js');
 var d3Selection = require('d3-selection');
 var d3Scale = require('d3-scale');
@@ -14,26 +12,30 @@ var d3Request = require('d3-request');
 var d3Array = require('d3-array');
 var d3Interpolate = require('d3-interpolate');
 
+function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
+
+var REGL__default = /*#__PURE__*/_interopDefaultLegacy(REGL);
+
 /*! *****************************************************************************
-Copyright (c) Microsoft Corporation. All rights reserved.
-Licensed under the Apache License, Version 2.0 (the "License"); you may not use
-this file except in compliance with the License. You may obtain a copy of the
-License at http://www.apache.org/licenses/LICENSE-2.0
+Copyright (c) Microsoft Corporation.
 
-THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
-WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
-MERCHANTABLITY OR NON-INFRINGEMENT.
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted.
 
-See the Apache Version 2.0 License for specific language governing permissions
-and limitations under the License.
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
 ***************************************************************************** */
 /* global Reflect, Promise */
 
 var extendStatics = function(d, b) {
     extendStatics = Object.setPrototypeOf ||
         ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
     return extendStatics(d, b);
 };
 
@@ -55,10 +57,11 @@ var __assign = function() {
 };
 
 function __awaiter(thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
         function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 }
@@ -118,8 +121,8 @@ function styleInject(css, ref) {
   }
 }
 
-var css = ".gl-tilelayer-tile {\n  -ms-interpolation-mode: nearest-neighbor;\n      image-rendering: -moz-crisp-edges;\n      image-rendering: pixelated;\n  image-rendering: crisp-edges;\n}\n";
-styleInject(css);
+var css_248z = ".gl-tilelayer-tile {\n  -ms-interpolation-mode: nearest-neighbor;\n      image-rendering: -moz-crisp-edges;\n      image-rendering: pixelated;\n  image-rendering: crisp-edges;\n}\n";
+styleInject(css_248z);
 
 var CLEAR_COLOR = [0, 0, 0, 0];
 var DEFAULT_COLOR_STOP = {
@@ -372,7 +375,7 @@ function getCommonDrawConfiguration(tileSize, nodataValue) {
 var deg2rad = 0.017453292519943295;
 var slopeFactor = 0.0333334;
 function createDrawTileCommand(regl, commonConfig, commonColors) {
-    return regl(__assign({}, commonConfig, { vert: vertSingle, frag: defineMacros(fragSingle, commonColors.fragMacros), uniforms: __assign({}, commonConfig.uniforms, commonColors.colorScaleUniforms, commonColors.sentinelValuesUniforms, { colorScaleLength: function (_, _a) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragSingle, commonColors.fragMacros), uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
                 var colorScale = _a.colorScale;
                 return colorScale.length;
             }, sentinelValuesLength: function (_, _a) {
@@ -384,13 +387,13 @@ function createDrawTileCommand(regl, commonConfig, commonColors) {
             }, enableSimpleHillshade: function (_, _a) {
                 var enableSimpleHillshade = _a.enableSimpleHillshade;
                 return enableSimpleHillshade;
-            }, offset: 0, azimuth: 0, altitude: 0, slopescale: 0, deg2rad: deg2rad, slopeFactor: slopeFactor, tileSize: 0, textureSize: 0, textureBounds: [0, 0, 0, 0] }), attributes: __assign({}, commonConfig.attributes, { texCoord: function (_, _a) {
+            }, offset: 0, azimuth: 0, altitude: 0, slopescale: 0, deg2rad: deg2rad, slopeFactor: slopeFactor, tileSize: 0, textureSize: 0, textureBounds: [0, 0, 0, 0] }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoord: function (_, _a) {
                 var textureBounds = _a.textureBounds;
                 return getTexCoordVertices(textureBounds);
             } }) }));
 }
 function createDrawTileHsSimpleCommand(regl, commonConfig, commonColors) {
-    return regl(__assign({}, commonConfig, { vert: vertSingle, frag: defineMacros(fragSingle, commonColors.fragMacros), uniforms: __assign({}, commonConfig.uniforms, commonColors.colorScaleUniforms, commonColors.sentinelValuesUniforms, { colorScaleLength: function (_, _a) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragSingle, commonColors.fragMacros), uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
                 var colorScale = _a.colorScale;
                 return colorScale.length;
             }, sentinelValuesLength: function (_, _a) {
@@ -428,13 +431,13 @@ function createDrawTileHsSimpleCommand(regl, commonConfig, commonColors) {
             }, tileSize: function (_, _a) {
                 var tileSize = _a.tileSize;
                 return tileSize;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoord: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoord: function (_, _a) {
                 var textureBounds = _a.textureBounds;
                 return getTexCoordVertices(textureBounds);
             } }) }));
 }
 function createDrawTileHsPregenCommand(regl, commonConfig, commonColors) {
-    return regl(__assign({}, commonConfig, { vert: vertDouble, frag: defineMacros(fragHsPregen, commonColors.fragMacros), uniforms: __assign({}, commonConfig.uniforms, commonColors.colorScaleUniforms, commonColors.sentinelValuesUniforms, { colorScaleLength: function (_, _a) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragHsPregen, commonColors.fragMacros), uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
                 var colorScale = _a.colorScale;
                 return colorScale.length;
             }, sentinelValuesLength: function (_, _a) {
@@ -446,7 +449,7 @@ function createDrawTileHsPregenCommand(regl, commonConfig, commonColors) {
             }, hillshadePregenTexture: function (_, _a) {
                 var hillshadePregenTexture = _a.hillshadePregenTexture;
                 return hillshadePregenTexture;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBounds = _a.textureBounds;
                 return getTexCoordVertices(textureBounds);
             }, texCoordB: function (_, _a) {
@@ -455,7 +458,7 @@ function createDrawTileHsPregenCommand(regl, commonConfig, commonColors) {
             } }) }));
 }
 function createDrawTileInterpolateValueCommand(regl, commonConfig, commonColors) {
-    return regl(__assign({}, commonConfig, { vert: vertDouble, frag: defineMacros(fragInterpolateValue, commonColors.fragMacros), uniforms: __assign({}, commonConfig.uniforms, commonColors.colorScaleUniforms, commonColors.sentinelValuesUniforms, { colorScaleLength: function (_, _a) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragInterpolateValue, commonColors.fragMacros), uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
                 var colorScale = _a.colorScale;
                 return colorScale.length;
             }, sentinelValuesLength: function (_, _a) {
@@ -470,7 +473,7 @@ function createDrawTileInterpolateValueCommand(regl, commonConfig, commonColors)
             }, interpolationFraction: function (_, _a) {
                 var interpolationFraction = _a.interpolationFraction;
                 return interpolationFraction;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -479,9 +482,9 @@ function createDrawTileInterpolateValueCommand(regl, commonConfig, commonColors)
             } }) }));
 }
 function createDrawTileMultiAnalyze1Command(regl, commonConfig, commonColors) {
-    return regl(__assign({}, commonConfig, { vert: vertSingle, frag: defineMacros(fragMulti1Draw, commonColors.fragMacros), depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragMulti1Draw, commonColors.fragMacros), depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, commonColors.colorScaleUniforms, commonColors.sentinelValuesUniforms, { colorScaleLength: function (_, _a) {
+        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
                 var colorScale = _a.colorScale;
                 return colorScale.length;
             }, sentinelValuesLength: function (_, _a) {
@@ -499,15 +502,15 @@ function createDrawTileMultiAnalyze1Command(regl, commonConfig, commonColors) {
             }, textureA: function (_, _a) {
                 var textureA = _a.textureA;
                 return textureA;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoord: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoord: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             } }) }));
 }
 function createCalcTileMultiAnalyze1Command(regl, commonConfig) {
-    return regl(__assign({}, commonConfig, { vert: vertSingle, frag: fragMulti1Calc, depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: fragMulti1Calc, depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, { filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -519,15 +522,15 @@ function createCalcTileMultiAnalyze1Command(regl, commonConfig) {
             }, textureA: function (_, _a) {
                 var textureA = _a.textureA;
                 return textureA;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoord: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoord: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             } }) }));
 }
 function createDrawTileMultiAnalyze2Command(regl, commonConfig, commonColors) {
-    return regl(__assign({}, commonConfig, { vert: vertDouble, frag: defineMacros(fragMulti2Draw, commonColors.fragMacros), depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragMulti2Draw, commonColors.fragMacros), depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, commonColors.colorScaleUniforms, commonColors.sentinelValuesUniforms, { colorScaleLength: function (_, _a) {
+        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
                 var colorScale = _a.colorScale;
                 return colorScale.length;
             }, sentinelValuesLength: function (_, _a) {
@@ -557,7 +560,7 @@ function createDrawTileMultiAnalyze2Command(regl, commonConfig, commonColors) {
             }, textureB: function (_, _a) {
                 var textureB = _a.textureB;
                 return textureB;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -566,9 +569,9 @@ function createDrawTileMultiAnalyze2Command(regl, commonConfig, commonColors) {
             } }) }));
 }
 function createCalcTileMultiAnalyze2Command(regl, commonConfig) {
-    return regl(__assign({}, commonConfig, { vert: vertDouble, frag: fragMulti2Calc, depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: fragMulti2Calc, depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, { filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -592,7 +595,7 @@ function createCalcTileMultiAnalyze2Command(regl, commonConfig) {
             }, textureB: function (_, _a) {
                 var textureB = _a.textureB;
                 return textureB;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -601,9 +604,9 @@ function createCalcTileMultiAnalyze2Command(regl, commonConfig) {
             } }) }));
 }
 function createDrawTileMultiAnalyze3Command(regl, commonConfig, commonColors) {
-    return regl(__assign({}, commonConfig, { vert: vertMulti3, frag: defineMacros(fragMulti3Draw, commonColors.fragMacros), depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti3, frag: defineMacros(fragMulti3Draw, commonColors.fragMacros), depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, commonColors.colorScaleUniforms, commonColors.sentinelValuesUniforms, { colorScaleLength: function (_, _a) {
+        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
                 var colorScale = _a.colorScale;
                 return colorScale.length;
             }, sentinelValuesLength: function (_, _a) {
@@ -645,7 +648,7 @@ function createDrawTileMultiAnalyze3Command(regl, commonConfig, commonColors) {
             }, textureC: function (_, _a) {
                 var textureC = _a.textureC;
                 return textureC;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -657,9 +660,9 @@ function createDrawTileMultiAnalyze3Command(regl, commonConfig, commonColors) {
             } }) }));
 }
 function createCalcTileMultiAnalyze3Command(regl, commonConfig) {
-    return regl(__assign({}, commonConfig, { vert: vertMulti3, frag: fragMulti3Calc, depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti3, frag: fragMulti3Calc, depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, { filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -695,7 +698,7 @@ function createCalcTileMultiAnalyze3Command(regl, commonConfig) {
             }, textureC: function (_, _a) {
                 var textureC = _a.textureC;
                 return textureC;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -707,9 +710,9 @@ function createCalcTileMultiAnalyze3Command(regl, commonConfig) {
             } }) }));
 }
 function createDrawTileMultiAnalyze4Command(regl, commonConfig, commonColors) {
-    return regl(__assign({}, commonConfig, { vert: vertMulti4, frag: defineMacros(fragMulti4Draw, commonColors.fragMacros), depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti4, frag: defineMacros(fragMulti4Draw, commonColors.fragMacros), depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, commonColors.colorScaleUniforms, commonColors.sentinelValuesUniforms, { colorScaleLength: function (_, _a) {
+        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
                 var colorScale = _a.colorScale;
                 return colorScale.length;
             }, sentinelValuesLength: function (_, _a) {
@@ -763,7 +766,7 @@ function createDrawTileMultiAnalyze4Command(regl, commonConfig, commonColors) {
             }, textureD: function (_, _a) {
                 var textureD = _a.textureD;
                 return textureD;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -778,9 +781,9 @@ function createDrawTileMultiAnalyze4Command(regl, commonConfig, commonColors) {
             } }) }));
 }
 function createCalcTileMultiAnalyze4Command(regl, commonConfig) {
-    return regl(__assign({}, commonConfig, { vert: vertMulti4, frag: fragMulti4Calc, depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti4, frag: fragMulti4Calc, depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, { filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -828,7 +831,7 @@ function createCalcTileMultiAnalyze4Command(regl, commonConfig) {
             }, textureD: function (_, _a) {
                 var textureD = _a.textureD;
                 return textureD;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -843,9 +846,9 @@ function createCalcTileMultiAnalyze4Command(regl, commonConfig) {
             } }) }));
 }
 function createDrawTileMultiAnalyze5Command(regl, commonConfig, commonColors) {
-    return regl(__assign({}, commonConfig, { vert: vertMulti5, frag: defineMacros(fragMulti5Draw, commonColors.fragMacros), depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti5, frag: defineMacros(fragMulti5Draw, commonColors.fragMacros), depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, commonColors.colorScaleUniforms, commonColors.sentinelValuesUniforms, { colorScaleLength: function (_, _a) {
+        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
                 var colorScale = _a.colorScale;
                 return colorScale.length;
             }, sentinelValuesLength: function (_, _a) {
@@ -911,7 +914,7 @@ function createDrawTileMultiAnalyze5Command(regl, commonConfig, commonColors) {
             }, textureE: function (_, _a) {
                 var textureE = _a.textureE;
                 return textureE;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -929,9 +932,9 @@ function createDrawTileMultiAnalyze5Command(regl, commonConfig, commonColors) {
             } }) }));
 }
 function createCalcTileMultiAnalyze5Command(regl, commonConfig) {
-    return regl(__assign({}, commonConfig, { vert: vertMulti5, frag: fragMulti5Calc, depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti5, frag: fragMulti5Calc, depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, { filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -991,7 +994,7 @@ function createCalcTileMultiAnalyze5Command(regl, commonConfig) {
             }, textureE: function (_, _a) {
                 var textureE = _a.textureE;
                 return textureE;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -1009,9 +1012,9 @@ function createCalcTileMultiAnalyze5Command(regl, commonConfig) {
             } }) }));
 }
 function createDrawTileMultiAnalyze6Command(regl, commonConfig, commonColors) {
-    return regl(__assign({}, commonConfig, { vert: vertMulti6, frag: defineMacros(fragMulti6Draw, commonColors.fragMacros), depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti6, frag: defineMacros(fragMulti6Draw, commonColors.fragMacros), depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, commonColors.colorScaleUniforms, commonColors.sentinelValuesUniforms, { colorScaleLength: function (_, _a) {
+        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
                 var colorScale = _a.colorScale;
                 return colorScale.length;
             }, sentinelValuesLength: function (_, _a) {
@@ -1089,7 +1092,7 @@ function createDrawTileMultiAnalyze6Command(regl, commonConfig, commonColors) {
             }, textureF: function (_, _a) {
                 var textureF = _a.textureF;
                 return textureF;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -1110,9 +1113,9 @@ function createDrawTileMultiAnalyze6Command(regl, commonConfig, commonColors) {
             } }) }));
 }
 function createCalcTileMultiAnalyze6Command(regl, commonConfig) {
-    return regl(__assign({}, commonConfig, { vert: vertMulti6, frag: fragMulti6Calc, depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti6, frag: fragMulti6Calc, depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, { filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -1184,7 +1187,7 @@ function createCalcTileMultiAnalyze6Command(regl, commonConfig) {
             }, textureF: function (_, _a) {
                 var textureF = _a.textureF;
                 return textureF;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -1205,15 +1208,15 @@ function createCalcTileMultiAnalyze6Command(regl, commonConfig) {
             } }) }));
 }
 function createCalcTileDiffCommand(regl, commonConfig) {
-    return regl(__assign({}, commonConfig, { vert: vertDouble, frag: fragDiffCalc, depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: fragDiffCalc, depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, { textureA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { textureA: function (_, _a) {
                 var textureA = _a.textureA;
                 return textureA;
             }, textureB: function (_, _a) {
                 var textureB = _a.textureB;
                 return textureB;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -1222,15 +1225,15 @@ function createCalcTileDiffCommand(regl, commonConfig) {
             } }) }));
 }
 function createDrawTileDiffCommand(regl, commonConfig, commonColors) {
-    return regl(__assign({}, commonConfig, { vert: vertDouble, frag: defineMacros(fragDiffDraw, commonColors.fragMacros), depth: {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragDiffDraw, commonColors.fragMacros), depth: {
             enable: false
-        }, uniforms: __assign({}, commonConfig.uniforms, commonColors.colorScaleUniforms, commonColors.sentinelValuesUniforms, { colorScaleLength: function (_, _a) {
+        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
                 var colorScale = _a.colorScale;
                 return colorScale.length;
             }, sentinelValuesLength: function (_, _a) {
                 var sentinelValues = _a.sentinelValues;
                 return sentinelValues.length;
-            }, textureA: regl.prop("textureA"), textureB: regl.prop("textureB") }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            }, textureA: regl.prop("textureA"), textureB: regl.prop("textureB") }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -1239,7 +1242,7 @@ function createDrawTileDiffCommand(regl, commonConfig, commonColors) {
             } }) }));
 }
 function createDrawTileInterpolateColorCommand(regl, commonConfig, colorsA, colorsB) {
-    return regl(__assign({}, commonConfig, { vert: vertDouble, frag: defineMacros(fragInterpolateColor, colorsA.fragMacros), uniforms: __assign({}, commonConfig.uniforms, colorsA.colorScaleUniforms, colorsA.sentinelValuesUniforms, colorsB.colorScaleUniforms, colorsB.sentinelValuesUniforms, { colorScaleLengthA: function (_, _a) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragInterpolateColor, colorsA.fragMacros), uniforms: __assign(__assign(__assign(__assign(__assign(__assign({}, commonConfig.uniforms), colorsA.colorScaleUniforms), colorsA.sentinelValuesUniforms), colorsB.colorScaleUniforms), colorsB.sentinelValuesUniforms), { colorScaleLengthA: function (_, _a) {
                 var colorScaleA = _a.colorScaleA;
                 return colorScaleA.length;
             }, colorScaleLengthB: function (_, _a) {
@@ -1260,7 +1263,7 @@ function createDrawTileInterpolateColorCommand(regl, commonConfig, colorsA, colo
             }, interpolationFraction: function (_, _a) {
                 var interpolationFraction = _a.interpolationFraction;
                 return interpolationFraction;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoordA: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -1269,7 +1272,7 @@ function createDrawTileInterpolateColorCommand(regl, commonConfig, colorsA, colo
             } }) }));
 }
 function createDrawTileInterpolateColorOnlyCommand(regl, commonConfig, colorsA, colorsB) {
-    return regl(__assign({}, commonConfig, { vert: vertSingle, frag: defineMacros(fragInterpolateColorOnly, colorsA.fragMacros), uniforms: __assign({}, commonConfig.uniforms, colorsA.colorScaleUniforms, colorsA.sentinelValuesUniforms, colorsB.colorScaleUniforms, colorsB.sentinelValuesUniforms, { colorScaleLengthA: function (_, _a) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragInterpolateColorOnly, colorsA.fragMacros), uniforms: __assign(__assign(__assign(__assign(__assign(__assign({}, commonConfig.uniforms), colorsA.colorScaleUniforms), colorsA.sentinelValuesUniforms), colorsB.colorScaleUniforms), colorsB.sentinelValuesUniforms), { colorScaleLengthA: function (_, _a) {
                 var colorScaleA = _a.colorScaleA;
                 return colorScaleA.length;
             }, colorScaleLengthB: function (_, _a) {
@@ -1287,7 +1290,7 @@ function createDrawTileInterpolateColorOnlyCommand(regl, commonConfig, colorsA, 
             }, interpolationFraction: function (_, _a) {
                 var interpolationFraction = _a.interpolationFraction;
                 return interpolationFraction;
-            } }), attributes: __assign({}, commonConfig.attributes, { texCoord: function (_, _a) {
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoord: function (_, _a) {
                 var textureBounds = _a.textureBounds;
                 return getTexCoordVertices(textureBounds);
             } }) }));
@@ -1296,7 +1299,7 @@ function createConvolutionSmoothCommand(regl, commonConfig) {
     return regl({
         vert: vertSmooth,
         frag: fragConvolutionSmooth,
-        uniforms: __assign({}, commonConfig.uniforms, { texture: regl.prop("texture"), textureSize: regl.prop("textureSize"), kernelSize: regl.prop("kernelSize") }),
+        uniforms: __assign(__assign({}, commonConfig.uniforms), { texture: regl.prop("texture"), textureSize: regl.prop("textureSize"), kernelSize: regl.prop("kernelSize") }),
         attributes: {
             texCoord: [0, 1, 1, 1, 0, 0, 1, 0],
             position: [-1, 1, 1, 1, -1, -1, 1, -1],
@@ -1406,7 +1409,7 @@ var Renderer = (function () {
     function Renderer(tileSize, nodataValue, colorscaleMaxLength, sentinelMaxLength) {
         var canvas = L.DomUtil.create('canvas');
         var maxTextureDimension = MAX_TEXTURE_DIMENSION;
-        var regl = REGL({
+        var regl = REGL__default['default']({
             canvas: canvas,
             onDone: function (err, regl) {
                 if (err) {
@@ -2049,7 +2052,7 @@ var Renderer = (function () {
         var _b = this.computeRequiredCanvasDimensions(tiles.length), canvasWidth = _b[0], canvasHeight = _b[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
         var canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tiles.length);
-        var tilesWithCanvasCoordinates = lodashEs.zipWith(tiles, canvasCoordinates, function (tile, canvasCoords) { return (__assign({}, tile, { canvasCoords: canvasCoords })); });
+        var tilesWithCanvasCoordinates = lodashEs.zipWith(tiles, canvasCoordinates, function (tile, canvasCoords) { return (__assign(__assign({}, tile), { canvasCoords: canvasCoords })); });
         var webGLColorScale = convertColorScale(colorScale);
         var webGLSentinelValues = convertColorScale(sentinelValues);
         var canvasSize = [canvasWidth, canvasHeight];
@@ -3094,7 +3097,7 @@ var Renderer = (function () {
                         canvasWidth = canvasSize[0], canvasHeight = canvasSize[1];
                         this.setCanvasSize(canvasWidth, canvasHeight);
                         canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tiles.length);
-                        tilesWithCanvasCoordinates = lodashEs.zipWith(tiles, canvasCoordinates, function (tile, canvasCoords) { return (__assign({}, tile, { canvasCoords: canvasCoords })); });
+                        tilesWithCanvasCoordinates = lodashEs.zipWith(tiles, canvasCoordinates, function (tile, canvasCoords) { return (__assign(__assign({}, tile), { canvasCoords: canvasCoords })); });
                         newTextureManager = new TextureManager(regl, tileSize, maxTextureDimension, false);
                         colorScaleA = convertColorScale(oldColorScale);
                         colorScaleB = convertColorScale(newColorScale);
@@ -3170,7 +3173,7 @@ var Renderer = (function () {
 }());
 
 var d3 = { select: d3Selection.select, selectAll: d3Selection.selectAll, scaleLinear: d3Scale.scaleLinear, geoPath: d3Geo.geoPath, contours: d3Contour.contours, interpolateHcl: d3Interpolate.interpolateHcl,
-    event: d3Selection.event, json: d3Request.json, min: d3Array.min, max: d3Array.max, scan: d3Array.scan, range: d3Array.range };
+    json: d3Request.json, min: d3Array.min, max: d3Array.max, scan: d3Array.scan, range: d3Array.range };
 var BYTES_PER_WORD = 4;
 var littleEndian$1 = machineIsLittleEndian();
 var defaultOptions = {
@@ -3468,7 +3471,7 @@ var GLOperations = (function (_super) {
             mousemove: mousemove,
             contextmenu: contextmenu,
         }, function (handler) { return !lodashEs.isUndefined(handler); });
-        return __assign({}, L.GridLayer.prototype.getEvents.call(this), lodashEs.mapValues(definedHandlers, function (val) { return val && _this._wrapMouseEventHandler(val); }));
+        return __assign(__assign({}, L.GridLayer.prototype.getEvents.call(this)), lodashEs.mapValues(definedHandlers, function (val) { return val && _this._wrapMouseEventHandler(val); }));
     };
     GLOperations.prototype.getTileUrl = function (coords, url) {
         var data = {
@@ -4856,7 +4859,6 @@ var GLOperations = (function (_super) {
                 else {
                     return [2, this._fetchTilesData(tiles, url)];
                 }
-                return [2];
             });
         });
     };
@@ -4945,7 +4947,7 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype._mergePixelData = function (activeTilesBounds, tileSize) {
         return __awaiter(this, void 0, void 0, function () {
-            var z, canvasMerged, ctx, nodataTile, i, x, j, y, uint8, element, uac, uac2, idata, imageData, mergedPixelData, mergedPixelArray, arrSum, contourCanvas, width, height;
+            var z, canvasMerged, ctx, nodataTile, i, x, j, y, uint8, element, uac, uac2, idata, imageData, mergedPixelData, mergedPixelArray, arrSum, contourCanvas;
             return __generator(this, function (_a) {
                 if (this.options.debug)
                     console.log("_mergePixelData()");
@@ -4995,15 +4997,13 @@ var GLOperations = (function (_super) {
                 }
                 if (this.options.contourCanvas) {
                     contourCanvas = this.options.contourCanvas;
+                    contourCanvas.width = this._contourData.width;
+                    contourCanvas.height = this._contourData.height;
                 }
                 else {
                     console.log("Error: contourCanvas not specified.");
                     return [2];
                 }
-                width = this._contourData.width;
-                height = this._contourData.height;
-                contourCanvas.width = width;
-                contourCanvas.height = height;
                 this._contourData.mergedTileArray = mergedPixelArray;
                 this._contourData.smoothedTileArray = undefined;
                 return [2];
@@ -5434,7 +5434,7 @@ var GLOperations = (function (_super) {
                 var pixelDataF = containingTile.el.pixelDataF;
                 pixelValues['pixelValueF'] = coordsInTile && _this._getPixelValue(pixelDataF, byteIndex);
             }
-            handler(__assign({}, event, { pixelValues: pixelValues }));
+            handler(__assign(__assign({}, event), { pixelValues: pixelValues }));
         };
     };
     GLOperations.prototype._getTileContainingPoint = function (point) {
