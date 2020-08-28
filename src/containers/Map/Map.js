@@ -1,4 +1,5 @@
 import "leaflet/dist/leaflet.css";
+import "./Map.css";
 
 import React, {useEffect, useRef, useState} from 'react';
 import { addValueDisplay } from '../../map/common/valuedisplay.js';
@@ -18,7 +19,6 @@ function Map(props) {
 
   const valueDisplayRef = useRef(null);
   useEffect(() => {
-    console.log(map)
     if (map) {
       const [contourPane, contourCanvas] = initContourLayer(map)
 

@@ -1,3 +1,19 @@
+#nav {
+  width: 400px;
+  height: auto;
+  margin: 0;
+  margin-top: 40px;
+  z-index: 100;
+}
+
+.ant-collapse {
+  border: none !important;
+}
+
+.ant-slider {
+  margin: 3px 6px 3px !important;
+}
+
 .toggleButton {
   padding-left: 10px;
   padding-right: 10px;
@@ -5,7 +21,13 @@
   border: 1px transparent;
   font-size: 12px;
   cursor: pointer;
-  }
+}
+
+.github-picker {
+  border: none !important;
+  box-shadow: none !important;
+  padding-left: 0px !important;
+}
 
 .toggleButton:hover {
   background: #777777 !important;

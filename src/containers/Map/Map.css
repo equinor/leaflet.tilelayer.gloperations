@@ -1,0 +1,25 @@
+#map {
+  width: 100%;
+  height: auto;
+}
+
+.leaflet-container, .leaflet-grab, .leaflet-mouse-marker, .leaflet-clickable, .leaflet-interactive {
+	cursor: crosshair !important;
+}
+
+.value-display {
+  font-size: 16px;
+}
+
+.leaflet-control-messagebox {
+	font-size: 1.5em;
+	background: rgba(255, 255, 255, 0.9);
+	border-radius: 5px;
+}
+
+.my-leaflet-control {
+  background-color: #fff;
+  border-radius: 4px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  padding: 5px;
+}
