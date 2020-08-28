@@ -151,20 +151,30 @@ export namespace DrawCommon {
 
 export namespace DrawTile {
   export interface Props extends DrawCommon.Props {
-    colorScale: WebGLColorStop[];
-    sentinelValues: WebGLColorStop[];
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     texture: REGL.Texture2D;
     textureBounds: TextureBounds;
     enableSimpleHillshade: boolean;
-    // enablePregenHillshade: boolean;
-    // textureSize: REGL.Vec2[];
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    colorScaleLength: number;
-    sentinelValuesLength: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
+    textureBounds: REGL.Vec4;
     texture: REGL.Texture2D;
     enableSimpleHillshade: boolean;
-    // textureSize: REGL.Vec2[];
+    offset: number;
+    azimuth: number;
+    altitude: number;
+    slopescale: number;
+    textureSize: number;
+    tileSize: number;
+    slopeFactor: number;
+    deg2rad: number;
   }
   export interface Attributes extends DrawCommon.Attributes {
     texCoord: REGL.Vec2[];
@@ -173,8 +183,10 @@ export namespace DrawTile {
 
 export namespace DrawTileHsSimple {
   export interface Props extends DrawCommon.Props {
-    colorScale: WebGLColorStop[];
-    sentinelValues: WebGLColorStop[];
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     texture: REGL.Texture2D;
     textureSize: number;
     tileSize: number;
@@ -184,21 +196,23 @@ export namespace DrawTileHsSimple {
     azimuth: number;
     altitude: number;
     slopescale: number;
-    // textureSize: REGL.Vec2[];
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    colorScaleLength: number;
-    sentinelValuesLength: number;
+    scaleLength: number;
+    sentinelLength: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    textureBounds: REGL.Vec4|number[][];
     texture: REGL.Texture2D;
     enableSimpleHillshade: boolean;
-    textureBounds: REGL.Vec4;
     offset: number;
     azimuth: number;
     altitude: number;
     slopescale: number;
     textureSize: number;
     tileSize: number;
-    // textureSize: REGL.Vec2[];
+    slopeFactor: number;
+    deg2rad: number;
   }
   export interface Attributes extends DrawCommon.Attributes {
     texCoord: REGL.Vec2[];
@@ -207,23 +221,22 @@ export namespace DrawTileHsSimple {
 
 export namespace DrawTileHsPregen {
   export interface Props extends DrawCommon.Props {
-    colorScale: WebGLColorStop[];
-    sentinelValues: WebGLColorStop[];
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     texture: REGL.Texture2D;
     textureBounds: TextureBounds;
     textureBoundsHs: TextureBounds;
-    // enableSimpleHillshade: boolean;
-    // enablePregenHillshade: boolean;
     textureSize: REGL.Vec2[];
     hillshadePregenTexture: REGL.Texture2D;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    colorScaleLength: number;
-    sentinelValuesLength: number;
+    scaleLength: number;
+    sentinelLength: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
     texture: REGL.Texture2D;
-    // enableSimpleHillshade: boolean;
-    // enablePregenHillshade: boolean;
-    textureSize: REGL.Vec2[];
     hillshadePregenTexture: REGL.Texture2D;
   }
   export interface Attributes extends DrawCommon.Attributes {
@@ -234,8 +247,10 @@ export namespace DrawTileHsPregen {
 
 export namespace DrawTileInterpolateValue {
   export interface Props extends DrawCommon.Props {
-    colorScale: WebGLColorStop[];
-    sentinelValues: WebGLColorStop[];
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     textureBoundsA: TextureBounds;
@@ -243,9 +258,10 @@ export namespace DrawTileInterpolateValue {
     interpolationFraction: number;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    // ...colorScale struct array properties
-    colorScaleLength: number;
-    sentinelValuesLength: number;
+    scaleLength: number;
+    sentinelLength: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     interpolationFraction: number;
@@ -258,8 +274,10 @@ export namespace DrawTileInterpolateValue {
 
 export namespace DrawTileMultiAnalyze1 {
   export interface Props extends DrawCommon.Props {
-    colorScale: WebGLColorStop[];
-    sentinelValues: WebGLColorStop[];
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureBoundsA: TextureBounds;
     filterLowA: number;
@@ -267,8 +285,10 @@ export namespace DrawTileMultiAnalyze1 {
     multiplierA: number;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    colorScaleLength: number;
-    sentinelValuesLength: number;
+    scaleLength: number;
+    sentinelLength: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
     textureA: REGL.Texture2D;
     filterLowA : number;
     filterHighA : number;
@@ -300,8 +320,10 @@ export namespace CalcTileMultiAnalyze1 {
 
 export namespace DrawTileMultiAnalyze2 {
   export interface Props extends DrawCommon.Props {
-    colorScale: WebGLColorStop[];
-    sentinelValues: WebGLColorStop[];
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     textureBoundsA: TextureBounds;
@@ -314,8 +336,10 @@ export namespace DrawTileMultiAnalyze2 {
     multiplierB: number;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    colorScaleLength: number;
-    sentinelValuesLength: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     filterLowA : number;
@@ -362,8 +386,10 @@ export namespace CalcTileMultiAnalyze2 {
 
 export namespace DrawTileMultiAnalyze3 {
   export interface Props extends DrawCommon.Props {
-    colorScale: WebGLColorStop[];
-    sentinelValues: WebGLColorStop[];
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     textureC: REGL.Texture2D;
@@ -381,9 +407,10 @@ export namespace DrawTileMultiAnalyze3 {
     multiplierC: number;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    // ...colorScale struct array properties
-    colorScaleLength: number;
-    sentinelValuesLength: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     textureC: REGL.Texture2D;
@@ -445,8 +472,10 @@ export namespace CalcTileMultiAnalyze3 {
 
 export namespace DrawTileMultiAnalyze4 {
   export interface Props extends DrawCommon.Props {
-    colorScale: WebGLColorStop[];
-    sentinelValues: WebGLColorStop[];
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     textureC: REGL.Texture2D;
@@ -469,9 +498,10 @@ export namespace DrawTileMultiAnalyze4 {
     multiplierD: number;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    // ...colorScale struct array properties
-    colorScaleLength: number;
-    sentinelValuesLength: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     textureC: REGL.Texture2D;
@@ -549,8 +579,10 @@ export namespace CalcTileMultiAnalyze4 {
 
 export namespace DrawTileMultiAnalyze5 {
   export interface Props extends DrawCommon.Props {
-    colorScale: WebGLColorStop[];
-    sentinelValues: WebGLColorStop[];
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     textureC: REGL.Texture2D;
@@ -578,9 +610,10 @@ export namespace DrawTileMultiAnalyze5 {
     multiplierE: number;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    // ...colorScale struct array properties
-    colorScaleLength: number;
-    sentinelValuesLength: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     textureC: REGL.Texture2D;
@@ -672,8 +705,10 @@ export namespace CalcTileMultiAnalyze5 {
 
 export namespace DrawTileMultiAnalyze6 {
   export interface Props extends DrawCommon.Props {
-    colorScale: WebGLColorStop[];
-    sentinelValues: WebGLColorStop[];
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     textureC: REGL.Texture2D;
@@ -706,8 +741,10 @@ export namespace DrawTileMultiAnalyze6 {
     multiplierF: number;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    colorScaleLength: number;
-    sentinelValuesLength: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     textureC: REGL.Texture2D;
@@ -833,8 +870,10 @@ export namespace CalcTileDiff {
 
 export namespace DrawTileDiff {
   export interface Props extends DrawCommon.Props {
-    colorScale: WebGLColorStop[];
-    sentinelValues: WebGLColorStop[];
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
     // texture: REGL.Framebuffer2D | REGL.Texture2D;
     // textureBounds: TextureBounds;
     textureA: REGL.Texture2D;
@@ -843,13 +882,14 @@ export namespace DrawTileDiff {
     textureBoundsB: TextureBounds;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    colorScaleLength: number;
-    sentinelValuesLength: number;
-    // texture: REGL.Texture2D;
-    texture: REGL.Framebuffer2D;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
+    textureA: REGL.Framebuffer2D;
+    textureB: REGL.Framebuffer2D;
   }
   export interface Attributes extends DrawCommon.Attributes {
-    // texCoord: REGL.Vec2[];
     texCoordA: REGL.Vec2[];
     texCoordB: REGL.Vec2[];
   }
@@ -876,10 +916,14 @@ export namespace ConvolutionSmooth {
 
 export namespace DrawTileInterpolateColor {
   export interface Props extends DrawCommon.Props {
-    colorScaleA: WebGLColorStop[];
-    colorScaleB: WebGLColorStop[];
-    sentinelValuesA: WebGLColorStop[];
-    sentinelValuesB: WebGLColorStop[];
+    scaleColormapA: REGL.Texture2D;
+    sentinelColormapA: REGL.Texture2D;
+    scaleLengthA: number;
+    sentinelLengthA: number;
+    scaleColormapB: REGL.Texture2D;
+    sentinelColormapB: REGL.Texture2D;
+    scaleLengthB: number;
+    sentinelLengthB: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     textureBoundsA: TextureBounds;
@@ -887,11 +931,14 @@ export namespace DrawTileInterpolateColor {
     interpolationFraction: number;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    // colorScale properties
-    colorScaleLengthA: number;
-    colorScaleLengthB: number;
-    sentinelValuesLengthA: number;
-    sentinelValuesLengthB: number;
+    scaleColormapA: REGL.Texture2D;
+    sentinelColormapA: REGL.Texture2D;
+    scaleLengthA: number;
+    sentinelLengthA: number;
+    scaleColormapB: REGL.Texture2D;
+    sentinelColormapB: REGL.Texture2D;
+    scaleLengthB: number;
+    sentinelLengthB: number;
     textureA: REGL.Texture2D;
     textureB: REGL.Texture2D;
     interpolationFraction: number;
@@ -904,20 +951,27 @@ export namespace DrawTileInterpolateColor {
 
 export namespace DrawTileInterpolateColorOnly {
   export interface Props extends DrawCommon.Props {
-    colorScaleA: WebGLColorStop[];
-    colorScaleB: WebGLColorStop[];
-    sentinelValuesA: WebGLColorStop[];
-    sentinelValuesB: WebGLColorStop[];
+    scaleColormapA: REGL.Texture2D;
+    sentinelColormapA: REGL.Texture2D;
+    scaleLengthA: number;
+    sentinelLengthA: number;
+    scaleColormapB: REGL.Texture2D;
+    sentinelColormapB: REGL.Texture2D;
+    scaleLengthB: number;
+    sentinelLengthB: number;
     texture: REGL.Texture2D;
     textureBounds: TextureBounds;
     interpolationFraction: number;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
-    // colorScale properties
-    colorScaleLengthA: number;
-    colorScaleLengthB: number;
-    sentinelValuesLengthA: number;
-    sentinelValuesLengthB: number;
+    scaleColormapA: REGL.Texture2D;
+    sentinelColormapA: REGL.Texture2D;
+    scaleLengthA: number;
+    sentinelLengthA: number;
+    scaleColormapB: REGL.Texture2D;
+    sentinelColormapB: REGL.Texture2D;
+    scaleLengthB: number;
+    sentinelLengthB: number;
     texture: REGL.Texture2D;
     interpolationFraction: number;
   }

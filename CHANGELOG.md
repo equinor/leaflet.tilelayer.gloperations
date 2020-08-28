@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- Can specify color as hex values (`#FF0000`) in addition to existing rgb format (`rgb(255,0,0)`).
+
+### Changed
+
+- Send colormaps as textures to webgl. Reduces the number of fragment uniforms used.
+
 ## [0.3.0]
 
 ### Added

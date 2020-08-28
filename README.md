@@ -108,14 +108,25 @@ Here's an example color scale:
 
 ```javascript
 const colorScale = [
-  { offset: 0, color: 'rgb(255, 0, 0)', label: 'zero' },
-  { offset: 1, color: 'rgb(0, 0, 255)', label: 'one' },
+  { offset: 0, color: 'rgb(255, 0, 0)'},
+  { offset: 1, color: 'rgb(0, 0, 255)'},
 ];
 
 const tileLayer = new GLOperations({ colorScale, /* ... */ });
 ```
 
 This tells the renderer to color pixels with value 0 (or less) red and value 1 (or greater) blue. Pixels with values between 0 and 1 will get a blend of red and blue, because colors are linearly interpolated between each pair of adjacent stops. You can have as few as two or as many as `colorscaleMaxLength` color stops in a color scale.
+
+Colors can be specified with both rgb and hex format or set to transparent. Can mix the formats, e.g.:
+```javascript
+const colorScale = [
+  { offset: 0, color: 'transparent'},
+  { offset: 0.01, color: '#FF0000'},
+  { offset: 100, color: 'rgb(0, 255, 0)'},
+  { offset: 1000, color: '#0000FF'},
+  { offset: 1000.01, color: 'transparent'},
+];
+```
 
 ## Sentinel values
 

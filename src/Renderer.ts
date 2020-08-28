@@ -57,6 +57,14 @@ export default class Renderer {
   textureManagerF: TextureManager;
   textureManagerHillshade: TextureManager;
   tileSize: number;
+  scaleColormap: REGL.Texture2D;
+  scaleColormapPrevious: REGL.Texture2D;
+  sentinelColormap: REGL.Texture2D;
+  sentinelColormapPrevious: REGL.Texture2D;
+  scaleInput: Color[];
+  scaleInputPrevious: Color[];
+  sentinelInput: SentinelValue[];
+  sentinelInputPrevious: SentinelValue[];
   fboTile: Framebuffer2D;
   maxTextureDimension: number;
 
@@ -86,6 +94,8 @@ export default class Renderer {
   constructor(
     tileSize: number,
     nodataValue: number,
+    scaleInput: Color[],
+    sentinelInput: SentinelValue[],
     colorscaleMaxLength: number,
     sentinelMaxLength: number,
   ) {
@@ -106,19 +116,25 @@ export default class Renderer {
             maxTextureDimension = 2048;
           } else if (regl.limits.maxTextureSize > 4096) {
             maxTextureDimension = 4096;
+          } else if (regl.limits.maxTextureSize > 8192) {
+            maxTextureDimension = 8192;
           };
         }
         // TODO: Improve software rendering detection
         if (regl.limits.maxFragmentUniforms === 261) {
-          console.log("Software rendering detected and not supported with GLOperations plugin. If you have a GPU, check if drivers are installed ok?");
+          console.warn("Software rendering detected and not supported with GLOperations plugin. If you have a GPU, check if drivers are installed ok?");
         }
       }
     });
 
     const commonDrawConfig = commands.getCommonDrawConfiguration(tileSize, nodataValue);
-    const commonDrawColors = commands.getColorStructArray('colorScale', colorscaleMaxLength, 'sentinelValues', sentinelMaxLength);
-    const interpolateDrawColorsA = commands.getColorStructArray('colorScaleA', colorscaleMaxLength, 'sentinelValuesA', sentinelMaxLength);
-    const interpolateDrawColorsB = commands.getColorStructArray('colorScaleB', colorscaleMaxLength, 'sentinelValuesB', sentinelMaxLength);
+    // const commonDrawColors = commands.getColorStructArray('colorScale', colorscaleMaxLength, 'sentinelValues', sentinelMaxLength);
+    // const interpolateDrawColorsA = commands.getColorStructArray('colorScaleA', colorscaleMaxLength, 'sentinelValuesA', sentinelMaxLength);
+    // const interpolateDrawColorsB = commands.getColorStructArray('colorScaleB', colorscaleMaxLength, 'sentinelValuesB', sentinelMaxLength);
+    const fragMacros = {
+      SCALE_MAX_LENGTH: colorscaleMaxLength,
+      SENTINEL_MAX_LENGTH: sentinelMaxLength,
+    }
 
     // Assign object "instance" properties.
     Object.assign(this, {
@@ -126,6 +142,10 @@ export default class Renderer {
       regl,
       tileSize,
       maxTextureDimension: maxTextureDimension,
+      scaleInput: scaleInput,
+      sentinelInput: sentinelInput,
+      scaleColormap: util.createColormapTexture(scaleInput, regl),
+      sentinelColormap: util.createColormapTexture(sentinelInput, regl),
       textureManager: new TextureManager(regl, tileSize, maxTextureDimension, false),
       textureManagerA: new TextureManager(regl, tileSize, maxTextureDimension, false),
       textureManagerB: new TextureManager(regl, tileSize, maxTextureDimension, false),
@@ -134,28 +154,47 @@ export default class Renderer {
       textureManagerE: new TextureManager(regl, tileSize, maxTextureDimension, false),
       textureManagerF: new TextureManager(regl, tileSize, maxTextureDimension, false),
       textureManagerHillshade: new TextureManager(regl, tileSize, maxTextureDimension, false),
-      drawTile: commands.createDrawTileCommand(regl, commonDrawConfig, commonDrawColors),
-      drawTileHsSimple: commands.createDrawTileHsSimpleCommand(regl, commonDrawConfig, commonDrawColors),
-      drawTileHsPregen: commands.createDrawTileHsPregenCommand(regl, commonDrawConfig, commonDrawColors),
-      drawTileInterpolateColor: commands.createDrawTileInterpolateColorCommand(regl, commonDrawConfig, interpolateDrawColorsA, interpolateDrawColorsB),
-      drawTileInterpolateColorOnly: commands.createDrawTileInterpolateColorOnlyCommand(regl, commonDrawConfig, interpolateDrawColorsA, interpolateDrawColorsB),
-      drawTileInterpolateValue: commands.createDrawTileInterpolateValueCommand(regl, commonDrawConfig, commonDrawColors),
+      drawTile: commands.createDrawTileCommand(regl, commonDrawConfig, fragMacros),
+      drawTileHsSimple: commands.createDrawTileHsSimpleCommand(regl, commonDrawConfig, fragMacros),
+      drawTileHsPregen: commands.createDrawTileHsPregenCommand(regl, commonDrawConfig, fragMacros),
+      drawTileInterpolateColor: commands.createDrawTileInterpolateColorCommand(regl, commonDrawConfig, fragMacros),
+      drawTileInterpolateColorOnly: commands.createDrawTileInterpolateColorOnlyCommand(regl, commonDrawConfig, fragMacros),
+      drawTileInterpolateValue: commands.createDrawTileInterpolateValueCommand(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze1: commands.createCalcTileMultiAnalyze1Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze1: commands.createDrawTileMultiAnalyze1Command(regl, commonDrawConfig, commonDrawColors),
+      drawTileMultiAnalyze1: commands.createDrawTileMultiAnalyze1Command(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze2: commands.createCalcTileMultiAnalyze2Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze2: commands.createDrawTileMultiAnalyze2Command(regl, commonDrawConfig, commonDrawColors),
+      drawTileMultiAnalyze2: commands.createDrawTileMultiAnalyze2Command(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze3: commands.createCalcTileMultiAnalyze3Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze3: commands.createDrawTileMultiAnalyze3Command(regl, commonDrawConfig, commonDrawColors),
+      drawTileMultiAnalyze3: commands.createDrawTileMultiAnalyze3Command(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze4: commands.createCalcTileMultiAnalyze4Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze4: commands.createDrawTileMultiAnalyze4Command(regl, commonDrawConfig, commonDrawColors),
+      drawTileMultiAnalyze4: commands.createDrawTileMultiAnalyze4Command(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze5: commands.createCalcTileMultiAnalyze5Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze5: commands.createDrawTileMultiAnalyze5Command(regl, commonDrawConfig, commonDrawColors),
+      drawTileMultiAnalyze5: commands.createDrawTileMultiAnalyze5Command(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze6: commands.createCalcTileMultiAnalyze6Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze6: commands.createDrawTileMultiAnalyze6Command(regl, commonDrawConfig, commonDrawColors),
-      drawTileDiff: commands.createDrawTileDiffCommand(regl, commonDrawConfig, commonDrawColors),
+      drawTileMultiAnalyze6: commands.createDrawTileMultiAnalyze6Command(regl, commonDrawConfig, fragMacros),
+      drawTileDiff: commands.createDrawTileDiffCommand(regl, commonDrawConfig, fragMacros),
       calcTileDiff: commands.createCalcTileDiffCommand(regl, commonDrawConfig),
       convolutionSmooth: commands.createConvolutionSmoothCommand(regl, commonDrawConfig),
     });
+  }
+
+  findMaxTextureDimension() {
+    // TODO: fix maxTextureSize logic
+    const {
+      regl,
+    } = this;
+
+    let maxTextureDimension = MAX_TEXTURE_DIMENSION;
+
+    if (regl.limits.maxTextureSize > 2048) {
+      maxTextureDimension = 2048;
+    } else if (regl.limits.maxTextureSize > 4096) {
+      maxTextureDimension = 4096;
+    } else if (regl.limits.maxTextureSize > 8192) {
+      maxTextureDimension = 8192;
+    };
+
+    return maxTextureDimension
   }
 
   setMaxTextureDimension(newMaxTextureDimension: number) {
@@ -173,27 +212,21 @@ export default class Renderer {
     });
   }
 
-  findMaxTextureDimension() {
-    // TODO: fix maxTextureSize logic
-    const {
-      regl,
-    } = this;
-
-    let maxTextureDimension = MAX_TEXTURE_DIMENSION;
-
-    if (regl.limits.maxTextureSize > 2048) {
-      maxTextureDimension = 2048;
-    } else if (regl.limits.maxTextureSize > 4096) {
-      maxTextureDimension = 4096;
-    };
-
-    return maxTextureDimension
+  updateColorscale(scaleInput: Color[]) {
+    this.scaleInputPrevious = this.scaleInput;
+    this.scaleInput = scaleInput;
+    this.scaleColormapPrevious = this.scaleColormap;
+    this.scaleColormap = util.createColormapTexture(scaleInput, this.regl);
   }
+  updateSentinels(sentinelInput: SentinelValue[]) {
+    this.sentinelInputPrevious = this.sentinelInput;
+    this.sentinelInput = sentinelInput;
+    this.sentinelColormapPrevious = this.sentinelColormap;
+    this.sentinelColormap = util.createColormapTexture(sentinelInput, this.regl);
+  }  
 
   renderTile(
     { coords, pixelData }: TileDatum,
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     _hillshadeOptions: HillshadeOptions,
     zoom: number = 0,
   ): Pair<number> {
@@ -215,18 +248,22 @@ export default class Renderer {
 
     if (_hillshadeOptions.hillshadeType === 'none') {
       this.drawTile({
-        colorScale: util.convertColorScale(colorScale),
-        sentinelValues: util.convertColorScale(sentinelValues),
         canvasSize: [tileSize, tileSize],
         canvasCoordinates: [0, 0],
         textureBounds,
         texture: textureManager.texture,
+        scaleLength: this.scaleInput.length,
+        sentinelLength: this.sentinelInput.length,
+        scaleColormap: this.scaleColormap,
+        sentinelColormap: this.sentinelColormap,
         enableSimpleHillshade: false,
       });
     } else if (_hillshadeOptions.hillshadeType === 'simple') {
       this.drawTileHsSimple({
-        colorScale: util.convertColorScale(colorScale),
-        sentinelValues: util.convertColorScale(sentinelValues),
+        scaleLength: this.scaleInput.length,
+        sentinelLength: this.sentinelInput.length,
+        scaleColormap: this.scaleColormap,
+        sentinelColormap: this.sentinelColormap,
         canvasSize: [tileSize, tileSize],
         canvasCoordinates: [0, 0],
         textureBounds: textureBounds,
@@ -249,8 +286,6 @@ export default class Renderer {
   renderTileHsPregen(
     tileDatum: TileDatum,
     tileDatumHs: TileDatum,
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     _hillshadeOptions: HillshadeOptions,
   ): Pair<number> {
     const {
@@ -267,8 +302,10 @@ export default class Renderer {
     regl.clear({ color: CLEAR_COLOR });
 
     this.drawTileHsPregen({
-      colorScale: util.convertColorScale(colorScale),
-      sentinelValues: util.convertColorScale(sentinelValues),
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureBounds: textureBounds,
@@ -281,34 +318,10 @@ export default class Renderer {
     return [0, 0];
   }
 
-
   // TODO: Render to a fbo using a texture with flipY and this should not be necessary?
-  flipReadPixelsFloat(
-    width: number,
-    height: number,
-    pixels: Float32Array,
-  ) {
-    let halfHeight = height / 2 | 0;  // the | 0 keeps the result an int
-    let bytesPerRow = width * 4;
-
-    // make a temp buffer to hold one row
-    var temp = new Float32Array(width * 4);
-    for (var y = 0; y < halfHeight; ++y) {
-      var topOffset = y * bytesPerRow;
-      var bottomOffset = (height - y - 1) * bytesPerRow;
-      // make copy of a row on the top half
-      temp.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
-      // copy a row from the bottom half to the top
-      pixels.copyWithin(topOffset, bottomOffset, bottomOffset + bytesPerRow);
-      // copy the copy of the top half row to the bottom half
-      pixels.set(temp, bottomOffset);
-    }
-    return pixels
-  }
-
   /**
    * WebGL uses [0,0] coordinate at top, not bottom. Use this function to flip readPixel results.
-   */
+  */
   flipReadPixelsUint(
     width: number,
     height: number,
@@ -335,8 +348,6 @@ export default class Renderer {
   renderTileDiff(
     tileDatumA: TileDatum,
     tileDatumB: TileDatum,
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
   ): calcResult {
     const {
       regl,
@@ -374,12 +385,13 @@ export default class Renderer {
       regl.read({data: resultEncodedPixels});
     });
 
-    // Flip readPixels result
     resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     this.drawTileDiff({
-      colorScale: util.convertColorScale(colorScale),
-      sentinelValues: util.convertColorScale(sentinelValues),
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -441,8 +453,6 @@ export default class Renderer {
 
   renderTileMulti1(
     tileDatumA: TileDatum,
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA: number,
     filterHighA: number,
     multiplierA: number,
@@ -483,13 +493,14 @@ export default class Renderer {
       regl.read({data: resultEncodedPixels});
     });
 
-    // Flip readPixels result
     resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     // draw result.
     this.drawTileMultiAnalyze1({
-      colorScale: util.convertColorScale(colorScale),
-      sentinelValues: util.convertColorScale(sentinelValues),
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -508,8 +519,6 @@ export default class Renderer {
   renderTileMulti2(
     tileDatumA: TileDatum,
     tileDatumB: TileDatum,
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA: number,
     filterHighA: number,
     filterLowB: number,
@@ -560,13 +569,14 @@ export default class Renderer {
       regl.read({data: resultEncodedPixels});
     });
 
-    // Flip readPixels result
     resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     // draw result.
     this.drawTileMultiAnalyze2({
-      colorScale: util.convertColorScale(colorScale),
-      sentinelValues: util.convertColorScale(sentinelValues),
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -587,13 +597,10 @@ export default class Renderer {
     return [0, 0, resultEncodedPixels];
   }
 
-
   renderTileMulti3(
     tileDatumA: TileDatum,
     tileDatumB: TileDatum,
     tileDatumC: TileDatum,
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA: number,
     filterHighA: number,
     filterLowB: number,
@@ -654,13 +661,14 @@ export default class Renderer {
       regl.read({data: resultEncodedPixels});
     });
 
-    // Flip readPixels result
     resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     // draw result.
     this.drawTileMultiAnalyze3({
-      colorScale: util.convertColorScale(colorScale),
-      sentinelValues: util.convertColorScale(sentinelValues),
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -691,8 +699,6 @@ export default class Renderer {
     tileDatumB: TileDatum,
     tileDatumC: TileDatum,
     tileDatumD: TileDatum,
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA: number,
     filterHighA: number,
     filterLowB: number,
@@ -714,7 +720,6 @@ export default class Renderer {
       textureManagerD,
       tileSize,
     } = this;
-    // Set canvas size.
     this.setCanvasSize(tileSize, tileSize);
 
     // Add image to the texture and retrieve its texture coordinates.
@@ -763,13 +768,14 @@ export default class Renderer {
       regl.read({data: resultEncodedPixels});
     });
 
-    // Flip readPixels result
     resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     // draw result.
     this.drawTileMultiAnalyze4({
-      colorScale: util.convertColorScale(colorScale),
-      sentinelValues: util.convertColorScale(sentinelValues),
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -806,8 +812,6 @@ export default class Renderer {
     tileDatumC: TileDatum,
     tileDatumD: TileDatum,
     tileDatumE: TileDatum,
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA: number,
     filterHighA: number,
     filterLowB: number,
@@ -888,12 +892,13 @@ export default class Renderer {
       regl.read({data: resultEncodedPixels});
     });
 
-    // Flip readPixels result
     resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     this.drawTileMultiAnalyze5({
-      colorScale: util.convertColorScale(colorScale),
-      sentinelValues: util.convertColorScale(sentinelValues),
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -936,8 +941,6 @@ export default class Renderer {
     tileDatumD: TileDatum,
     tileDatumE: TileDatum,
     tileDatumF: TileDatum,
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA: number,
     filterHighA: number,
     filterLowB: number,
@@ -1028,12 +1031,13 @@ export default class Renderer {
       regl.read({data: resultEncodedPixels});
     });
 
-    // Flip readPixels result
     resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
 
     this.drawTileMultiAnalyze6({
-      colorScale: util.convertColorScale(colorScale),
-      sentinelValues: util.convertColorScale(sentinelValues),
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -1077,8 +1081,6 @@ export default class Renderer {
 
   renderTiles(
     tiles: TileDatum[],
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     _hillshadeOptions: HillshadeOptions,
     zoom: number = 0,
   ): Array<Pair<number>> {
@@ -1107,10 +1109,6 @@ export default class Renderer {
       }),
     );
 
-    // Convert the color scale and sentinel values to the form expected by WebGL.
-    const webGLColorScale = util.convertColorScale(colorScale);
-    const webGLSentinelValues = util.convertColorScale(sentinelValues);
-
     const canvasSize = [canvasWidth, canvasHeight] as Pair<number>;
 
     // Clear existing tiles from cache.
@@ -1136,18 +1134,22 @@ export default class Renderer {
 
       if (_hillshadeOptions.hillshadeType === 'none') {
         this.drawTile(chunk.map(({ canvasCoords }, index) => ({
-          colorScale: webGLColorScale,
-          sentinelValues: webGLSentinelValues,
           canvasSize,
           canvasCoordinates: canvasCoords,
           textureBounds: textureBounds[index],
           texture: textureManager.texture,
+          scaleLength: this.scaleInput.length,
+          sentinelLength: this.sentinelInput.length,
+          scaleColormap: this.scaleColormap,
+          sentinelColormap: this.sentinelColormap,
           enableSimpleHillshade: false,
         })));
       } else if (_hillshadeOptions.hillshadeType === 'simple') {
         this.drawTileHsSimple(chunk.map(({ canvasCoords }, index) => ({
-          colorScale: webGLColorScale,
-          sentinelValues: webGLSentinelValues,
+          scaleLength: this.scaleInput.length,
+          sentinelLength: this.sentinelInput.length,
+          scaleColormap: this.scaleColormap,
+          sentinelColormap: this.sentinelColormap,
           canvasSize,
           canvasCoordinates: canvasCoords,
           textureBounds: textureBounds[index],
@@ -1169,8 +1171,6 @@ export default class Renderer {
   renderTilesHsPregen(
     tiles: TileDatum[],
     tilesHs: TileDatum[],
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     _hillshadeOptions: HillshadeOptions,
   ): Array<Pair<number>> {
     const {
@@ -1206,10 +1206,6 @@ export default class Renderer {
       }),
     );
 
-    // Convert the color scale and sentinel values to the form expected by WebGL.
-    const webGLColorScale = util.convertColorScale(colorScale);
-    const webGLSentinelValues = util.convertColorScale(sentinelValues);
-
     const canvasSize = [canvasWidth, canvasHeight] as Pair<number>;
 
     // Clear existing tiles from cache.
@@ -1234,8 +1230,10 @@ export default class Renderer {
       );
 
       this.drawTileHsPregen(chunk.map(({ canvasCoords }, index) => ({
-        colorScale: webGLColorScale,
-        sentinelValues: webGLSentinelValues,
+        scaleLength: this.scaleInput.length,
+        sentinelLength: this.sentinelInput.length,
+        scaleColormap: this.scaleColormap,
+        sentinelColormap: this.sentinelColormap,
         canvasSize,
         canvasCoordinates: canvasCoords,
         textureBounds: textureBounds[index],
@@ -1251,8 +1249,6 @@ export default class Renderer {
   renderTilesWithDiff(
     tilesA: TileDatum[],
     tilesB: TileDatum[],
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     onFrameRendered: (canvasCoordinates: Array<Pair<number>>) => void,
   ) {
     const {
@@ -1289,10 +1285,6 @@ export default class Renderer {
         canvasCoords,
       }),
     );
-
-    // Convert the color scale and sentinel values to the form expected by WebGL.
-    const webGLColorScale = util.convertColorScale(colorScale);
-    const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
     // let resultEncodedPixels: Float32Array[] = [];
     let resultEncodedPixels: Uint8Array[] = [];
@@ -1340,15 +1332,16 @@ export default class Renderer {
             regl.read({data: resultEncodedPixelsTile});
           });
 
-          // Flip readPixels result
           resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
 
           this.drawTileDiff({
-            colorScale: webGLColorScale,
-            sentinelValues: webGLSentinelValues,
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize,
             canvasCoordinates: canvasCoords,
             textureA: textureManagerA.texture,
@@ -1378,8 +1371,6 @@ export default class Renderer {
 
   renderTilesWithMultiAnalyze1(
     tilesA: TileDatum[],
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA : number,
     filterHighA : number,
     multiplierA: number,
@@ -1415,10 +1406,6 @@ export default class Renderer {
         canvasCoords,
       }),
     );
-
-    // Convert the color scale and sentinel values to the form expected by WebGL.
-    const webGLColorScale = util.convertColorScale(colorScale);
-    const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
     let resultEncodedPixels: Uint8Array[] = [];
 
@@ -1465,16 +1452,16 @@ export default class Renderer {
             regl.read({data: resultEncodedPixelsTile});
           });
 
-
-          // Flip readPixels result
           resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
 
           this.drawTileMultiAnalyze1({
-            colorScale: webGLColorScale,
-            sentinelValues: webGLSentinelValues,
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize,
             canvasCoordinates: canvasCoords,
             textureA: textureManagerA.texture,
@@ -1504,8 +1491,6 @@ export default class Renderer {
   renderTilesWithMultiAnalyze2(
     tilesA: TileDatum[],
     tilesB: TileDatum[],
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA : number,
     filterHighA : number,
     filterLowB : number,
@@ -1548,10 +1533,6 @@ export default class Renderer {
         canvasCoords,
       }),
     );
-
-    // Convert the color scale and sentinel values to the form expected by WebGL.
-    const webGLColorScale = util.convertColorScale(colorScale);
-    const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
     let resultEncodedPixels: Uint8Array[] = [];
 
@@ -1606,16 +1587,16 @@ export default class Renderer {
             regl.read({data: resultEncodedPixelsTile});
           });
 
-
-          // Flip readPixels result
           resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
 
           this.drawTileMultiAnalyze2({
-            colorScale: webGLColorScale,
-            sentinelValues: webGLSentinelValues,
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize,
             canvasCoordinates: canvasCoords,
             textureA: textureManagerA.texture,
@@ -1654,8 +1635,6 @@ export default class Renderer {
     tilesA: TileDatum[],
     tilesB: TileDatum[],
     tilesC: TileDatum[],
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA : number,
     filterHighA : number,
     filterLowB : number,
@@ -1705,10 +1684,6 @@ export default class Renderer {
         canvasCoords,
       }),
     );
-
-    // Convert the color scale and sentinel values to the form expected by WebGL.
-    const webGLColorScale = util.convertColorScale(colorScale);
-    const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
     let resultEncodedPixels: Uint8Array[] = [];
 
@@ -1772,15 +1747,16 @@ export default class Renderer {
           });
 
 
-          // Flip readPixels result
           resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
 
           this.drawTileMultiAnalyze3({
-            colorScale: webGLColorScale,
-            sentinelValues: webGLSentinelValues,
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize,
             canvasCoordinates: canvasCoords,
             textureA: textureManagerA.texture,
@@ -1827,8 +1803,6 @@ export default class Renderer {
     tilesB: TileDatum[],
     tilesC: TileDatum[],
     tilesD: TileDatum[],
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA : number,
     filterHighA : number,
     filterLowB : number,
@@ -1885,10 +1859,6 @@ export default class Renderer {
         canvasCoords,
       }),
     );
-
-    // Convert the color scale and sentinel values to the form expected by WebGL.
-    const webGLColorScale = util.convertColorScale(colorScale);
-    const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
     let resultEncodedPixels: Uint8Array[] = [];
 
@@ -1959,15 +1929,16 @@ export default class Renderer {
             regl.read({data: resultEncodedPixelsTile});
           });
 
-          // Flip readPixels result
           resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
 
           this.drawTileMultiAnalyze4({
-            colorScale: webGLColorScale,
-            sentinelValues: webGLSentinelValues,
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize,
             canvasCoordinates: canvasCoords,
             textureA: textureManagerA.texture,
@@ -2021,8 +1992,6 @@ export default class Renderer {
     tilesC: TileDatum[],
     tilesD: TileDatum[],
     tilesE: TileDatum[],
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA : number,
     filterHighA : number,
     filterLowB : number,
@@ -2086,10 +2055,6 @@ export default class Renderer {
         canvasCoords,
       }),
     );
-
-    // Convert the color scale and sentinel values to the form expected by WebGL.
-    const webGLColorScale = util.convertColorScale(colorScale);
-    const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
     let resultEncodedPixels: Uint8Array[] = [];
 
@@ -2168,15 +2133,16 @@ export default class Renderer {
             regl.read({data: resultEncodedPixelsTile});
           });
 
-          // Flip readPixels result
           resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
 
           this.drawTileMultiAnalyze5({
-            colorScale: webGLColorScale,
-            sentinelValues: webGLSentinelValues,
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize,
             canvasCoordinates: canvasCoords,
             textureA: textureManagerA.texture,
@@ -2238,8 +2204,6 @@ export default class Renderer {
     tilesD: TileDatum[],
     tilesE: TileDatum[],
     tilesF: TileDatum[],
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     filterLowA : number,
     filterHighA : number,
     filterLowB : number,
@@ -2310,10 +2274,6 @@ export default class Renderer {
         canvasCoords,
       }),
     );
-
-    // Convert the color scale and sentinel values to the form expected by WebGL.
-    const webGLColorScale = util.convertColorScale(colorScale);
-    const webGLSentinelValues = util.convertColorScale(sentinelValues);
 
     let resultEncodedPixels: Uint8Array[] = [];
 
@@ -2400,15 +2360,16 @@ export default class Renderer {
             regl.read({data: resultEncodedPixelsTile});
           });
 
-          // Flip readPixels result
           resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
           // Add tile result to array
           resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
           tileIndex += 1;
 
           this.drawTileMultiAnalyze6({
-            colorScale: webGLColorScale,
-            sentinelValues: webGLSentinelValues,
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize,
             canvasCoordinates: canvasCoords,
             textureA: textureManagerA.texture,
@@ -2473,8 +2434,6 @@ export default class Renderer {
   async renderTilesWithTransition(
     oldTiles: TileDatum[],
     newTiles: TileDatum[],
-    colorScale: Color[],
-    sentinelValues: SentinelValue[],
     transitionDurationMs: number,
     onFrameRendered: (canvasCoordinates: Array<Pair<number>>) => void,
   ) {
@@ -2517,10 +2476,6 @@ export default class Renderer {
     // Renderer's stored TextureManager.
     const newTextureManager = new TextureManager(regl, tileSize, maxTextureDimension, false);
 
-    // Convert the color scale and sentinel values to the form expected by WebGL.
-    const webGLColorScale = util.convertColorScale(colorScale);
-    const webGLSentinelValues = util.convertColorScale(sentinelValues);
-
     // Record the starting time.
     const transitionStart = regl.now();
 
@@ -2544,8 +2499,10 @@ export default class Renderer {
 
         // Render each tile.
         this.drawTileInterpolateValue(chunk.map(({ canvasCoords }, index) => ({
-          colorScale: webGLColorScale,
-          sentinelValues: webGLSentinelValues,
+          scaleLength: this.scaleInput.length,
+          sentinelLength: this.sentinelInput.length,
+          scaleColormap: this.scaleColormap,
+          sentinelColormap: this.sentinelColormap,
           canvasSize,
           canvasCoordinates: canvasCoords,
           textureA: textureManager.texture,
@@ -2580,10 +2537,6 @@ export default class Renderer {
   async renderTilesWithTransitionAndNewColorScale(
     oldTiles: TileDatum[],
     newTiles: TileDatum[],
-    oldColorScale: Color[],
-    newColorScale: Color[],
-    oldSentinelValues: SentinelValue[],
-    newSentinelValues: SentinelValue[],
     transitionDurationMs: number,
     onFrameRendered: (canvasCoordinates: Array<Pair<number>>) => void,
   ) {
@@ -2626,12 +2579,6 @@ export default class Renderer {
     // Renderer's stored TextureManager.
     const newTextureManager = new TextureManager(regl, tileSize, maxTextureDimension, false);
 
-    // Convert the color scales and sentinel values to the form expected by WebGL.
-    const colorScaleA = util.convertColorScale(oldColorScale);
-    const colorScaleB = util.convertColorScale(newColorScale);
-    const sentinelValuesA = util.convertColorScale(oldSentinelValues);
-    const sentinelValuesB = util.convertColorScale(newSentinelValues);
-
     // Record the starting time.
     const transitionStart = regl.now();
 
@@ -2655,10 +2602,14 @@ export default class Renderer {
 
         // Render each tile.
         this.drawTileInterpolateColor(chunk.map(({ canvasCoords }, index) => ({
-          colorScaleA,
-          colorScaleB,
-          sentinelValuesA,
-          sentinelValuesB,
+          scaleLengthA: this.scaleInputPrevious.length,
+          sentinelLengthA: this.sentinelInputPrevious.length,
+          scaleColormapA: this.scaleColormapPrevious,
+          sentinelColormapA: this.sentinelColormapPrevious,
+          scaleLengthB: this.scaleInput.length,
+          sentinelLengthB: this.sentinelInput.length,
+          scaleColormapB: this.scaleColormap,
+          sentinelColormapB: this.sentinelColormap,
           canvasSize,
           canvasCoordinates: canvasCoords,
           textureA: textureManager.texture,
@@ -2692,10 +2643,6 @@ export default class Renderer {
 
   async renderTilesWithTransitionAndNewColorScaleOnly(
     tiles: TileDatum[],
-    oldColorScale: Color[],
-    newColorScale: Color[],
-    oldSentinelValues: SentinelValue[],
-    newSentinelValues: SentinelValue[],
     transitionDurationMs: number,
     onFrameRendered: (canvasCoordinates: Array<Pair<number>>) => void,
   ) {
@@ -2730,12 +2677,6 @@ export default class Renderer {
     // Renderer's stored TextureManager.
     const newTextureManager = new TextureManager(regl, tileSize, maxTextureDimension, false);
 
-    // Convert the color scales and sentinel values to the form expected by WebGL.
-    const colorScaleA = util.convertColorScale(oldColorScale);
-    const colorScaleB = util.convertColorScale(newColorScale);
-    const sentinelValuesA = util.convertColorScale(oldSentinelValues);
-    const sentinelValuesB = util.convertColorScale(newSentinelValues);
-
     // Record the starting time.
     const transitionStart = regl.now();
 
@@ -2756,10 +2697,14 @@ export default class Renderer {
 
         // Render each tile.
         this.drawTileInterpolateColorOnly(chunk.map(({ canvasCoords }, index) => ({
-          colorScaleA,
-          colorScaleB,
-          sentinelValuesA,
-          sentinelValuesB,
+          scaleLengthA: this.scaleInputPrevious.length,
+          sentinelLengthA: this.sentinelInputPrevious.length,
+          scaleColormapA: this.scaleColormapPrevious,
+          sentinelColormapA: this.sentinelColormapPrevious,
+          scaleLengthB: this.scaleInput.length,
+          sentinelLengthB: this.sentinelInput.length,
+          scaleColormapB: this.scaleColormap,
+          sentinelColormapB: this.sentinelColormap,
           canvasSize,
           canvasCoordinates: canvasCoords,
           texture: textureManager.texture,

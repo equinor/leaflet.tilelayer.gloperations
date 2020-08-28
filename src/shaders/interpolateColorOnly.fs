@@ -4,22 +4,21 @@ precision highp float;
 precision mediump float;
 #endif
 
-#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
 #pragma glslify: computeColor = require(./util/computeColor.glsl)
 #pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
-#pragma glslify: ScaleStop = require(./util/ScaleStop.glsl)
+#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
 
 uniform sampler2D texture;
 
-uniform ScaleStop colorScaleA[SCALE_MAX_LENGTH];
-uniform int colorScaleLengthA;
-uniform ScaleStop sentinelValuesA[SENTINEL_MAX_LENGTH];
-uniform int sentinelValuesLengthA;
+uniform int scaleLengthA;
+uniform int sentinelLengthA;
+uniform sampler2D scaleColormapA;
+uniform sampler2D sentinelColormapA;
 
-uniform ScaleStop colorScaleB[SCALE_MAX_LENGTH];
-uniform int colorScaleLengthB;
-uniform ScaleStop sentinelValuesB[SENTINEL_MAX_LENGTH];
-uniform int sentinelValuesLengthB;
+uniform int scaleLengthB;
+uniform int sentinelLengthB;
+uniform sampler2D scaleColormapB;
+uniform sampler2D sentinelColormapB;
 
 uniform float nodataValue;
 uniform bool littleEndian;
@@ -36,12 +35,12 @@ void main() {
   }
 
   if (interpolationFraction <= 0.0) {
-    gl_FragColor = computeColor(texelFloat, colorScaleA, sentinelValuesA, colorScaleLengthA, sentinelValuesLengthA);
+    gl_FragColor = computeColor(texelFloat, scaleColormapA, sentinelColormapA, scaleLengthA, sentinelLengthA, littleEndian);
   } else if (interpolationFraction >= 1.0) {
-    gl_FragColor = computeColor(texelFloat, colorScaleB, sentinelValuesB, colorScaleLengthB, sentinelValuesLengthB);
+    gl_FragColor = computeColor(texelFloat, scaleColormapB, sentinelColormapB, scaleLengthB, sentinelLengthB, littleEndian);
   } else {
-    vec4 colorA = computeColor(texelFloat, colorScaleA, sentinelValuesA, colorScaleLengthA, sentinelValuesLengthA);
-    vec4 colorB = computeColor(texelFloat, colorScaleB, sentinelValuesB, colorScaleLengthB, sentinelValuesLengthB);
+    vec4 colorA = computeColor(texelFloat, scaleColormapA, sentinelColormapA, scaleLengthA, sentinelLengthA, littleEndian);
+    vec4 colorB = computeColor(texelFloat, scaleColormapB, sentinelColormapB, scaleLengthB, sentinelLengthB, littleEndian);
     gl_FragColor = mix(colorA, colorB, interpolationFraction);
   }
 }
