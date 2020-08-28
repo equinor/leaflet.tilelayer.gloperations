@@ -1,10 +1,10 @@
 import autoprefixer from 'autoprefixer';
 import typescript from 'typescript';
 
-import minify from 'rollup-plugin-babel-minify';
-import commonjsPlugin from 'rollup-plugin-commonjs';
+import { terser } from "rollup-plugin-terser";
+import commonjs from '@rollup/plugin-commonjs';
 import glslifyPlugin from './rollup-plugin-glslify-cli';
-import nodeResolvePlugin from 'rollup-plugin-node-resolve';
+import resolve from '@rollup/plugin-node-resolve';
 import postcssPlugin from 'rollup-plugin-postcss';
 import typescriptPlugin from 'rollup-plugin-typescript2';
 
@@ -64,22 +64,13 @@ export default [
     },
     external: [...Object.keys(pkg.peerDependencies || {})],
     plugins: [
-      nodeResolvePlugin({
-        module: true,
-        jsnext: true,
-        main: false,
-        browser: true,
+      resolve({
+        mainFields: ['browser', 'jsnext:main', 'module', 'main'],
         preferBuiltins: false,
       }),
-      commonjsPlugin({
-        namedExports: {
-          'node_modules/upng-js/UPNG.js': ['decode'],
-        }, 
-      }),
+      commonjs(),
       ...commonPlugins,
-      minify({
-        comments: false,
-      }),
+      terser(),
     ],
   },
 ];
