@@ -31,7 +31,7 @@ import {
 } from './types';
 import { ContourMultiPolygon } from 'd3-contour';
 import * as util from './util';
-import { select, selectAll, event } from "d3-selection";
+import { select, selectAll } from "d3-selection";
 import { scaleLinear } from "d3-scale";
 import { geoPath } from "d3-geo";
 import { contours } from "d3-contour";
@@ -39,7 +39,7 @@ import { json } from "d3-request";
 import { min, max, scan, range } from "d3-array";
 import { interpolateHcl } from "d3-interpolate";
 const d3 = { select, selectAll, scaleLinear, geoPath, contours, interpolateHcl,
-  event, json, min, max, scan, range }
+  json, min, max, scan, range }
 
 /**
  * Augment Leaflet GridLayer definition to include some helpful "private" properties.
@@ -412,6 +412,7 @@ export default class GLOperations extends L.GridLayer {
       const renderer = new Renderer(tileSize, this.options.nodataValue, this.options.colorscaleMaxLength, this.options.sentinelMaxLength);
 
       this._renderer.regl.destroy();
+      //@ts-ignore
       delete this._renderer;
 
       Object.assign(this, {
