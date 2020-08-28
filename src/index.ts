@@ -305,7 +305,14 @@ export default class GLOperations extends L.GridLayer {
     } = this.options;
 
     const tileSize: number = this._tileSizeAsNumber();
-    const renderer = new Renderer(tileSize, nodataValue, this.options.colorscaleMaxLength, this.options.sentinelMaxLength);
+    const renderer = new Renderer(
+      tileSize,
+      nodataValue,
+      this.options.colorScale,
+      this.options.sentinelValues,
+      this.options.colorscaleMaxLength,
+      this.options.sentinelMaxLength
+    );
 
     // Set instance properties.
     Object.assign(this, {
@@ -405,11 +412,18 @@ export default class GLOperations extends L.GridLayer {
       sentinelMaxLength: prevSentinelMaxLength,
     } = this.options;
     L.Util.setOptions(this, options);
-    // create new renderer of max length of sentinels or colorscale changes
+    // create new renderer if max length of sentinels or colorscale changes
     if (this.options.colorscaleMaxLength !== prevScaleMaxLength || this.options.sentinelMaxLength !== prevSentinelMaxLength) {
       if (this.options.debug) console.log("Creating new renderer");
       const tileSize: number = this._tileSizeAsNumber();
-      const renderer = new Renderer(tileSize, this.options.nodataValue, this.options.colorscaleMaxLength, this.options.sentinelMaxLength);
+      const renderer = new Renderer(
+        tileSize,
+        this.options.nodataValue,
+        this.options.colorScale,
+        this.options.sentinelValues,
+        this.options.colorscaleMaxLength,
+        this.options.sentinelMaxLength
+      );
 
       this._renderer.regl.destroy();
       //@ts-ignore
@@ -420,6 +434,12 @@ export default class GLOperations extends L.GridLayer {
       });
     }
     this._checkColorScaleAndSentinels();
+    if (this.options.colorScale !== prevColorScale) {
+      this._renderer.updateColorscale(this.options.colorScale);
+    }
+    if (this.options.sentinelValues !== prevSentinelValues) {
+      this._renderer.updateSentinels(this.options.sentinelValues);
+    }
     this._maybePreload(this.options.preloadUrl);
     this.options._hillshadeOptions = {
       hillshadeType: this.options.hillshadeType,
@@ -642,8 +662,6 @@ export default class GLOperations extends L.GridLayer {
    */
   createTile(coords: TileCoordinates, done: L.DoneCallback): TileElement {
     const {
-      colorScale,
-      sentinelValues,
       extraPixelLayers,
       tileSize,
       url,
@@ -707,8 +725,6 @@ export default class GLOperations extends L.GridLayer {
           const [sourceX, sourceY] = this._renderer.renderTileHsPregen(
             { coords: coords, pixelData: pixelData },
             { coords: coords, pixelData: pixelDataHs },
-            colorScale,
-            sentinelValues,
             this.options._hillshadeOptions,
           );
 
@@ -727,8 +743,6 @@ export default class GLOperations extends L.GridLayer {
           if (this.options.debug) console.log("_fetchTileData with no operation")
           const [sourceX, sourceY] = this._renderer.renderTile(
             { coords, pixelData },
-            colorScale,
-            sentinelValues,
             this.options._hillshadeOptions,
             this._getZoomForUrl(),
           );
@@ -753,8 +767,6 @@ export default class GLOperations extends L.GridLayer {
         const [sourceX, sourceY, resultEncodedPixels] = this._renderer.renderTileDiff(
           { coords: coords, pixelData: pixelDataA },
           { coords: coords, pixelData: pixelDataB },
-          colorScale,
-          sentinelValues,
         );
 
         tileCanvas.pixelData = <Uint8Array>resultEncodedPixels;
@@ -774,8 +786,6 @@ export default class GLOperations extends L.GridLayer {
         var pixelDataA: Uint8Array = pixelDataArray[0];
         const [sourceX, sourceY, resultEncodedPixels] = this._renderer.renderTileMulti1(
           { coords: coords, pixelData: pixelDataA },
-          colorScale,
-          sentinelValues,
           filterLowA,
           filterHighA,
           multiplierA,
@@ -801,8 +811,6 @@ export default class GLOperations extends L.GridLayer {
         const [sourceX, sourceY, resultEncodedPixels] = this._renderer.renderTileMulti2(
           { coords: coords, pixelData: pixelDataA },
           { coords: coords, pixelData: pixelDataB },
-          colorScale,
-          sentinelValues,
           filterLowA,
           filterHighA,
           filterLowB,
@@ -835,8 +843,6 @@ export default class GLOperations extends L.GridLayer {
           { coords: coords, pixelData: pixelDataA },
           { coords: coords, pixelData: pixelDataB },
           { coords: coords, pixelData: pixelDataC },
-          colorScale,
-          sentinelValues,
           filterLowA,
           filterHighA,
           filterLowB,
@@ -876,8 +882,6 @@ export default class GLOperations extends L.GridLayer {
           { coords: coords, pixelData: pixelDataB },
           { coords: coords, pixelData: pixelDataC },
           { coords: coords, pixelData: pixelDataD },
-          colorScale,
-          sentinelValues,
           filterLowA,
           filterHighA,
           filterLowB,
@@ -924,8 +928,6 @@ export default class GLOperations extends L.GridLayer {
           { coords: coords, pixelData: pixelDataC },
           { coords: coords, pixelData: pixelDataD },
           { coords: coords, pixelData: pixelDataE },
-          colorScale,
-          sentinelValues,
           filterLowA,
           filterHighA,
           filterLowB,
@@ -979,8 +981,6 @@ export default class GLOperations extends L.GridLayer {
           { coords: coords, pixelData: pixelDataD },
           { coords: coords, pixelData: pixelDataE },
           { coords: coords, pixelData: pixelDataF },
-          colorScale,
-          sentinelValues,
           filterLowA,
           filterHighA,
           filterLowB,
@@ -1088,8 +1088,6 @@ export default class GLOperations extends L.GridLayer {
     const tilesData: TileDatum[] = await this._getTilesData(activeTiles);
     if (this.options.debug) console.log("_updateTiles() with url "+this.options.url);
 
-    const { colorScale, sentinelValues = [] } = this.options;
-
     // Render using the new data.
     let canvasCoordinates: Array<Pair<number>>;
     let tilesDataHs: TileDatum[];
@@ -1098,15 +1096,11 @@ export default class GLOperations extends L.GridLayer {
       canvasCoordinates = this._renderer.renderTilesHsPregen(
         tilesData,
         tilesDataHs,
-        colorScale,
-        sentinelValues,
         this.options._hillshadeOptions,
       );
     } else {
       canvasCoordinates = this._renderer.renderTiles(
         tilesData,
-        colorScale,
-        sentinelValues,
         this.options._hillshadeOptions,
         this._getZoomForUrl(),
       );
@@ -1132,7 +1126,6 @@ export default class GLOperations extends L.GridLayer {
   protected async _updateTilesColorscaleOnly() {
     if (this.options.debug) console.log("_updateTilesColorscaleOnly()");
     const activeTiles: GridLayerTile[] = this._getActiveTiles();
-    const { colorScale, sentinelValues = [] } = this.options;
 
     // Render using the new data.
     if (this.options._hillshadeOptions.hillshadeType === 'pregen') {
@@ -1149,8 +1142,6 @@ export default class GLOperations extends L.GridLayer {
       let canvasCoordinates = this._renderer.renderTilesHsPregen(
         tilesData,
         tilesDataHs,
-        colorScale,
-        sentinelValues,
         this.options._hillshadeOptions,
       );
 
@@ -1168,8 +1159,6 @@ export default class GLOperations extends L.GridLayer {
 
       let canvasCoordinates = this._renderer.renderTiles(
         tilesData,
-        colorScale,
-        sentinelValues,
         this.options._hillshadeOptions,
         this._getZoomForUrl(),
       );
@@ -1227,8 +1216,6 @@ export default class GLOperations extends L.GridLayer {
       this._renderer.renderTilesWithTransition(
         prevTilesData,
         newTilesData,
-        newColorScale,
-        newSentinelValues,
         transitionTimeMs,
         onFrameRendered,
       );
@@ -1236,10 +1223,6 @@ export default class GLOperations extends L.GridLayer {
       this._renderer.renderTilesWithTransitionAndNewColorScale(
         prevTilesData,
         newTilesData,
-        prevColorScale,
-        newColorScale,
-        prevSentinelValues,
-        newSentinelValues,
         transitionTimeMs,
         onFrameRendered,
       );
@@ -1282,10 +1265,6 @@ export default class GLOperations extends L.GridLayer {
     if (JSON.stringify(newColorScale) !== JSON.stringify(prevColorScale) || JSON.stringify(newSentinelValues) !== JSON.stringify(prevSentinelValues)) {
       this._renderer.renderTilesWithTransitionAndNewColorScaleOnly(
         tilesData,
-        prevColorScale,
-        newColorScale,
-        prevSentinelValues,
-        newSentinelValues,
         transitionTimeMs,
         onFrameRendered,
       );
@@ -1354,11 +1333,6 @@ export default class GLOperations extends L.GridLayer {
       }
     }
 
-    const {
-      colorScale: newColorScale,
-      sentinelValues: newSentinelValues = [],
-    } = this.options;
-
     if (
       this.options.glOperation === prevGlOperation &&
       this.options.operationUrlA === prevUrlA &&
@@ -1367,8 +1341,6 @@ export default class GLOperations extends L.GridLayer {
       if (this.options.debug) console.log("_updateTilesWithDiff: both same urls. Running renderTiles()");
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
-        newColorScale,
-        newSentinelValues,
         this.options._hillshadeOptions,
       );
 
@@ -1395,8 +1367,6 @@ export default class GLOperations extends L.GridLayer {
       resultEncodedPixels = this._renderer.renderTilesWithDiff(
         tilesA,
         tilesB,
-        newColorScale,
-        newSentinelValues,
         onFrameRendered,
       );
 
@@ -1422,11 +1392,6 @@ export default class GLOperations extends L.GridLayer {
     if (this.options.debug) console.log("_updateTilesWithMultiAnalyze1()");
     const activeTiles: GridLayerTile[] = this._getActiveTiles();
 
-    const {
-      colorScale: newColorScale,
-      sentinelValues: newSentinelValues = [],
-    } = this.options;
-
     if (
       this.options.glOperation === prevGlOperation &&
       this.options.operationUrlA === prevUrlA &&
@@ -1444,8 +1409,6 @@ export default class GLOperations extends L.GridLayer {
 
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
-        newColorScale,
-        newSentinelValues,
         this.options._hillshadeOptions,
       );
 
@@ -1485,8 +1448,6 @@ export default class GLOperations extends L.GridLayer {
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
       let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze1(
         tilesA,
-        newColorScale,
-        newSentinelValues,
         this.options.filterLowA,
         this.options.filterHighA,
         this.options.multiplierA,
@@ -1519,11 +1480,6 @@ export default class GLOperations extends L.GridLayer {
     if (this.options.debug) console.log("_updateTilesWithMultiAnalyze2()");
     const activeTiles: GridLayerTile[] = this._getActiveTiles();
 
-    const {
-      colorScale: newColorScale,
-      sentinelValues: newSentinelValues = [],
-    } = this.options;
-
     if (
       this.options.glOperation === prevGlOperation &&
       this.options.operationUrlA === prevUrlA &&
@@ -1545,8 +1501,6 @@ export default class GLOperations extends L.GridLayer {
 
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
-        newColorScale,
-        newSentinelValues,
         this.options._hillshadeOptions,
       );
 
@@ -1604,8 +1558,6 @@ export default class GLOperations extends L.GridLayer {
       let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze2(
         tilesA,
         tilesB,
-        newColorScale,
-        newSentinelValues,
         this.options.filterLowA,
         this.options.filterHighA,
         this.options.filterLowB,
@@ -1645,11 +1597,6 @@ export default class GLOperations extends L.GridLayer {
     if (this.options.debug) console.log("_updateTilesWithMultiAnalyze3()");
     const activeTiles: GridLayerTile[] = this._getActiveTiles();
 
-    const {
-      colorScale: newColorScale,
-      sentinelValues: newSentinelValues = [],
-    } = this.options;
-
     if (
       this.options.glOperation === prevGlOperation &&
       this.options.operationUrlA === prevUrlA &&
@@ -1675,8 +1622,6 @@ export default class GLOperations extends L.GridLayer {
 
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
-        newColorScale,
-        newSentinelValues,
         this.options._hillshadeOptions,
       );
 
@@ -1752,8 +1697,6 @@ export default class GLOperations extends L.GridLayer {
         tilesA,
         tilesB,
         tilesC,
-        newColorScale,
-        newSentinelValues,
         this.options.filterLowA,
         this.options.filterHighA,
         this.options.filterLowB,
@@ -1800,11 +1743,6 @@ export default class GLOperations extends L.GridLayer {
     if (this.options.debug) console.log("_updateTilesWithMultiAnalyze4()");
     const activeTiles: GridLayerTile[] = this._getActiveTiles();
 
-    const {
-      colorScale: newColorScale,
-      sentinelValues: newSentinelValues = [],
-    } = this.options;
-
     if (
       this.options.glOperation === prevGlOperation &&
       this.options.operationUrlA === prevUrlA &&
@@ -1834,8 +1772,6 @@ export default class GLOperations extends L.GridLayer {
 
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
-        newColorScale,
-        newSentinelValues,
         this.options._hillshadeOptions,
       );
 
@@ -1929,8 +1865,6 @@ export default class GLOperations extends L.GridLayer {
         tilesB,
         tilesC,
         tilesD,
-        newColorScale,
-        newSentinelValues,
         this.options.filterLowA,
         this.options.filterHighA,
         this.options.filterLowB,
@@ -1983,11 +1917,6 @@ export default class GLOperations extends L.GridLayer {
     if (this.options.debug) console.log("_updateTilesWithMultiAnalyze5()");
     const activeTiles: GridLayerTile[] = this._getActiveTiles();
 
-    const {
-      colorScale: newColorScale,
-      sentinelValues: newSentinelValues = [],
-    } = this.options;
-
     if (
       this.options.glOperation === prevGlOperation &&
       this.options.operationUrlA === prevUrlA &&
@@ -2021,8 +1950,6 @@ export default class GLOperations extends L.GridLayer {
 
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
-        newColorScale,
-        newSentinelValues,
         this.options._hillshadeOptions,
       );
 
@@ -2134,8 +2061,6 @@ export default class GLOperations extends L.GridLayer {
         tilesC,
         tilesD,
         tilesE,
-        newColorScale,
-        newSentinelValues,
         this.options.filterLowA,
         this.options.filterHighA,
         this.options.filterLowB,
@@ -2196,11 +2121,6 @@ export default class GLOperations extends L.GridLayer {
     if (this.options.debug) console.log("_updateTilesWithMultiAnalyze6()");
     const activeTiles: GridLayerTile[] = this._getActiveTiles();
 
-    const {
-      colorScale: newColorScale,
-      sentinelValues: newSentinelValues = [],
-    } = this.options;
-
     if (
       this.options.glOperation === prevGlOperation &&
       this.options.operationUrlA === prevUrlA &&
@@ -2238,8 +2158,6 @@ export default class GLOperations extends L.GridLayer {
 
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
-        newColorScale,
-        newSentinelValues,
         this.options._hillshadeOptions,
       );
 
@@ -2370,8 +2288,6 @@ export default class GLOperations extends L.GridLayer {
         tilesD,
         tilesE,
         tilesF,
-        newColorScale,
-        newSentinelValues,
         this.options.filterLowA,
         this.options.filterHighA,
         this.options.filterLowB,

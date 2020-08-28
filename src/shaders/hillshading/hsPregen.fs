@@ -4,17 +4,14 @@ precision highp float;
 precision mediump float;
 #endif
 
-#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
-
 #pragma glslify: computeColor = require(./util/computeColor.glsl)
 #pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
-#pragma glslify: ScaleStop = require(./util/ScaleStop.glsl)
+#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
 
-uniform ScaleStop colorScale[SCALE_MAX_LENGTH];
-uniform int colorScaleLength;
-
-uniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];
-uniform int sentinelValuesLength;
+uniform int scaleLength;
+uniform int sentinelLength;
+uniform sampler2D scaleColormap;
+uniform sampler2D sentinelColormap;
 
 uniform float nodataValue;
 uniform sampler2D texture;
@@ -33,7 +30,14 @@ void main() {
     discard;
   }
 
-  vec4 clr = computeColor(texelFloat, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);
+  vec4 clr = computeColor(
+    texelFloat,
+    scaleColormap,
+    sentinelColormap,
+    scaleLength,
+    sentinelLength,
+    littleEndian
+  );
 
   // Hillshade
   float l = texture2D(hillshadePregenTexture, vTexCoordB).r;

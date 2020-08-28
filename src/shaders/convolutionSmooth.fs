@@ -25,7 +25,6 @@ float getTexelValue(vec2 pos) {
   return texelFloat;
 }
 
-
 float runConvKernel(vec2 pos, vec2 onePixel) {
   float convKernelWeight = 0.0;
   float sum = 0.0;
@@ -50,12 +49,10 @@ float runConvKernel(vec2 pos, vec2 onePixel) {
 void main() {
   float texelFloat = getTexelValue(vTexCoord);
   if (isCloseEnough(texelFloat, nodataValue)) {
-    // gl_FragColor = vec4(nodataValue);
     gl_FragColor = floatToRgba(nodataValue, littleEndian);
   } else {
     vec2 onePixel = vec2(1.0, 1.0) / textureSize;
     float texelFloatSmoothed = runConvKernel(vTexCoord, onePixel);
-    // gl_FragColor = vec4(texelFloatSmoothed);
     gl_FragColor = floatToRgba(texelFloatSmoothed, littleEndian);
   }
 }

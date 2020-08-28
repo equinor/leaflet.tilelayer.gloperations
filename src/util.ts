@@ -4,71 +4,10 @@ import { decode } from 'upng-js';
 
 import {
   Color,
-  Dictionary,
+  SentinelValue,
   TextureBounds,
   TileCoordinates,
-  WebGLColorStop,
 } from './types';
-
-/**
- * Converts a color scale (or array of SentinelValues) to a format usable by WebGL.
- */
-export function convertColorScale(colorScale: Color[]): WebGLColorStop[] {
-  return colorScale.map(({ color, offset }) => ({
-    color: colorStringToWebGLFloats(color),
-    offset,
-  }));
-}
-
-const RGB_REGEX = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/;
-
-/**
- * Parses a color string of the form 'rgb({rVal}, {gVal}, {bVal})' and converts the resulting values
- * to a Vec4 consumable by WebGL. Each color value is normalized to the range 0.0 to 1.0.
- */
-export function colorStringToWebGLFloats(rgb: string): REGL.Vec4 {
-  if (rgb === 'transparent') {
-    return [1, 1, 1, 0];
-  }
-  const match = rgb.match(RGB_REGEX);
-  if (match === null) {
-    throw new Error(`'${rgb}' is not a valid RGB color expression.`);
-  }
-  const [, r, g, b] = match;
-  return [+r / 255, +g / 255, +b / 255, 1];
-}
-
-/**
- * Create an object representing the elements and properties of a WebGL struct array to be passed
- * to Regl. Each property is a "dynamic prop" in Regl parlance. That is, it's a function that is
- * evaluated when the drawing function is called. When each dynamic prop (function) is evaluated,
- * it's passed as second argument a `props` object (similar to `props` in a React component).
- */
-export function bindStructArray<
-  Struct extends Dictionary<any>,
-  Props extends Dictionary<any[]> = {}
->(
-  structPropertyNames: Array<keyof Struct>,
-  defaultValue: Struct,
-  maxArrayLength: number,
-  glslIdentifier: string,
-  propName: keyof Props = (glslIdentifier as keyof Props),
-) {
-  const output = {} as Dictionary<any>;
-  for (let i = 0; i < maxArrayLength; ++i) {
-    for (const key of structPropertyNames) {
-      output[`${glslIdentifier}[${i}].${key}`] = (_: any, props: Props) => {
-        const inputArray = props[propName];
-        return (
-          i < inputArray.length
-          ? inputArray[i][key]
-          : defaultValue[key]
-        );
-      };
-    }
-  }
-  return output;
-}
 
 export function machineIsLittleEndian() {
   const uint8Array = new Uint8Array([0xAA, 0xBB]);
@@ -241,4 +180,90 @@ export function PingPong(regl: REGL.Regl, opts: REGL.FramebufferOptions) {
     pong,
     swap
   };
+}
+
+/**
+ * hexToRGB converts a color from hex format to rgb-format.
+ * @param {String} hex - A color in hex format
+ *
+ * @example
+ * const [r, g, b, a] = hexToRGB("#ffeeaaff")
+ */
+export const hexToRGB = (hex: string) => {
+  const hasAlpha = hex.length === 9;
+  const start = hasAlpha ? 24 : 16;
+  const bigint = parseInt(hex.slice(1), 16);
+  const r = (bigint >> start) & 255;
+  const g = (bigint >> (start - 8)) & 255;
+  const b = (bigint >> (start - 16)) & 255;
+  const a = hasAlpha ? (bigint >> (start - 24)) & 255 : 255;
+  return [r, g, b, a];
+};
+
+const RGB_REGEX = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/;
+const HEX_REGEX = /(?:#)[0-9a-f]{8}|(?:#)[0-9a-f]{6}|(?:#)[0-9a-f]{4}|(?:#)[0-9a-f]{3}/ig;
+
+/**
+ * Parses a color string of the form 'rgb({rVal}, {gVal}, {bVal})' and converts the resulting values
+ * to an array with ints 0 - 255.
+ */
+export function colorStringToInts(colorstring: string): number[] {
+  if (colorstring === 'transparent') {
+    return [0, 0, 0, 0];
+  }
+  const rgbmatch = colorstring.match(RGB_REGEX);
+  const hexmatch = colorstring.match(HEX_REGEX);
+  if (rgbmatch !== null) {
+    const [, r, g, b] = rgbmatch;
+    return [+r, +g, +b, 255];
+  } else if (hexmatch !== null) {
+    // const [, r, g, b] = rgbmatch;
+    return hexToRGB(colorstring);
+  } else {
+    throw new Error(`'${colorstring}' is not a valid RGB or hex color expression.`);
+  }
+}
+
+/**
+ * colormapToFlatArray takes the input colormap and returns a flat array to be 
+ * used as input to a texture. The first row in the array contains the colors.
+ * The second row contains the encoded offset values.
+ */
+export const colormapToFlatArray = (colormap: Color[]) => {
+  let offsets: number[] = [];
+  let colors: number[] = [];
+  for (let i = 0; i < colormap.length; i++) {
+    offsets.push(colormap[i].offset);
+    let colorsnew = colorStringToInts(colormap[i].color)
+    colors = colors.concat(colorsnew);
+  }
+
+  const floatOffsets = new Float32Array(offsets);
+  const uintOffsets = new Uint8Array(floatOffsets.buffer);
+  const normalOffsets = Array.from(uintOffsets);
+  const colormapArray: number[] = colors.concat(normalOffsets);
+
+  return colormapArray;
+};
+
+/**
+ * Creates a texture with colors on first row and offsets on second row
+ */
+export function createColormapTexture(colormapInput: Color[]|SentinelValue[], regl: REGL.Regl) {
+  let colormapFlatArray = colormapToFlatArray(colormapInput);
+  let colormapTexture: REGL.Texture2D;
+  if (colormapInput.length === 0) {
+    // empty texture
+    colormapTexture = regl.texture({
+      shape: [2, 2]
+    })
+  } else {
+    colormapTexture = regl.texture({
+      width: colormapInput.length,
+      height: 2,
+      data: colormapFlatArray
+    })
+  };
+
+  return colormapTexture;
 }

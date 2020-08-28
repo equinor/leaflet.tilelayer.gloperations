@@ -6,10 +6,9 @@ precision mediump float;
 
 #define TRANSPARENT vec4(0.0)
 
-#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
 #pragma glslify: computeColor = require(./util/computeColor.glsl)
 #pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
-#pragma glslify: ScaleStop = require(./util/ScaleStop.glsl)
+#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
 
 uniform sampler2D textureA;
 uniform sampler2D textureB;
@@ -18,10 +17,10 @@ uniform sampler2D textureD;
 uniform sampler2D textureE;
 uniform sampler2D textureF;
 
-uniform ScaleStop colorScale[SCALE_MAX_LENGTH];
-uniform int colorScaleLength;
-uniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];
-uniform int sentinelValuesLength;
+uniform int scaleLength;
+uniform int sentinelLength;
+uniform sampler2D scaleColormap;
+uniform sampler2D sentinelColormap;
 
 uniform float nodataValue;
 uniform bool littleEndian;
@@ -86,6 +85,13 @@ void main() {
     gl_FragColor = TRANSPARENT;
   } else {
     float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC + texelFloatD * multiplierD + texelFloatE * multiplierE + texelFloatF * multiplierF;
-    gl_FragColor = computeColor(texelFloatFinal, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);
+    gl_FragColor = computeColor(
+      texelFloatFinal,
+      scaleColormap,
+      sentinelColormap,
+      scaleLength,
+      sentinelLength,
+      littleEndian
+    );
   }
 }
