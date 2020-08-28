@@ -9,7 +9,7 @@ const { execSync } = require('child_process');
 const path = require('path');
 
 function compile(code, options) {
-    return execSync('$(npm bin)/glslify', {
+    return execSync('$(pnpm bin)/glslify', {
         encoding: 'utf-8',
         cwd: options.basedir,
         input: code,
