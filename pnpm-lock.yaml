@@ -15,6 +15,7 @@ dependencies:
   d3-scale: 3.2.1
   d3-selection: 1.4.1
   dayjs: 1.8.25
+  dot-prop: 5.2.0
   file-loader: 6.0.0_webpack@4.42.1
   glsl-rgba-to-float: 1.0.0
   leaflet: 1.6.0
@@ -8590,6 +8591,7 @@ specifiers:
   d3-scale: ^3.2.1
   d3-selection: ^1.4.1
   dayjs: ^1.8.25
+  dot-prop: '>=4.2.1'
   file-loader: ^6.0.0
   glsl-rgba-to-float: ^1.0.0
   leaflet: ^1.6.0
