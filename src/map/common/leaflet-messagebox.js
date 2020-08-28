@@ -1,3 +1,5 @@
+import L from 'leaflet'
+
 L.Control.Messagebox = L.Control.extend({
     options: {
         position: 'topright',

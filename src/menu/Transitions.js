@@ -1,5 +1,6 @@
+import { Input, Select, Switch } from 'antd';
+
 import React from 'react'
-import { Select, Switch, Input } from 'antd';
 
 const { Option, OptGroup } = Select;
 

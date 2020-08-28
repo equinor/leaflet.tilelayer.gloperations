@@ -1,6 +1,6 @@
 import L from 'leaflet';
 
-export default function addValueDisplay(map, VALUE_DISPLAY_PRECISION) {
+export function addValueDisplay(map) {
   let valueDisplay = L.control({
     position : 'topright'
   });

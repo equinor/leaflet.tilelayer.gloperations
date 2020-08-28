@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { Select } from 'antd';
 import 'antd/dist/antd.css';
+
+import React, { useEffect, useState } from "react";
+
 import { Colorscale } from './react-colorscales';
 import ColorscalePicker from './react-colorscales';
 import { DEFAULT_SCALE } from "./react-colorscales/components/constants";
+import { Select } from 'antd';
 
 const { Option, OptGroup } = Select;
 

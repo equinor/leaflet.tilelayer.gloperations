@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { Radio, Slider } from 'antd';
 import 'antd/dist/antd.css';
+
+import { Radio, Slider } from 'antd';
+import React, { useState } from "react";
 
 const radioStyle = {
   display: 'block',

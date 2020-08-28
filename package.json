@@ -53,5 +53,9 @@
     "webpack-merge": "^4.2.2",
     "webpack-plugin-serve": "^0.12.1",
     "webpack-serve": "^3.2.0"
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-export-default-from": "^7.10.4",
+    "@babel/plugin-proposal-export-namespace-from": "^7.10.4"
   }
 }

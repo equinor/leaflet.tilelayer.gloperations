@@ -1,13 +1,15 @@
-import React, { useState } from "react";
-import { Collapse } from 'antd';
 import 'antd/dist/antd.css';
-import surfaceOptions from '../menu/surfaceOptions'
-import Hillshading from '../menu/Hillshading'
-import Multi from '../menu/Multi'
-import Contours from '../menu/Contours'
-import Transitions from '../menu/Transitions'
-import ColorscaleAndUrl from '../menu/ColorscaleAndUrl'
 import "./Navigation.css";
+
+import React, { useState } from "react";
+
+import { Collapse } from 'antd';
+import ColorscaleAndUrl from '../../menu/ColorscaleAndUrl'
+import Contours from '../../menu/Contours'
+import Hillshading from '../../menu/Hillshading'
+import Multi from '../../menu/Multi'
+import Transitions from '../../menu/Transitions'
+import surfaceOptions from '../../menu/surfaceOptions'
 
 const { Panel } = Collapse;
 
@@ -45,7 +47,7 @@ const Navigation = ({tilelayer}) => {
   }
 
   return (
-    <div>
+    <div id="nav">
       <Collapse accordion onChange={accordionCallback}>
         <Panel header="Colorscale" key="colorscale">
           <ColorscaleAndUrl tilelayer={tilelayer} handleUrlChange={handleUrlChange} scaleMinMax={scaleMinMax} surfaceUrl={surfaceUrl} showColorscalePicker={showColorscalePicker} setShowColorscalePicker={setShowColorscalePicker} />

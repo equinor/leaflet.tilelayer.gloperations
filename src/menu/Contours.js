@@ -1,6 +1,8 @@
-import React, { useState } from "react";
-import { Radio, Slider, Switch } from 'antd';
 import 'antd/dist/antd.css';
+
+import { Radio, Slider, Switch } from 'antd';
+import React, { useState } from "react";
+
 import { GithubPicker } from 'react-color';
 
 const Contours = ({tilelayer}) => {

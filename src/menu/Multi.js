@@ -1,6 +1,7 @@
+import 'antd/dist/antd.css';
+
 import React from 'react'
 import { Slider } from 'antd';
-import 'antd/dist/antd.css';
 
 const Multi = ({tilelayer}) => {
 
