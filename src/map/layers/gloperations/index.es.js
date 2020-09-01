@@ -119,10 +119,6 @@ var css_248z = ".gl-tilelayer-tile {\n  -ms-interpolation-mode: nearest-neighbor
 styleInject(css_248z);
 
 var CLEAR_COLOR = [0, 0, 0, 0];
-var DEFAULT_COLOR_STOP = {
-    color: CLEAR_COLOR,
-    offset: 0,
-};
 var MAX_TEXTURE_DIMENSION = 1024;
 
 var vertDouble = "#define GLSLIFY 1\nuniform mat4 transformMatrix;\n\nattribute vec2 position;\nattribute vec2 texCoordA;\n// use same coords for all textures?\nattribute vec2 texCoordB;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nvoid main() {\n  vTexCoordA = texCoordA;\n  vTexCoordB = texCoordB;\n  gl_Position = transformMatrix * vec4(position, 0.0, 1.0);\n}\n"; // eslint-disable-line
@@ -139,89 +135,46 @@ var vertMulti6 = "#define GLSLIFY 1\nuniform mat4 transformMatrix;\n\nattribute 
 
 var vertSmooth = "#define GLSLIFY 1\nattribute vec2 position;\nattribute vec2 texCoord;\n\nvarying vec2 vTexCoord;\n\nvoid main() {\n  vTexCoord = texCoord;\n  gl_Position = vec4(position, 0.0, 1.0);\n}\n"; // eslint-disable-line
 
-var fragInterpolateColor = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength,\n  int sentinelValuesLength\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform ScaleStop colorScaleA[SCALE_MAX_LENGTH];\nuniform int colorScaleLengthA;\nuniform ScaleStop sentinelValuesA[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLengthA;\n\nuniform sampler2D textureB;\nuniform ScaleStop colorScaleB[SCALE_MAX_LENGTH];\nuniform int colorScaleLengthB;\nuniform ScaleStop sentinelValuesB[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLengthB;\n\nuniform float nodataValue;\nuniform bool littleEndian;\nuniform float interpolationFraction;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nvoid main() {\n  if (interpolationFraction <= 0.0) {\n    vec4 texelRgba = texture2D(textureA, vTexCoordA);\n    float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n    if (isCloseEnough(texelFloat, nodataValue)) {\n      discard;\n    }\n    gl_FragColor = computeColor(texelFloat, colorScaleA, sentinelValuesA, colorScaleLengthA, sentinelValuesLengthA);\n  } else if (interpolationFraction >= 1.0) {\n    vec4 texelRgba = texture2D(textureB, vTexCoordB);\n    float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n    if (isCloseEnough(texelFloat, nodataValue)) {\n      discard;\n    }\n    gl_FragColor = computeColor(texelFloat, colorScaleB, sentinelValuesB, colorScaleLengthB, sentinelValuesLengthB);\n  } else {\n    vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n    float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n    vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n    float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n    vec4 colorA = (\n      isCloseEnough(texelFloatA, nodataValue)\n      ? TRANSPARENT\n      : computeColor(texelFloatA, colorScaleA, sentinelValuesA, colorScaleLengthA, sentinelValuesLengthA)\n    );\n    vec4 colorB = (\n      isCloseEnough(texelFloatB, nodataValue)\n      ? TRANSPARENT\n      : computeColor(texelFloatB, colorScaleB, sentinelValuesB, colorScaleLengthB, sentinelValuesLengthB)\n    );\n    gl_FragColor = mix(colorA, colorB, interpolationFraction);\n  }\n}"; // eslint-disable-line
+var fragInterpolateColor = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\n\nuniform int scaleLengthA;\nuniform int sentinelLengthA;\nuniform sampler2D scaleColormapA;\nuniform sampler2D sentinelColormapA;\n\nuniform int scaleLengthB;\nuniform int sentinelLengthB;\nuniform sampler2D scaleColormapB;\nuniform sampler2D sentinelColormapB;\n\nuniform float nodataValue;\nuniform bool littleEndian;\nuniform float interpolationFraction;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nvoid main() {\n  if (interpolationFraction <= 0.0) {\n    vec4 texelRgba = texture2D(textureA, vTexCoordA);\n    float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n    if (isCloseEnough(texelFloat, nodataValue)) {\n      discard;\n    }\n    gl_FragColor = computeColor(texelFloat, scaleColormapA, sentinelColormapA, scaleLengthA, sentinelLengthA, littleEndian);\n  } else if (interpolationFraction >= 1.0) {\n    vec4 texelRgba = texture2D(textureB, vTexCoordB);\n    float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n    if (isCloseEnough(texelFloat, nodataValue)) {\n      discard;\n    }\n    gl_FragColor = computeColor(texelFloat, scaleColormapB, sentinelColormapB, scaleLengthB, sentinelLengthB, littleEndian);\n  } else {\n    vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n    float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n    vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n    float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n    vec4 colorA = (\n      isCloseEnough(texelFloatA, nodataValue)\n      ? TRANSPARENT\n      : computeColor(texelFloatA, scaleColormapA, sentinelColormapA, scaleLengthA, sentinelLengthA, littleEndian)\n    );\n    vec4 colorB = (\n      isCloseEnough(texelFloatB, nodataValue)\n      ? TRANSPARENT\n      : computeColor(texelFloatB, scaleColormapB, sentinelColormapB, scaleLengthB, sentinelLengthB, littleEndian)\n    );\n    gl_FragColor = mix(colorA, colorB, interpolationFraction);\n  }\n}"; // eslint-disable-line
 
-var fragInterpolateColorOnly = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength,\n  int sentinelValuesLength\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D texture;\n\nuniform ScaleStop colorScaleA[SCALE_MAX_LENGTH];\nuniform int colorScaleLengthA;\nuniform ScaleStop sentinelValuesA[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLengthA;\n\nuniform ScaleStop colorScaleB[SCALE_MAX_LENGTH];\nuniform int colorScaleLengthB;\nuniform ScaleStop sentinelValuesB[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLengthB;\n\nuniform float nodataValue;\nuniform bool littleEndian;\nuniform float interpolationFraction;\n\nvarying vec2 vTexCoord;\n\nvoid main() {\n  vec4 texelRgba = texture2D(texture, vTexCoord);\n  float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n\n  if (isCloseEnough(texelFloat, nodataValue)) {\n    discard;\n  }\n\n  if (interpolationFraction <= 0.0) {\n    gl_FragColor = computeColor(texelFloat, colorScaleA, sentinelValuesA, colorScaleLengthA, sentinelValuesLengthA);\n  } else if (interpolationFraction >= 1.0) {\n    gl_FragColor = computeColor(texelFloat, colorScaleB, sentinelValuesB, colorScaleLengthB, sentinelValuesLengthB);\n  } else {\n    vec4 colorA = computeColor(texelFloat, colorScaleA, sentinelValuesA, colorScaleLengthA, sentinelValuesLengthA);\n    vec4 colorB = computeColor(texelFloat, colorScaleB, sentinelValuesB, colorScaleLengthB, sentinelValuesLengthB);\n    gl_FragColor = mix(colorA, colorB, interpolationFraction);\n  }\n}"; // eslint-disable-line
+var fragInterpolateColorOnly = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D texture;\n\nuniform int scaleLengthA;\nuniform int sentinelLengthA;\nuniform sampler2D scaleColormapA;\nuniform sampler2D sentinelColormapA;\n\nuniform int scaleLengthB;\nuniform int sentinelLengthB;\nuniform sampler2D scaleColormapB;\nuniform sampler2D sentinelColormapB;\n\nuniform float nodataValue;\nuniform bool littleEndian;\nuniform float interpolationFraction;\n\nvarying vec2 vTexCoord;\n\nvoid main() {\n  vec4 texelRgba = texture2D(texture, vTexCoord);\n  float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n\n  if (isCloseEnough(texelFloat, nodataValue)) {\n    discard;\n  }\n\n  if (interpolationFraction <= 0.0) {\n    gl_FragColor = computeColor(texelFloat, scaleColormapA, sentinelColormapA, scaleLengthA, sentinelLengthA, littleEndian);\n  } else if (interpolationFraction >= 1.0) {\n    gl_FragColor = computeColor(texelFloat, scaleColormapB, sentinelColormapB, scaleLengthB, sentinelLengthB, littleEndian);\n  } else {\n    vec4 colorA = computeColor(texelFloat, scaleColormapA, sentinelColormapA, scaleLengthA, sentinelLengthA, littleEndian);\n    vec4 colorB = computeColor(texelFloat, scaleColormapB, sentinelColormapB, scaleLengthB, sentinelLengthB, littleEndian);\n    gl_FragColor = mix(colorA, colorB, interpolationFraction);\n  }\n}"; // eslint-disable-line
 
-var fragInterpolateValue = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength_0,\n  int sentinelValuesLength_0\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength_0 > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength_0) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength_0 > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength_0) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform ScaleStop colorScale[SCALE_MAX_LENGTH];\nuniform int colorScaleLength;\n\nuniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLength;\n\nuniform float nodataValue;\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform bool littleEndian;\nuniform float interpolationFraction;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nbool isSentinelValue(ScaleStop sentinelValues[SENTINEL_MAX_LENGTH], int len, float value) {\n  for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n    if (i == len) {\n      break;\n    }\n    if (isCloseEnough(sentinelValues[i].offset, value)) {\n      return true;\n    }\n  }\n  return false;\n}\n\nvoid main() {\n  if (interpolationFraction <= 0.0) {\n    vec4 texelRgba = texture2D(textureA, vTexCoordA);\n    float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n    if (isCloseEnough(texelFloat, nodataValue)) {\n      discard;\n    }\n    gl_FragColor = computeColor(texelFloat, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n  } else if (interpolationFraction >= 1.0) {\n    vec4 texelRgba = texture2D(textureB, vTexCoordB);\n    float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n    if (isCloseEnough(texelFloat, nodataValue)) {\n      discard;\n    }\n    gl_FragColor = computeColor(texelFloat, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n  } else {\n    // retrieve and decode pixel value from both tiles\n    vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n    float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n    vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n    float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n    bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n    bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n    if (aIsNodata && bIsNodata) {\n      discard;\n    } else if (\n      aIsNodata\n      || bIsNodata\n      || colorScaleLength == 0\n      || isSentinelValue(sentinelValues, sentinelValuesLength, texelFloatA)\n      || isSentinelValue(sentinelValues, sentinelValuesLength, texelFloatB)\n    ) {\n      vec4 colorA = (\n        aIsNodata\n        ? TRANSPARENT\n        : computeColor(texelFloatA, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength)\n      );\n      vec4 colorB = (\n        bIsNodata\n        ? TRANSPARENT\n        : computeColor(texelFloatB, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength)\n      );\n      gl_FragColor = mix(colorA, colorB, interpolationFraction);\n    } else {\n      float interpolated = mix(texelFloatA, texelFloatB, interpolationFraction);\n      gl_FragColor = computeColor(interpolated, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n    }\n  }\n}\n"; // eslint-disable-line
+var fragInterpolateValue = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform int scaleLength;\nuniform int sentinelLength;\nuniform sampler2D scaleColormap;\nuniform sampler2D sentinelColormap;\n\nuniform float nodataValue;\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform bool littleEndian;\nuniform float interpolationFraction;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nbool isSentinelValue(sampler2D sentinelColormap, int len, float value) {\n  for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n    if (i == len) {\n      break;\n    }\n    float i_f = float(i);\n    float lenFloat = float(len);\n    vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / lenFloat, 0.75));\n    float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n    if (isCloseEnough(sentinelOffset, value)) {\n      return true;\n    }\n  }\n  return false;\n}\n\nvoid main() {\n  if (interpolationFraction <= 0.0) {\n    vec4 texelRgba = texture2D(textureA, vTexCoordA);\n    float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n    if (isCloseEnough(texelFloat, nodataValue)) {\n      discard;\n    }\n    gl_FragColor = computeColor(\n      texelFloat,\n      scaleColormap,\n      sentinelColormap,\n      scaleLength,\n      sentinelLength,\n      littleEndian\n    );\n  } else if (interpolationFraction >= 1.0) {\n    vec4 texelRgba = texture2D(textureB, vTexCoordB);\n    float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n    if (isCloseEnough(texelFloat, nodataValue)) {\n      discard;\n    }\n    gl_FragColor = computeColor(\n      texelFloat,\n      scaleColormap,\n      sentinelColormap,\n      scaleLength,\n      sentinelLength,\n      littleEndian\n    );\n  } else {\n    // retrieve and decode pixel value from both tiles\n    vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n    float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n    vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n    float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n    bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n    bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n    if (aIsNodata && bIsNodata) {\n      discard;\n    } else if (\n      aIsNodata\n      || bIsNodata\n      || scaleLength == 0\n      || isSentinelValue(sentinelColormap, sentinelLength, texelFloatA)\n      || isSentinelValue(sentinelColormap, sentinelLength, texelFloatB)\n    ) {\n      vec4 colorA = (\n        aIsNodata\n        ? TRANSPARENT\n        : computeColor(\n            texelFloatA,\n            scaleColormap,\n            sentinelColormap,\n            scaleLength,\n            sentinelLength,\n            littleEndian\n          )\n      );\n      vec4 colorB = (\n        bIsNodata\n        ? TRANSPARENT\n        : computeColor(\n            texelFloatB,\n            scaleColormap,\n            sentinelColormap,\n            scaleLength,\n            sentinelLength,\n            littleEndian\n          )\n      );\n      gl_FragColor = mix(colorA, colorB, interpolationFraction);\n    } else {\n      float interpolated = mix(texelFloatA, texelFloatB, interpolationFraction);\n      gl_FragColor = computeColor(\n        interpolated,\n        scaleColormap,\n        sentinelColormap,\n        scaleLength,\n        sentinelLength,\n        littleEndian\n      );\n    }\n  }\n}\n"; // eslint-disable-line
 
-var fragSingle = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength_0,\n  int sentinelValuesLength_0\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength_0 > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength_0) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength_0 > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength_0) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform ScaleStop colorScale[SCALE_MAX_LENGTH];\nuniform int colorScaleLength;\n\nuniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLength;\n\nuniform float nodataValue;\nuniform sampler2D texture;\nuniform bool littleEndian;\nuniform bool enableSimpleHillshade;\n\nuniform float textureSize;\nuniform float tileSize;\nuniform vec4 textureBounds;\nvarying vec2 vTexCoord;\n\nuniform float offset;\nuniform float slopescale;\nuniform float slopeFactor;\nuniform float deg2rad;\nuniform float azimuth;\nuniform float altitude;\n\nfloat getTexelValue(vec2 pos) {\n  vec4 texelRgba = texture2D(texture, pos);\n  float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n  return texelFloat;\n}\n\nfloat getRelativeHeight(vec2 pos, float v, vec4 textureBounds) {\n  // if (pos.x < textureBounds[0]) {\n  //   pos = vec2(textureBounds[0], pos.y);\n  // }\n  // if (pos.x > textureBounds[2]) {\n  //   pos = vec2(textureBounds[2], pos.y);\n  // }\n  // if (pos.y < textureBounds[1]) {\n  //   pos = vec2(pos.x, textureBounds[1]);\n  // }\n  // if (pos.y > textureBounds[3]) {\n  //   pos = vec2(pos.x, textureBounds[3]);\n  // }\n  float pixelFloatValue = getTexelValue(pos);\n  float test = step(0.0, pixelFloatValue);\n  float testReturn = ((test * pixelFloatValue) + ((1.0 - test) * v)) * (slopescale*slopeFactor);\n  return testReturn;\n}\n\nfloat hillshade(vec2 pos, float v, float offset, vec4 textureBounds) {\n  float cv = v * (slopescale * slopeFactor);\n  vec4 nv = vec4(\n  getRelativeHeight(vec2(pos.x + offset, pos.y), v, textureBounds),\n  getRelativeHeight(vec2(pos.x - offset, pos.y), v, textureBounds),\n  getRelativeHeight(vec2(pos.x, pos.y + offset), v, textureBounds),\n  getRelativeHeight(vec2(pos.x, pos.y - offset), v, textureBounds)\n  );\n\n  vec2 grad = vec2(\n    (nv[0] - cv) / 2.0 + (cv - nv[1]) / 2.0,\n    (nv[2] - cv) / 2.0 + (cv - nv[3]) / 2.0\n  );\n\n  float slope = max(3.141593 / 2.0 - atan(sqrt(dot(grad, grad))), 0.0);\n  float aspect = atan(-grad.y, grad.x);\n\n  float hs = sin(altitude * deg2rad) * sin(slope) +\n    cos(altitude * deg2rad) * cos(slope) *\n    cos((azimuth * deg2rad) - aspect);\n\n  return clamp(hs, 0.0, 1.0);\n}\n\nvoid main() {\n  float texelFloat = getTexelValue(vTexCoord);\n\n  if (isCloseEnough(texelFloat, nodataValue)) {\n    discard;\n  }\n\n  vec4 clr = computeColor(texelFloat, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n\n  if (enableSimpleHillshade) {\n    float hs = hillshade(vTexCoord, texelFloat, offset, textureBounds);\n    clr.rgb = clr.rgb * hs;\n  }\n\n  gl_FragColor = clr;\n}\n"; // eslint-disable-line
+var fragSingle = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform int scaleLength;\nuniform int sentinelLength;\nuniform sampler2D scaleColormap;\nuniform sampler2D sentinelColormap;\n\nuniform float nodataValue;\nuniform sampler2D texture;\nuniform bool littleEndian;\nuniform bool enableSimpleHillshade;\n\nuniform float textureSize;\nuniform float tileSize;\nuniform vec4 textureBounds;\nvarying vec2 vTexCoord;\n\nuniform float offset;\nuniform float slopescale;\nuniform float slopeFactor;\nuniform float deg2rad;\nuniform float azimuth;\nuniform float altitude;\n\nfloat getTexelValue(vec2 pos) {\n  vec4 texelRgba = texture2D(texture, pos);\n  float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n  return texelFloat;\n}\n\nfloat getRelativeHeight(vec2 pos, float v, vec4 textureBounds) {\n  // if (pos.x < textureBounds[0]) {\n  //   pos = vec2(textureBounds[0], pos.y);\n  // }\n  // if (pos.x > textureBounds[2]) {\n  //   pos = vec2(textureBounds[2], pos.y);\n  // }\n  // if (pos.y < textureBounds[1]) {\n  //   pos = vec2(pos.x, textureBounds[1]);\n  // }\n  // if (pos.y > textureBounds[3]) {\n  //   pos = vec2(pos.x, textureBounds[3]);\n  // }\n  float pixelFloatValue = getTexelValue(pos);\n  float test = step(0.0, pixelFloatValue);\n  float testReturn = ((test * pixelFloatValue) + ((1.0 - test) * v)) * (slopescale*slopeFactor);\n  return testReturn;\n}\n\nfloat hillshade(vec2 pos, float v, float offset, vec4 textureBounds) {\n  float cv = v * (slopescale * slopeFactor);\n  vec4 nv = vec4(\n  getRelativeHeight(vec2(pos.x + offset, pos.y), v, textureBounds),\n  getRelativeHeight(vec2(pos.x - offset, pos.y), v, textureBounds),\n  getRelativeHeight(vec2(pos.x, pos.y + offset), v, textureBounds),\n  getRelativeHeight(vec2(pos.x, pos.y - offset), v, textureBounds)\n  );\n\n  vec2 grad = vec2(\n    (nv[0] - cv) / 2.0 + (cv - nv[1]) / 2.0,\n    (nv[2] - cv) / 2.0 + (cv - nv[3]) / 2.0\n  );\n\n  float slope = max(3.141593 / 2.0 - atan(sqrt(dot(grad, grad))), 0.0);\n  float aspect = atan(-grad.y, grad.x);\n\n  float hs = sin(altitude * deg2rad) * sin(slope) +\n    cos(altitude * deg2rad) * cos(slope) *\n    cos((azimuth * deg2rad) - aspect);\n\n  return clamp(hs, 0.0, 1.0);\n}\n\nvoid main() {\n  float texelFloat = getTexelValue(vTexCoord);\n\n  if (isCloseEnough(texelFloat, nodataValue)) {\n    discard;\n  }\n\n  vec4 clr = computeColor(\n    texelFloat,\n    scaleColormap,\n    sentinelColormap,\n    scaleLength,\n    sentinelLength,\n    littleEndian\n  );\n\n  if (enableSimpleHillshade) {\n    float hs = hillshade(vTexCoord, texelFloat, offset, textureBounds);\n    clr.rgb = clr.rgb * hs;\n  }\n\n  gl_FragColor = clr;\n}\n"; // eslint-disable-line
 
-var fragHsPregen = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength_0,\n  int sentinelValuesLength_0\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength_0 > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength_0) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength_0 > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength_0) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform ScaleStop colorScale[SCALE_MAX_LENGTH];\nuniform int colorScaleLength;\n\nuniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLength;\n\nuniform float nodataValue;\nuniform sampler2D texture;\nuniform bool littleEndian;\nuniform sampler2D hillshadePregenTexture;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nvoid main() {\n  vec4 texelRgba = texture2D(texture, vTexCoordA);\n  float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n\n  if (isCloseEnough(texelFloat, nodataValue)) {\n    discard;\n  }\n\n  vec4 clr = computeColor(texelFloat, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n\n  // Hillshade\n  float l = texture2D(hillshadePregenTexture, vTexCoordB).r;\n  clr.rgb = l * pow(clr.rgb, vec3(2.0));\n  clr.rgb = pow(clr.rgb, vec3(1.0/2.2));\n\n  gl_FragColor = clr;\n}\n"; // eslint-disable-line
+var fragHsPregen = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform int scaleLength;\nuniform int sentinelLength;\nuniform sampler2D scaleColormap;\nuniform sampler2D sentinelColormap;\n\nuniform float nodataValue;\nuniform sampler2D texture;\nuniform bool littleEndian;\nuniform sampler2D hillshadePregenTexture;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nvoid main() {\n  vec4 texelRgba = texture2D(texture, vTexCoordA);\n  float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n\n  if (isCloseEnough(texelFloat, nodataValue)) {\n    discard;\n  }\n\n  vec4 clr = computeColor(\n    texelFloat,\n    scaleColormap,\n    sentinelColormap,\n    scaleLength,\n    sentinelLength,\n    littleEndian\n  );\n\n  // Hillshade\n  float l = texture2D(hillshadePregenTexture, vTexCoordB).r;\n  clr.rgb = l * pow(clr.rgb, vec3(2.0));\n  clr.rgb = pow(clr.rgb, vec3(1.0/2.2));\n\n  gl_FragColor = clr;\n}\n"; // eslint-disable-line
 
 var fragMulti1Calc = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n\nprecision highp sampler2D;\n#define GLSLIFY 1\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\nfloat shiftRight (float v, float amt) {\n  v = floor(v) + 0.5;\n  return floor(v / exp2(amt));\n}\nfloat shiftLeft (float v, float amt) {\n    return floor(v * exp2(amt) + 0.5);\n}\nfloat maskLast (float v, float bits_0) {\n    return mod(v, shiftLeft(1.0, bits_0));\n}\nfloat extractBits (float num, float from, float to) {\n    from = floor(from + 0.5); to = floor(to + 0.5);\n    return maskLast(shiftRight(num, from), to - from);\n}\nvec4 floatToRgba(float texelFloat, bool littleEndian) {\n    if (texelFloat == 0.0) return vec4(0, 0, 0, 0);\n    float sign = texelFloat > 0.0 ? 0.0 : 1.0;\n    texelFloat = abs(texelFloat);\n    float exponent = floor(log2(texelFloat));\n    float biased_exponent = exponent + 127.0;\n    float fraction = ((texelFloat / exp2(exponent)) - 1.0) * 8388608.0;\n    float t = biased_exponent / 2.0;\n    float last_bit_of_biased_exponent = fract(t) * 2.0;\n    float remaining_bits_of_biased_exponent = floor(t);\n    float byte4 = extractBits(fraction, 0.0, 8.0) / 255.0;\n    float byte3 = extractBits(fraction, 8.0, 16.0) / 255.0;\n    float byte2 = (last_bit_of_biased_exponent * 128.0 + extractBits(fraction, 16.0, 23.0)) / 255.0;\n    float byte1 = (sign * 128.0 + remaining_bits_of_biased_exponent) / 255.0;\n    return (\n      littleEndian\n      ? vec4(byte4, byte3, byte2, byte1)\n      : vec4(byte1, byte2, byte3, byte4)\n    );\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nuniform sampler2D textureA;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float multiplierA;\n\nvarying vec2 vTexCoord;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoord);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n\n  if (aIsNodata || texelFloatA < filterLowA || texelFloatA > filterHighA) {\n    gl_FragColor = floatToRgba(nodataValue, littleEndian);\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA;\n    gl_FragColor = floatToRgba(texelFloatFinal, littleEndian);\n  }\n}\n"; // eslint-disable-line
 
-var fragMulti1Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n// precision highp sampler2D;\n\n#define TRANSPARENT vec4(0.0)\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength_0,\n  int sentinelValuesLength_0\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength_0 > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength_0) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength_0 > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength_0) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\n\nuniform ScaleStop colorScale[SCALE_MAX_LENGTH];\nuniform int colorScaleLength;\nuniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLength;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float multiplierA;\n\nvarying vec2 vTexCoord;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoord);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n\n  if (aIsNodata || texelFloatA < filterLowA || texelFloatA > filterHighA) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA;\n    gl_FragColor = computeColor(texelFloatFinal, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n  }\n}\n"; // eslint-disable-line
+var fragMulti1Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\n\nuniform int scaleLength;\nuniform int sentinelLength;\nuniform sampler2D scaleColormap;\nuniform sampler2D sentinelColormap;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float multiplierA;\n\nvarying vec2 vTexCoord;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoord);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n\n  if (aIsNodata || texelFloatA < filterLowA || texelFloatA > filterHighA) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA;\n    gl_FragColor = computeColor(\n      texelFloatFinal,\n      scaleColormap,\n      sentinelColormap,\n      scaleLength,\n      sentinelLength,\n      littleEndian\n    );\n  }\n}\n"; // eslint-disable-line
 
 var fragMulti2Calc = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n\nprecision highp sampler2D;\n#define GLSLIFY 1\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\nfloat shiftRight (float v, float amt) {\n  v = floor(v) + 0.5;\n  return floor(v / exp2(amt));\n}\nfloat shiftLeft (float v, float amt) {\n    return floor(v * exp2(amt) + 0.5);\n}\nfloat maskLast (float v, float bits_0) {\n    return mod(v, shiftLeft(1.0, bits_0));\n}\nfloat extractBits (float num, float from, float to) {\n    from = floor(from + 0.5); to = floor(to + 0.5);\n    return maskLast(shiftRight(num, from), to - from);\n}\nvec4 floatToRgba(float texelFloat, bool littleEndian) {\n    if (texelFloat == 0.0) return vec4(0, 0, 0, 0);\n    float sign = texelFloat > 0.0 ? 0.0 : 1.0;\n    texelFloat = abs(texelFloat);\n    float exponent = floor(log2(texelFloat));\n    float biased_exponent = exponent + 127.0;\n    float fraction = ((texelFloat / exp2(exponent)) - 1.0) * 8388608.0;\n    float t = biased_exponent / 2.0;\n    float last_bit_of_biased_exponent = fract(t) * 2.0;\n    float remaining_bits_of_biased_exponent = floor(t);\n    float byte4 = extractBits(fraction, 0.0, 8.0) / 255.0;\n    float byte3 = extractBits(fraction, 8.0, 16.0) / 255.0;\n    float byte2 = (last_bit_of_biased_exponent * 128.0 + extractBits(fraction, 16.0, 23.0)) / 255.0;\n    float byte1 = (sign * 128.0 + remaining_bits_of_biased_exponent) / 255.0;\n    return (\n      littleEndian\n      ? vec4(byte4, byte3, byte2, byte1)\n      : vec4(byte1, byte2, byte3, byte4)\n    );\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float multiplierA;\nuniform float multiplierB;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n\n  if (aIsNodata || bIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB\n      ) {\n    gl_FragColor = floatToRgba(nodataValue, littleEndian);\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB;\n    gl_FragColor = floatToRgba(texelFloatFinal, littleEndian);\n  }\n}\n"; // eslint-disable-line
 
-var fragMulti2Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n// precision highp sampler2D;\n\n#define TRANSPARENT vec4(0.0)\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength_0,\n  int sentinelValuesLength_0\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength_0 > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength_0) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength_0 > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength_0) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\n\nuniform ScaleStop colorScale[SCALE_MAX_LENGTH];\nuniform int colorScaleLength;\nuniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLength;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float multiplierA;\nuniform float multiplierB;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n\n  if (aIsNodata || bIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB\n      ) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB;\n    gl_FragColor = computeColor(texelFloatFinal, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n  }\n}\n"; // eslint-disable-line
+var fragMulti2Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\n\nuniform int scaleLength;\nuniform int sentinelLength;\nuniform sampler2D scaleColormap;\nuniform sampler2D sentinelColormap;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float multiplierA;\nuniform float multiplierB;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n\n  if (aIsNodata || bIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB\n      ) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB;\n    gl_FragColor = computeColor(\n      texelFloatFinal,\n      scaleColormap,\n      sentinelColormap,\n      scaleLength,\n      sentinelLength,\n      littleEndian\n    );\n  }\n}\n"; // eslint-disable-line
 
 var fragMulti3Calc = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n\nprecision highp sampler2D;\n#define GLSLIFY 1\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\nfloat shiftRight (float v, float amt) {\n  v = floor(v) + 0.5;\n  return floor(v / exp2(amt));\n}\nfloat shiftLeft (float v, float amt) {\n    return floor(v * exp2(amt) + 0.5);\n}\nfloat maskLast (float v, float bits_0) {\n    return mod(v, shiftLeft(1.0, bits_0));\n}\nfloat extractBits (float num, float from, float to) {\n    from = floor(from + 0.5); to = floor(to + 0.5);\n    return maskLast(shiftRight(num, from), to - from);\n}\nvec4 floatToRgba(float texelFloat, bool littleEndian) {\n    if (texelFloat == 0.0) return vec4(0, 0, 0, 0);\n    float sign = texelFloat > 0.0 ? 0.0 : 1.0;\n    texelFloat = abs(texelFloat);\n    float exponent = floor(log2(texelFloat));\n    float biased_exponent = exponent + 127.0;\n    float fraction = ((texelFloat / exp2(exponent)) - 1.0) * 8388608.0;\n    float t = biased_exponent / 2.0;\n    float last_bit_of_biased_exponent = fract(t) * 2.0;\n    float remaining_bits_of_biased_exponent = floor(t);\n    float byte4 = extractBits(fraction, 0.0, 8.0) / 255.0;\n    float byte3 = extractBits(fraction, 8.0, 16.0) / 255.0;\n    float byte2 = (last_bit_of_biased_exponent * 128.0 + extractBits(fraction, 16.0, 23.0)) / 255.0;\n    float byte1 = (sign * 128.0 + remaining_bits_of_biased_exponent) / 255.0;\n    return (\n      littleEndian\n      ? vec4(byte4, byte3, byte2, byte1)\n      : vec4(byte1, byte2, byte3, byte4)\n    );\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC\n      ) {\n    gl_FragColor = floatToRgba(nodataValue, littleEndian);\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC;\n    gl_FragColor = floatToRgba(texelFloatFinal, littleEndian);\n  }\n}\n"; // eslint-disable-line
 
-var fragMulti3Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n// precision highp float;\n// precision highp sampler2D;\n\n#define TRANSPARENT vec4(0.0)\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength_0,\n  int sentinelValuesLength_0\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength_0 > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength_0) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength_0 > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength_0) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\n\nuniform ScaleStop colorScale[SCALE_MAX_LENGTH];\nuniform int colorScaleLength;\nuniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLength;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC\n      ) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC;\n    gl_FragColor = computeColor(texelFloatFinal, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n  }\n}\n"; // eslint-disable-line
+var fragMulti3Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\n\nuniform int scaleLength;\nuniform int sentinelLength;\nuniform sampler2D scaleColormap;\nuniform sampler2D sentinelColormap;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC\n      ) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC;\n    gl_FragColor = computeColor(\n      texelFloatFinal,\n      scaleColormap,\n      sentinelColormap,\n      scaleLength,\n      sentinelLength,\n      littleEndian\n    );\n  }\n}\n"; // eslint-disable-line
 
 var fragMulti4Calc = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n\nprecision highp sampler2D;\n#define GLSLIFY 1\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\nfloat shiftRight (float v, float amt) {\n  v = floor(v) + 0.5;\n  return floor(v / exp2(amt));\n}\nfloat shiftLeft (float v, float amt) {\n    return floor(v * exp2(amt) + 0.5);\n}\nfloat maskLast (float v, float bits_0) {\n    return mod(v, shiftLeft(1.0, bits_0));\n}\nfloat extractBits (float num, float from, float to) {\n    from = floor(from + 0.5); to = floor(to + 0.5);\n    return maskLast(shiftRight(num, from), to - from);\n}\nvec4 floatToRgba(float texelFloat, bool littleEndian) {\n    if (texelFloat == 0.0) return vec4(0, 0, 0, 0);\n    float sign = texelFloat > 0.0 ? 0.0 : 1.0;\n    texelFloat = abs(texelFloat);\n    float exponent = floor(log2(texelFloat));\n    float biased_exponent = exponent + 127.0;\n    float fraction = ((texelFloat / exp2(exponent)) - 1.0) * 8388608.0;\n    float t = biased_exponent / 2.0;\n    float last_bit_of_biased_exponent = fract(t) * 2.0;\n    float remaining_bits_of_biased_exponent = floor(t);\n    float byte4 = extractBits(fraction, 0.0, 8.0) / 255.0;\n    float byte3 = extractBits(fraction, 8.0, 16.0) / 255.0;\n    float byte2 = (last_bit_of_biased_exponent * 128.0 + extractBits(fraction, 16.0, 23.0)) / 255.0;\n    float byte1 = (sign * 128.0 + remaining_bits_of_biased_exponent) / 255.0;\n    return (\n      littleEndian\n      ? vec4(byte4, byte3, byte2, byte1)\n      : vec4(byte1, byte2, byte3, byte4)\n    );\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\nuniform sampler2D textureD;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float filterLowD;\nuniform float filterHighD;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\nuniform float multiplierD;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\nvarying vec2 vTexCoordD;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n  vec4 texelRgbaD = texture2D(textureD, vTexCoordD);\n  float texelFloatD = rgbaToFloat(texelRgbaD, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n  bool dIsNodata = isCloseEnough(texelFloatD, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata || dIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC ||\n      texelFloatD < filterLowD || texelFloatD > filterHighD\n      ) {\n    gl_FragColor = floatToRgba(nodataValue, littleEndian);\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC + texelFloatD * multiplierD;\n    gl_FragColor = floatToRgba(texelFloatFinal, littleEndian);\n  }\n}\n"; // eslint-disable-line
 
-var fragMulti4Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n// precision highp float;\n// precision highp sampler2D;\n\n#define TRANSPARENT vec4(0.0)\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength_0,\n  int sentinelValuesLength_0\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength_0 > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength_0) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength_0 > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength_0) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\nuniform sampler2D textureD;\n\nuniform ScaleStop colorScale[SCALE_MAX_LENGTH];\nuniform int colorScaleLength;\nuniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLength;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float filterLowD;\nuniform float filterHighD;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\nuniform float multiplierD;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\nvarying vec2 vTexCoordD;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n  vec4 texelRgbaD = texture2D(textureD, vTexCoordD);\n  float texelFloatD = rgbaToFloat(texelRgbaD, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n  bool dIsNodata = isCloseEnough(texelFloatD, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata || dIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC ||\n      texelFloatD < filterLowD || texelFloatD > filterHighD\n      ) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC + texelFloatD * multiplierD;\n    gl_FragColor = computeColor(texelFloatFinal, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n  }\n}\n"; // eslint-disable-line
+var fragMulti4Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\nuniform sampler2D textureD;\n\nuniform int scaleLength;\nuniform int sentinelLength;\nuniform sampler2D scaleColormap;\nuniform sampler2D sentinelColormap;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float filterLowD;\nuniform float filterHighD;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\nuniform float multiplierD;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\nvarying vec2 vTexCoordD;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n  vec4 texelRgbaD = texture2D(textureD, vTexCoordD);\n  float texelFloatD = rgbaToFloat(texelRgbaD, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n  bool dIsNodata = isCloseEnough(texelFloatD, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata || dIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC ||\n      texelFloatD < filterLowD || texelFloatD > filterHighD\n      ) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC + texelFloatD * multiplierD;\n    gl_FragColor = computeColor(\n      texelFloatFinal,\n      scaleColormap,\n      sentinelColormap,\n      scaleLength,\n      sentinelLength,\n      littleEndian\n    );\n  }\n}\n"; // eslint-disable-line
 
 var fragMulti5Calc = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n\nprecision highp sampler2D;\n#define GLSLIFY 1\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\nfloat shiftRight (float v, float amt) {\n  v = floor(v) + 0.5;\n  return floor(v / exp2(amt));\n}\nfloat shiftLeft (float v, float amt) {\n    return floor(v * exp2(amt) + 0.5);\n}\nfloat maskLast (float v, float bits_0) {\n    return mod(v, shiftLeft(1.0, bits_0));\n}\nfloat extractBits (float num, float from, float to) {\n    from = floor(from + 0.5); to = floor(to + 0.5);\n    return maskLast(shiftRight(num, from), to - from);\n}\nvec4 floatToRgba(float texelFloat, bool littleEndian) {\n    if (texelFloat == 0.0) return vec4(0, 0, 0, 0);\n    float sign = texelFloat > 0.0 ? 0.0 : 1.0;\n    texelFloat = abs(texelFloat);\n    float exponent = floor(log2(texelFloat));\n    float biased_exponent = exponent + 127.0;\n    float fraction = ((texelFloat / exp2(exponent)) - 1.0) * 8388608.0;\n    float t = biased_exponent / 2.0;\n    float last_bit_of_biased_exponent = fract(t) * 2.0;\n    float remaining_bits_of_biased_exponent = floor(t);\n    float byte4 = extractBits(fraction, 0.0, 8.0) / 255.0;\n    float byte3 = extractBits(fraction, 8.0, 16.0) / 255.0;\n    float byte2 = (last_bit_of_biased_exponent * 128.0 + extractBits(fraction, 16.0, 23.0)) / 255.0;\n    float byte1 = (sign * 128.0 + remaining_bits_of_biased_exponent) / 255.0;\n    return (\n      littleEndian\n      ? vec4(byte4, byte3, byte2, byte1)\n      : vec4(byte1, byte2, byte3, byte4)\n    );\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\nuniform sampler2D textureD;\nuniform sampler2D textureE;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float filterLowD;\nuniform float filterHighD;\nuniform float filterLowE;\nuniform float filterHighE;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\nuniform float multiplierD;\nuniform float multiplierE;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\nvarying vec2 vTexCoordD;\nvarying vec2 vTexCoordE;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n  vec4 texelRgbaD = texture2D(textureD, vTexCoordD);\n  float texelFloatD = rgbaToFloat(texelRgbaD, littleEndian);\n  vec4 texelRgbaE = texture2D(textureE, vTexCoordE);\n  float texelFloatE = rgbaToFloat(texelRgbaE, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n  bool dIsNodata = isCloseEnough(texelFloatD, nodataValue);\n  bool eIsNodata = isCloseEnough(texelFloatE, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata || dIsNodata || eIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC ||\n      texelFloatD < filterLowD || texelFloatD > filterHighD ||\n      texelFloatE < filterLowE || texelFloatE > filterHighE\n      ) {\n    gl_FragColor = floatToRgba(nodataValue, littleEndian);\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC + texelFloatD * multiplierD + texelFloatE * multiplierE;\n    gl_FragColor = floatToRgba(texelFloatFinal, littleEndian);\n  }\n}\n"; // eslint-disable-line
 
-var fragMulti5Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength_0,\n  int sentinelValuesLength_0\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength_0 > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength_0) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength_0 > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength_0) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\nuniform sampler2D textureD;\nuniform sampler2D textureE;\n\nuniform ScaleStop colorScale[SCALE_MAX_LENGTH];\nuniform int colorScaleLength;\nuniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLength;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float filterLowD;\nuniform float filterHighD;\nuniform float filterLowE;\nuniform float filterHighE;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\nuniform float multiplierD;\nuniform float multiplierE;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\nvarying vec2 vTexCoordD;\nvarying vec2 vTexCoordE;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n  vec4 texelRgbaD = texture2D(textureD, vTexCoordD);\n  float texelFloatD = rgbaToFloat(texelRgbaD, littleEndian);\n  vec4 texelRgbaE = texture2D(textureE, vTexCoordE);\n  float texelFloatE = rgbaToFloat(texelRgbaE, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n  bool dIsNodata = isCloseEnough(texelFloatD, nodataValue);\n  bool eIsNodata = isCloseEnough(texelFloatE, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata || dIsNodata || eIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC ||\n      texelFloatD < filterLowD || texelFloatD > filterHighD ||\n      texelFloatE < filterLowE || texelFloatE > filterHighE\n      ) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC + texelFloatD * multiplierD + texelFloatE * multiplierE;\n    gl_FragColor = computeColor(texelFloatFinal, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n  }\n}\n"; // eslint-disable-line
+var fragMulti5Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\nuniform sampler2D textureD;\nuniform sampler2D textureE;\n\nuniform int scaleLength;\nuniform int sentinelLength;\nuniform sampler2D scaleColormap;\nuniform sampler2D sentinelColormap;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float filterLowD;\nuniform float filterHighD;\nuniform float filterLowE;\nuniform float filterHighE;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\nuniform float multiplierD;\nuniform float multiplierE;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\nvarying vec2 vTexCoordD;\nvarying vec2 vTexCoordE;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n  vec4 texelRgbaD = texture2D(textureD, vTexCoordD);\n  float texelFloatD = rgbaToFloat(texelRgbaD, littleEndian);\n  vec4 texelRgbaE = texture2D(textureE, vTexCoordE);\n  float texelFloatE = rgbaToFloat(texelRgbaE, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n  bool dIsNodata = isCloseEnough(texelFloatD, nodataValue);\n  bool eIsNodata = isCloseEnough(texelFloatE, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata || dIsNodata || eIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC ||\n      texelFloatD < filterLowD || texelFloatD > filterHighD ||\n      texelFloatE < filterLowE || texelFloatE > filterHighE\n      ) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC + texelFloatD * multiplierD + texelFloatE * multiplierE;\n    gl_FragColor = computeColor(\n      texelFloatFinal,\n      scaleColormap,\n      sentinelColormap,\n      scaleLength,\n      sentinelLength,\n      littleEndian\n    );\n  }\n}\n"; // eslint-disable-line
 
 var fragMulti6Calc = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n\nprecision highp sampler2D;\n#define GLSLIFY 1\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\nfloat shiftRight (float v, float amt) {\n  v = floor(v) + 0.5;\n  return floor(v / exp2(amt));\n}\nfloat shiftLeft (float v, float amt) {\n    return floor(v * exp2(amt) + 0.5);\n}\nfloat maskLast (float v, float bits_0) {\n    return mod(v, shiftLeft(1.0, bits_0));\n}\nfloat extractBits (float num, float from, float to) {\n    from = floor(from + 0.5); to = floor(to + 0.5);\n    return maskLast(shiftRight(num, from), to - from);\n}\nvec4 floatToRgba(float texelFloat, bool littleEndian) {\n    if (texelFloat == 0.0) return vec4(0, 0, 0, 0);\n    float sign = texelFloat > 0.0 ? 0.0 : 1.0;\n    texelFloat = abs(texelFloat);\n    float exponent = floor(log2(texelFloat));\n    float biased_exponent = exponent + 127.0;\n    float fraction = ((texelFloat / exp2(exponent)) - 1.0) * 8388608.0;\n    float t = biased_exponent / 2.0;\n    float last_bit_of_biased_exponent = fract(t) * 2.0;\n    float remaining_bits_of_biased_exponent = floor(t);\n    float byte4 = extractBits(fraction, 0.0, 8.0) / 255.0;\n    float byte3 = extractBits(fraction, 8.0, 16.0) / 255.0;\n    float byte2 = (last_bit_of_biased_exponent * 128.0 + extractBits(fraction, 16.0, 23.0)) / 255.0;\n    float byte1 = (sign * 128.0 + remaining_bits_of_biased_exponent) / 255.0;\n    return (\n      littleEndian\n      ? vec4(byte4, byte3, byte2, byte1)\n      : vec4(byte1, byte2, byte3, byte4)\n    );\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\nuniform sampler2D textureD;\nuniform sampler2D textureE;\nuniform sampler2D textureF;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float filterLowD;\nuniform float filterHighD;\nuniform float filterLowE;\nuniform float filterHighE;\nuniform float filterLowF;\nuniform float filterHighF;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\nuniform float multiplierD;\nuniform float multiplierE;\nuniform float multiplierF;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\nvarying vec2 vTexCoordD;\nvarying vec2 vTexCoordE;\nvarying vec2 vTexCoordF;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n  vec4 texelRgbaD = texture2D(textureD, vTexCoordD);\n  float texelFloatD = rgbaToFloat(texelRgbaD, littleEndian);\n  vec4 texelRgbaE = texture2D(textureE, vTexCoordE);\n  float texelFloatE = rgbaToFloat(texelRgbaE, littleEndian);\n  vec4 texelRgbaF = texture2D(textureF, vTexCoordF);\n  float texelFloatF = rgbaToFloat(texelRgbaF, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n  bool dIsNodata = isCloseEnough(texelFloatD, nodataValue);\n  bool eIsNodata = isCloseEnough(texelFloatE, nodataValue);\n  bool fIsNodata = isCloseEnough(texelFloatF, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata || dIsNodata || eIsNodata || fIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC ||\n      texelFloatD < filterLowD || texelFloatD > filterHighD ||\n      texelFloatE < filterLowE || texelFloatE > filterHighE ||\n      texelFloatF < filterLowF || texelFloatF > filterHighF\n      ) {\n    gl_FragColor = floatToRgba(nodataValue, littleEndian);\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC + texelFloatD * multiplierD + texelFloatE * multiplierE + texelFloatF * multiplierF;\n    gl_FragColor = floatToRgba(texelFloatFinal, littleEndian);\n  }\n}\n"; // eslint-disable-line
 
-var fragMulti6Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength_0,\n  int sentinelValuesLength_0\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength_0 > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength_0) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength_0 > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength_0) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\nuniform sampler2D textureD;\nuniform sampler2D textureE;\nuniform sampler2D textureF;\n\nuniform ScaleStop colorScale[SCALE_MAX_LENGTH];\nuniform int colorScaleLength;\nuniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLength;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float filterLowD;\nuniform float filterHighD;\nuniform float filterLowE;\nuniform float filterHighE;\nuniform float filterLowF;\nuniform float filterHighF;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\nuniform float multiplierD;\nuniform float multiplierE;\nuniform float multiplierF;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\nvarying vec2 vTexCoordD;\nvarying vec2 vTexCoordE;\nvarying vec2 vTexCoordF;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n  vec4 texelRgbaD = texture2D(textureD, vTexCoordD);\n  float texelFloatD = rgbaToFloat(texelRgbaD, littleEndian);\n  vec4 texelRgbaE = texture2D(textureE, vTexCoordE);\n  float texelFloatE = rgbaToFloat(texelRgbaE, littleEndian);\n  vec4 texelRgbaF = texture2D(textureF, vTexCoordF);\n  float texelFloatF = rgbaToFloat(texelRgbaF, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n  bool dIsNodata = isCloseEnough(texelFloatD, nodataValue);\n  bool eIsNodata = isCloseEnough(texelFloatE, nodataValue);\n  bool fIsNodata = isCloseEnough(texelFloatF, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata || dIsNodata || eIsNodata || fIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC ||\n      texelFloatD < filterLowD || texelFloatD > filterHighD ||\n      texelFloatE < filterLowE || texelFloatE > filterHighE ||\n      texelFloatF < filterLowF || texelFloatF > filterHighF\n      ) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC + texelFloatD * multiplierD + texelFloatE * multiplierE + texelFloatF * multiplierF;\n    gl_FragColor = computeColor(texelFloatFinal, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n  }\n}\n"; // eslint-disable-line
+var fragMulti6Draw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform sampler2D textureC;\nuniform sampler2D textureD;\nuniform sampler2D textureE;\nuniform sampler2D textureF;\n\nuniform int scaleLength;\nuniform int sentinelLength;\nuniform sampler2D scaleColormap;\nuniform sampler2D sentinelColormap;\n\nuniform float nodataValue;\nuniform bool littleEndian;\n\nuniform float filterLowA;\nuniform float filterHighA;\nuniform float filterLowB;\nuniform float filterHighB;\nuniform float filterLowC;\nuniform float filterHighC;\nuniform float filterLowD;\nuniform float filterHighD;\nuniform float filterLowE;\nuniform float filterHighE;\nuniform float filterLowF;\nuniform float filterHighF;\nuniform float multiplierA;\nuniform float multiplierB;\nuniform float multiplierC;\nuniform float multiplierD;\nuniform float multiplierE;\nuniform float multiplierF;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\nvarying vec2 vTexCoordC;\nvarying vec2 vTexCoordD;\nvarying vec2 vTexCoordE;\nvarying vec2 vTexCoordF;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  vec4 texelRgbaC = texture2D(textureC, vTexCoordC);\n  float texelFloatC = rgbaToFloat(texelRgbaC, littleEndian);\n  vec4 texelRgbaD = texture2D(textureD, vTexCoordD);\n  float texelFloatD = rgbaToFloat(texelRgbaD, littleEndian);\n  vec4 texelRgbaE = texture2D(textureE, vTexCoordE);\n  float texelFloatE = rgbaToFloat(texelRgbaE, littleEndian);\n  vec4 texelRgbaF = texture2D(textureF, vTexCoordF);\n  float texelFloatF = rgbaToFloat(texelRgbaF, littleEndian);\n\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n  bool cIsNodata = isCloseEnough(texelFloatC, nodataValue);\n  bool dIsNodata = isCloseEnough(texelFloatD, nodataValue);\n  bool eIsNodata = isCloseEnough(texelFloatE, nodataValue);\n  bool fIsNodata = isCloseEnough(texelFloatF, nodataValue);\n\n  if (aIsNodata || bIsNodata || cIsNodata || dIsNodata || eIsNodata || fIsNodata ||\n      texelFloatA < filterLowA || texelFloatA > filterHighA ||\n      texelFloatB < filterLowB || texelFloatB > filterHighB ||\n      texelFloatC < filterLowC || texelFloatC > filterHighC ||\n      texelFloatD < filterLowD || texelFloatD > filterHighD ||\n      texelFloatE < filterLowE || texelFloatE > filterHighE ||\n      texelFloatF < filterLowF || texelFloatF > filterHighF\n      ) {\n    // TODO: Check if we need to disable filtering\n    // https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/discard.php\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float texelFloatFinal = texelFloatA * multiplierA + texelFloatB * multiplierB + texelFloatC * multiplierC + texelFloatD * multiplierD + texelFloatE * multiplierE + texelFloatF * multiplierF;\n    gl_FragColor = computeColor(\n      texelFloatFinal,\n      scaleColormap,\n      sentinelColormap,\n      scaleLength,\n      sentinelLength,\n      littleEndian\n    );\n  }\n}\n"; // eslint-disable-line
 
 var fragDiffCalc = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n\nprecision highp sampler2D;\n#define GLSLIFY 1\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\nfloat shiftRight (float v, float amt) {\n  v = floor(v) + 0.5;\n  return floor(v / exp2(amt));\n}\nfloat shiftLeft (float v, float amt) {\n    return floor(v * exp2(amt) + 0.5);\n}\nfloat maskLast (float v, float bits_0) {\n    return mod(v, shiftLeft(1.0, bits_0));\n}\nfloat extractBits (float num, float from, float to) {\n    from = floor(from + 0.5); to = floor(to + 0.5);\n    return maskLast(shiftRight(num, from), to - from);\n}\nvec4 floatToRgba(float texelFloat, bool littleEndian) {\n    if (texelFloat == 0.0) return vec4(0, 0, 0, 0);\n    float sign = texelFloat > 0.0 ? 0.0 : 1.0;\n    texelFloat = abs(texelFloat);\n    float exponent = floor(log2(texelFloat));\n    float biased_exponent = exponent + 127.0;\n    float fraction = ((texelFloat / exp2(exponent)) - 1.0) * 8388608.0;\n    float t = biased_exponent / 2.0;\n    float last_bit_of_biased_exponent = fract(t) * 2.0;\n    float remaining_bits_of_biased_exponent = floor(t);\n    float byte4 = extractBits(fraction, 0.0, 8.0) / 255.0;\n    float byte3 = extractBits(fraction, 8.0, 16.0) / 255.0;\n    float byte2 = (last_bit_of_biased_exponent * 128.0 + extractBits(fraction, 16.0, 23.0)) / 255.0;\n    float byte1 = (sign * 128.0 + remaining_bits_of_biased_exponent) / 255.0;\n    return (\n      littleEndian\n      ? vec4(byte4, byte3, byte2, byte1)\n      : vec4(byte1, byte2, byte3, byte4)\n    );\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nuniform float nodataValue;\nuniform bool littleEndian;\nuniform sampler2D textureA;\nuniform sampler2D textureB;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nvoid main() {\n  // vec4 texelRgbaA = texture2D(textureA, vec2(vTexCoordA.x, 1.0 - vTexCoordA.y));\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  // vec4 texelRgbaB = texture2D(textureB, vec2(vTexCoordB.x, 1.0 - vTexCoordB.y));\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n\n  if (aIsNodata || bIsNodata) {\n    gl_FragColor = floatToRgba(nodataValue, littleEndian);\n  } else {\n    float diff = texelFloatB - texelFloatA;\n    gl_FragColor = floatToRgba(diff, littleEndian);\n  }\n}\n"; // eslint-disable-line
 
-var fragDiffDraw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nstruct ScaleStop {\n  float offset;\n  vec4 color;\n};\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\nvec4 computeColor(\n  float inputVal,\n  ScaleStop colorScale[SCALE_MAX_LENGTH],\n  ScaleStop sentinelValues[SENTINEL_MAX_LENGTH],\n  int colorScaleLength_0,\n  int sentinelValuesLength_0\n) {\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelValuesLength_0 > 0) {\n    for (int i_0 = 0; i_0 < SENTINEL_MAX_LENGTH; ++i_0) {\n      if (i_0 == sentinelValuesLength_0) {\n        break;\n      }\n      ScaleStop sentinel = sentinelValues[i_0];\n      if (isCloseEnough(inputVal, sentinel.offset)) {\n        return sentinel.color;\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (colorScaleLength_0 > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    if (inputVal < colorScale[0].offset) {\n      return colorScale[0].color;\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        // If value above color scale range, clamp to highest color stop.\n        if (i == colorScaleLength_0) {\n          return colorScale[i - 1].color;\n        } else if (inputVal <= colorScale[i + 1].offset) {\n          float percent = (inputVal - colorScale[i].offset)\n            / (colorScale[i + 1].offset - colorScale[i].offset);\n          return mix(colorScale[i].color, colorScale[i + 1].color, percent);\n        }\n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform ScaleStop colorScale[SCALE_MAX_LENGTH];\nuniform int colorScaleLength;\n\nuniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];\nuniform int sentinelValuesLength;\n\nuniform float nodataValue;\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform bool littleEndian;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n\n  if (aIsNodata || bIsNodata) {\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float diff = texelFloatB - texelFloatA;\n    gl_FragColor = computeColor(diff, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);\n  }\n}\n"; // eslint-disable-line
+var fragDiffDraw = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#endif\n\n#define TRANSPARENT vec4(0.0)\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\n// Make sure this is included in the shader where computeColor is used?\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\n#ifndef DEFAULT_COLOR\n#define DEFAULT_COLOR vec4(0.0)\n#endif\n\n#ifndef SCALE_MAX_LENGTH\n#define SCALE_MAX_LENGTH 16\n#endif\n\n#ifndef SENTINEL_MAX_LENGTH\n#define SENTINEL_MAX_LENGTH 16\n#endif\n\n// float getTexelValue(vec2 pos) {\n//   vec4 texelRgba = texture2D(texture, pos);\n//   float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n//   return texelFloat;\n// }\n\nvec4 computeColor(\n  float inputVal,\n  sampler2D scaleColormap,\n  sampler2D sentinelColormap,\n  int scaleLength,\n  int sentinelLength,\n  bool littleEndian\n) {\n\n  // vertical texture coordinate to find color and offset\n  float colorRow = 0.25;\n  float offsetRow = 0.75;\n\n  // Compare the value against any sentinel values, if defined.\n  if (sentinelLength > 0) {\n    for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {\n      if (i == sentinelLength) {\n        break;\n      }\n\n      float i_f = float(i);\n      float sentinelLengthFloat = float(sentinelLength);\n      // float sentinelOffset = sentinelOffsets[i];\n      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));\n      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);\n      if (isCloseEnough(inputVal, sentinelOffset)) {\n        // retrieve the color from the colormap\n        vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);\n        return texture2D(sentinelColormap, colormapCoord);\n      }\n    }\n  }\n\n  // Do linear interpolation using the color scale, if defined.\n  if (scaleLength > 0) {\n    // If value below color scale range, clamp to lowest color stop.\n    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));\n    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);\n    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));\n    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);\n    if (inputVal < scaleOffsetLowest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(0.0, colorRow));\n    } else if (inputVal > scaleOffsetHighest) {\n      // return colorScale[0].color;\n      return texture2D(scaleColormap, vec2(1.0, colorRow));\n    } else {\n      for (int i = 0; i < SCALE_MAX_LENGTH; ++i) {\n        float i_f = float(i);\n        float scaleLengthFloat = float(scaleLength);\n\n        // If value above color scale range, clamp to highest color stop.\n        if (i == scaleLength) {\n          return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));\n        }\n        \n        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));\n        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);\n\n        if (inputVal <= scaleOffsetNext) {\n          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));\n          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);\n          float percent = (inputVal - scaleOffset)\n            / (scaleOffsetNext - scaleOffset);\n          vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));\n          vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));\n          return mix(colorLow, colorHigh, percent);\n        } \n      }\n    }\n  }\n\n  return DEFAULT_COLOR;\n}\n\nuniform int scaleLength;\nuniform int sentinelLength;\nuniform sampler2D scaleColormap;\nuniform sampler2D sentinelColormap;\n\nuniform float nodataValue;\nuniform sampler2D textureA;\nuniform sampler2D textureB;\nuniform bool littleEndian;\n\nvarying vec2 vTexCoordA;\nvarying vec2 vTexCoordB;\n\nvoid main() {\n  vec4 texelRgbaA = texture2D(textureA, vTexCoordA);\n  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);\n  vec4 texelRgbaB = texture2D(textureB, vTexCoordB);\n  float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);\n  bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);\n  bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);\n\n  if (aIsNodata || bIsNodata) {\n    gl_FragColor = TRANSPARENT;\n  } else {\n    float diff = texelFloatB - texelFloatA;\n    gl_FragColor = computeColor(\n      diff,\n      scaleColormap,\n      sentinelColormap,\n      scaleLength,\n      sentinelLength,\n      littleEndian\n    );\n  }\n}\n"; // eslint-disable-line
 
-var fragConvolutionSmooth = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#define GLSLIFY 1\n#endif\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\nfloat shiftRight (float v, float amt) {\n  v = floor(v) + 0.5;\n  return floor(v / exp2(amt));\n}\nfloat shiftLeft (float v, float amt) {\n    return floor(v * exp2(amt) + 0.5);\n}\nfloat maskLast (float v, float bits_0) {\n    return mod(v, shiftLeft(1.0, bits_0));\n}\nfloat extractBits (float num, float from, float to) {\n    from = floor(from + 0.5); to = floor(to + 0.5);\n    return maskLast(shiftRight(num, from), to - from);\n}\nvec4 floatToRgba(float texelFloat, bool littleEndian) {\n    if (texelFloat == 0.0) return vec4(0, 0, 0, 0);\n    float sign = texelFloat > 0.0 ? 0.0 : 1.0;\n    texelFloat = abs(texelFloat);\n    float exponent = floor(log2(texelFloat));\n    float biased_exponent = exponent + 127.0;\n    float fraction = ((texelFloat / exp2(exponent)) - 1.0) * 8388608.0;\n    float t = biased_exponent / 2.0;\n    float last_bit_of_biased_exponent = fract(t) * 2.0;\n    float remaining_bits_of_biased_exponent = floor(t);\n    float byte4 = extractBits(fraction, 0.0, 8.0) / 255.0;\n    float byte3 = extractBits(fraction, 8.0, 16.0) / 255.0;\n    float byte2 = (last_bit_of_biased_exponent * 128.0 + extractBits(fraction, 16.0, 23.0)) / 255.0;\n    float byte1 = (sign * 128.0 + remaining_bits_of_biased_exponent) / 255.0;\n    return (\n      littleEndian\n      ? vec4(byte4, byte3, byte2, byte1)\n      : vec4(byte1, byte2, byte3, byte4)\n    );\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nuniform sampler2D texture;\nuniform float textureSize;\nuniform bool littleEndian;\nuniform float nodataValue;\nvarying vec2 vTexCoord;\nuniform int kernelSize;\n\nint kernelEnd = int(kernelSize/2);\nint kernelStart = kernelEnd * -1;\n\nfloat getTexelValue(vec2 pos) {\n  vec4 texelRgba = texture2D(texture, pos);\n  float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n  return texelFloat;\n}\n\nfloat runConvKernel(vec2 pos, vec2 onePixel) {\n  float convKernelWeight = 0.0;\n  float sum = 0.0;\n\n  for (int i = -20; i < 20; i ++) {\n    if (i < kernelStart) continue;\n    if (i > kernelEnd) break;\n    for (int j = -20; j < 20; j ++) {\n      if (j < kernelStart) continue;\n      if (j > kernelEnd) break;\n      float texelValue = getTexelValue(pos + onePixel * vec2(i, j));\n      if (!isCloseEnough(texelValue, nodataValue)) {\n        sum = sum + texelValue;\n        convKernelWeight = convKernelWeight + 1.0;\n      }\n    }\n  }\n  return (sum / convKernelWeight);\n}\n\nvoid main() {\n  float texelFloat = getTexelValue(vTexCoord);\n  if (isCloseEnough(texelFloat, nodataValue)) {\n    // gl_FragColor = vec4(nodataValue);\n    gl_FragColor = floatToRgba(nodataValue, littleEndian);\n  } else {\n    vec2 onePixel = vec2(1.0, 1.0) / textureSize;\n    float texelFloatSmoothed = runConvKernel(vTexCoord, onePixel);\n    // gl_FragColor = vec4(texelFloatSmoothed);\n    gl_FragColor = floatToRgba(texelFloatSmoothed, littleEndian);\n  }\n}\n"; // eslint-disable-line
+var fragConvolutionSmooth = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#define GLSLIFY 1\n#define GLSLIFY 1\n#endif\n\n// Denormalize 8-bit color channels to integers in the range 0 to 255.\nivec4 floatsToBytes(vec4 inputFloats, bool littleEndian) {\n  ivec4 bytes = ivec4(inputFloats * 255.0);\n  return (\n    littleEndian\n    ? bytes.abgr\n    : bytes\n  );\n}\n\n// Break the four bytes down into an array of 32 bits.\nvoid bytesToBits(const in ivec4 bytes, out bool bits[32]) {\n  for (int channelIndex = 0; channelIndex < 4; ++channelIndex) {\n    float acc = float(bytes[channelIndex]);\n    for (int indexInByte = 7; indexInByte >= 0; --indexInByte) {\n      float powerOfTwo = exp2(float(indexInByte));\n      bool bit = acc >= powerOfTwo;\n      bits[channelIndex * 8 + (7 - indexInByte)] = bit;\n      acc = mod(acc, powerOfTwo);\n    }\n  }\n}\n\n// Compute the exponent of the 32-bit float.\nfloat getExponent(bool bits[32]) {\n  const int startIndex = 1;\n  const int bitStringLength = 8;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  float acc = 0.0;\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Compute the mantissa of the 32-bit float.\nfloat getMantissa(bool bits[32], bool subnormal) {\n  const int startIndex = 9;\n  const int bitStringLength = 23;\n  const int endBeforeIndex = startIndex + bitStringLength;\n  // Leading/implicit/hidden bit convention:\n  // If the number is not subnormal (with exponent 0), we add a leading 1 digit.\n  float acc = float(!subnormal) * exp2(float(bitStringLength));\n  int pow2 = bitStringLength - 1;\n  for (int bitIndex = startIndex; bitIndex < endBeforeIndex; ++bitIndex) {\n    acc += float(bits[bitIndex]) * exp2(float(pow2--));\n  }\n  return acc;\n}\n\n// Parse the float from its 32 bits.\nfloat bitsToFloat(bool bits[32]) {\n  float signBit = float(bits[0]) * -2.0 + 1.0;\n  float exponent = getExponent(bits);\n  bool subnormal = abs(exponent - 0.0) < 0.01;\n  float mantissa = getMantissa(bits, subnormal);\n  float exponentBias = 127.0;\n  return signBit * mantissa * exp2(exponent - exponentBias - 23.0);\n}\n\n// Decode a 32-bit float from the RGBA color channels of a texel.\nfloat rgbaToFloat(vec4 texelRGBA, bool littleEndian) {\n  ivec4 rgbaBytes = floatsToBytes(texelRGBA, littleEndian);\n  bool bits[32];\n  bytesToBits(rgbaBytes, bits);\n  return bitsToFloat(bits);\n}\n\nfloat shiftRight (float v, float amt) {\n  v = floor(v) + 0.5;\n  return floor(v / exp2(amt));\n}\nfloat shiftLeft (float v, float amt) {\n    return floor(v * exp2(amt) + 0.5);\n}\nfloat maskLast (float v, float bits_0) {\n    return mod(v, shiftLeft(1.0, bits_0));\n}\nfloat extractBits (float num, float from, float to) {\n    from = floor(from + 0.5); to = floor(to + 0.5);\n    return maskLast(shiftRight(num, from), to - from);\n}\nvec4 floatToRgba(float texelFloat, bool littleEndian) {\n    if (texelFloat == 0.0) return vec4(0, 0, 0, 0);\n    float sign = texelFloat > 0.0 ? 0.0 : 1.0;\n    texelFloat = abs(texelFloat);\n    float exponent = floor(log2(texelFloat));\n    float biased_exponent = exponent + 127.0;\n    float fraction = ((texelFloat / exp2(exponent)) - 1.0) * 8388608.0;\n    float t = biased_exponent / 2.0;\n    float last_bit_of_biased_exponent = fract(t) * 2.0;\n    float remaining_bits_of_biased_exponent = floor(t);\n    float byte4 = extractBits(fraction, 0.0, 8.0) / 255.0;\n    float byte3 = extractBits(fraction, 8.0, 16.0) / 255.0;\n    float byte2 = (last_bit_of_biased_exponent * 128.0 + extractBits(fraction, 16.0, 23.0)) / 255.0;\n    float byte1 = (sign * 128.0 + remaining_bits_of_biased_exponent) / 255.0;\n    return (\n      littleEndian\n      ? vec4(byte4, byte3, byte2, byte1)\n      : vec4(byte1, byte2, byte3, byte4)\n    );\n}\n\n#ifndef RELATIVE_TOLERANCE\n#define RELATIVE_TOLERANCE 0.0001\n#endif\n\nbool isCloseEnough(float a, float b) {\n  return abs(a - b) <= max(abs(a), abs(b)) * RELATIVE_TOLERANCE;\n}\n\nuniform sampler2D texture;\nuniform float textureSize;\nuniform bool littleEndian;\nuniform float nodataValue;\nvarying vec2 vTexCoord;\nuniform int kernelSize;\n\nint kernelEnd = int(kernelSize/2);\nint kernelStart = kernelEnd * -1;\n\nfloat getTexelValue(vec2 pos) {\n  vec4 texelRgba = texture2D(texture, pos);\n  float texelFloat = rgbaToFloat(texelRgba, littleEndian);\n  return texelFloat;\n}\n\nfloat runConvKernel(vec2 pos, vec2 onePixel) {\n  float convKernelWeight = 0.0;\n  float sum = 0.0;\n\n  for (int i = -20; i < 20; i ++) {\n    if (i < kernelStart) continue;\n    if (i > kernelEnd) break;\n    for (int j = -20; j < 20; j ++) {\n      if (j < kernelStart) continue;\n      if (j > kernelEnd) break;\n      float texelValue = getTexelValue(pos + onePixel * vec2(i, j));\n      if (!isCloseEnough(texelValue, nodataValue)) {\n        sum = sum + texelValue;\n        convKernelWeight = convKernelWeight + 1.0;\n      }\n    }\n  }\n  return (sum / convKernelWeight);\n}\n\nvoid main() {\n  float texelFloat = getTexelValue(vTexCoord);\n  if (isCloseEnough(texelFloat, nodataValue)) {\n    gl_FragColor = floatToRgba(nodataValue, littleEndian);\n  } else {\n    vec2 onePixel = vec2(1.0, 1.0) / textureSize;\n    float texelFloatSmoothed = runConvKernel(vTexCoord, onePixel);\n    gl_FragColor = floatToRgba(texelFloatSmoothed, littleEndian);\n  }\n}\n"; // eslint-disable-line
 
-function convertColorScale(colorScale) {
-    return colorScale.map(function (_a) {
-        var color = _a.color, offset = _a.offset;
-        return ({
-            color: colorStringToWebGLFloats(color),
-            offset: offset,
-        });
-    });
-}
-var RGB_REGEX = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/;
-function colorStringToWebGLFloats(rgb) {
-    if (rgb === 'transparent') {
-        return [1, 1, 1, 0];
-    }
-    var match = rgb.match(RGB_REGEX);
-    if (match === null) {
-        throw new Error("'" + rgb + "' is not a valid RGB color expression.");
-    }
-    var r = match[1], g = match[2], b = match[3];
-    return [+r / 255, +g / 255, +b / 255, 1];
-}
-function bindStructArray(structPropertyNames, defaultValue, maxArrayLength, glslIdentifier, propName) {
-    if (propName === void 0) { propName = glslIdentifier; }
-    var output = {};
-    var _loop_1 = function (i) {
-        var _loop_2 = function (key) {
-            output[glslIdentifier + "[" + i + "]." + key] = function (_, props) {
-                var inputArray = props[propName];
-                return (i < inputArray.length
-                    ? inputArray[i][key]
-                    : defaultValue[key]);
-            };
-        };
-        for (var _i = 0, structPropertyNames_1 = structPropertyNames; _i < structPropertyNames_1.length; _i++) {
-            var key = structPropertyNames_1[_i];
-            _loop_2(key);
-        }
-    };
-    for (var i = 0; i < maxArrayLength; ++i) {
-        _loop_1(i);
-    }
-    return output;
-}
 function machineIsLittleEndian() {
     var uint8Array = new Uint8Array([0xAA, 0xBB]);
     var uint16array = new Uint16Array(uint8Array.buffer);
@@ -321,19 +274,68 @@ function defineMacros(src, macros) {
     var defs = Object.keys(macros).map(function (key) { return "#define " + key + " " + macros[key] + "\n"; }).join('');
     return defs + "\n" + src;
 }
+var hexToRGB = function (hex) {
+    var hasAlpha = hex.length === 9;
+    var start = hasAlpha ? 24 : 16;
+    var bigint = parseInt(hex.slice(1), 16);
+    var r = (bigint >> start) & 255;
+    var g = (bigint >> (start - 8)) & 255;
+    var b = (bigint >> (start - 16)) & 255;
+    var a = hasAlpha ? (bigint >> (start - 24)) & 255 : 255;
+    return [r, g, b, a];
+};
+var RGB_REGEX = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/;
+var HEX_REGEX = /(?:#)[0-9a-f]{8}|(?:#)[0-9a-f]{6}|(?:#)[0-9a-f]{4}|(?:#)[0-9a-f]{3}/ig;
+function colorStringToInts(colorstring) {
+    if (colorstring === 'transparent') {
+        return [0, 0, 0, 0];
+    }
+    var rgbmatch = colorstring.match(RGB_REGEX);
+    var hexmatch = colorstring.match(HEX_REGEX);
+    if (rgbmatch !== null) {
+        var r = rgbmatch[1], g = rgbmatch[2], b = rgbmatch[3];
+        return [+r, +g, +b, 255];
+    }
+    else if (hexmatch !== null) {
+        return hexToRGB(colorstring);
+    }
+    else {
+        throw new Error("'" + colorstring + "' is not a valid RGB or hex color expression.");
+    }
+}
+var colormapToFlatArray = function (colormap) {
+    var offsets = [];
+    var colors = [];
+    for (var i = 0; i < colormap.length; i++) {
+        offsets.push(colormap[i].offset);
+        var colorsnew = colorStringToInts(colormap[i].color);
+        colors = colors.concat(colorsnew);
+    }
+    var floatOffsets = new Float32Array(offsets);
+    var uintOffsets = new Uint8Array(floatOffsets.buffer);
+    var normalOffsets = Array.from(uintOffsets);
+    var colormapArray = colors.concat(normalOffsets);
+    return colormapArray;
+};
+function createColormapTexture(colormapInput, regl) {
+    var colormapFlatArray = colormapToFlatArray(colormapInput);
+    var colormapTexture;
+    if (colormapInput.length === 0) {
+        colormapTexture = regl.texture({
+            shape: [2, 2]
+        });
+    }
+    else {
+        colormapTexture = regl.texture({
+            width: colormapInput.length,
+            height: 2,
+            data: colormapFlatArray
+        });
+    }
+    return colormapTexture;
+}
 
 var littleEndian = machineIsLittleEndian();
-var bindStructArray$1 = bindStructArray.bind(null, ['color', 'offset'], DEFAULT_COLOR_STOP);
-function getColorStructArray(colorscaleName, scaleMaxLength, sentinelName, sentinelMaxLength) {
-    return {
-        colorScaleUniforms: bindStructArray$1(scaleMaxLength, colorscaleName),
-        sentinelValuesUniforms: bindStructArray$1(sentinelMaxLength, sentinelName),
-        fragMacros: {
-            SCALE_MAX_LENGTH: scaleMaxLength,
-            SENTINEL_MAX_LENGTH: sentinelMaxLength,
-        },
-    };
-}
 function getCommonDrawConfiguration(tileSize, nodataValue) {
     return {
         uniforms: {
@@ -368,14 +370,8 @@ function getCommonDrawConfiguration(tileSize, nodataValue) {
 }
 var deg2rad = 0.017453292519943295;
 var slopeFactor = 0.0333334;
-function createDrawTileCommand(regl, commonConfig, commonColors) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragSingle, commonColors.fragMacros), uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
-                var colorScale = _a.colorScale;
-                return colorScale.length;
-            }, sentinelValuesLength: function (_, _a) {
-                var sentinelValues = _a.sentinelValues;
-                return sentinelValues.length;
-            }, texture: function (_, _a) {
+function createDrawTileCommand(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragSingle, fragMacros), uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLength: regl.prop('scaleLength'), sentinelLength: regl.prop('sentinelLength'), scaleColormap: regl.prop('scaleColormap'), sentinelColormap: regl.prop('sentinelColormap'), texture: function (_, _a) {
                 var texture = _a.texture;
                 return texture;
             }, enableSimpleHillshade: function (_, _a) {
@@ -386,14 +382,8 @@ function createDrawTileCommand(regl, commonConfig, commonColors) {
                 return getTexCoordVertices(textureBounds);
             } }) }));
 }
-function createDrawTileHsSimpleCommand(regl, commonConfig, commonColors) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragSingle, commonColors.fragMacros), uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
-                var colorScale = _a.colorScale;
-                return colorScale.length;
-            }, sentinelValuesLength: function (_, _a) {
-                var sentinelValues = _a.sentinelValues;
-                return sentinelValues.length;
-            }, texture: function (_, _a) {
+function createDrawTileHsSimpleCommand(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragSingle, fragMacros), uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLength: regl.prop('scaleLength'), sentinelLength: regl.prop('sentinelLength'), scaleColormap: regl.prop('scaleColormap'), sentinelColormap: regl.prop('sentinelColormap'), texture: function (_, _a) {
                 var texture = _a.texture;
                 return texture;
             }, enableSimpleHillshade: function (_, _a) {
@@ -430,14 +420,8 @@ function createDrawTileHsSimpleCommand(regl, commonConfig, commonColors) {
                 return getTexCoordVertices(textureBounds);
             } }) }));
 }
-function createDrawTileHsPregenCommand(regl, commonConfig, commonColors) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragHsPregen, commonColors.fragMacros), uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
-                var colorScale = _a.colorScale;
-                return colorScale.length;
-            }, sentinelValuesLength: function (_, _a) {
-                var sentinelValues = _a.sentinelValues;
-                return sentinelValues.length;
-            }, texture: function (_, _a) {
+function createDrawTileHsPregenCommand(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragHsPregen, fragMacros), uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLength: regl.prop('scaleLength'), sentinelLength: regl.prop('sentinelLength'), scaleColormap: regl.prop('scaleColormap'), sentinelColormap: regl.prop('sentinelColormap'), texture: function (_, _a) {
                 var texture = _a.texture;
                 return texture;
             }, hillshadePregenTexture: function (_, _a) {
@@ -451,40 +435,10 @@ function createDrawTileHsPregenCommand(regl, commonConfig, commonColors) {
                 return getTexCoordVertices(textureBoundsHs);
             } }) }));
 }
-function createDrawTileInterpolateValueCommand(regl, commonConfig, commonColors) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragInterpolateValue, commonColors.fragMacros), uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
-                var colorScale = _a.colorScale;
-                return colorScale.length;
-            }, sentinelValuesLength: function (_, _a) {
-                var sentinelValues = _a.sentinelValues;
-                return sentinelValues.length;
-            }, textureA: function (_, _a) {
-                var textureA = _a.textureA;
-                return textureA;
-            }, textureB: function (_, _a) {
-                var textureB = _a.textureB;
-                return textureB;
-            }, interpolationFraction: function (_, _a) {
-                var interpolationFraction = _a.interpolationFraction;
-                return interpolationFraction;
-            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
-                var textureBoundsA = _a.textureBoundsA;
-                return getTexCoordVertices(textureBoundsA);
-            }, texCoordB: function (_, _a) {
-                var textureBoundsB = _a.textureBoundsB;
-                return getTexCoordVertices(textureBoundsB);
-            } }) }));
-}
-function createDrawTileMultiAnalyze1Command(regl, commonConfig, commonColors) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragMulti1Draw, commonColors.fragMacros), depth: {
+function createDrawTileMultiAnalyze1Command(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragMulti1Draw, fragMacros), depth: {
             enable: false
-        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
-                var colorScale = _a.colorScale;
-                return colorScale.length;
-            }, sentinelValuesLength: function (_, _a) {
-                var sentinelValues = _a.sentinelValues;
-                return sentinelValues.length;
-            }, filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLength: regl.prop('scaleLength'), sentinelLength: regl.prop('sentinelLength'), scaleColormap: regl.prop('scaleColormap'), sentinelColormap: regl.prop('sentinelColormap'), filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -521,16 +475,10 @@ function createCalcTileMultiAnalyze1Command(regl, commonConfig) {
                 return getTexCoordVertices(textureBoundsA);
             } }) }));
 }
-function createDrawTileMultiAnalyze2Command(regl, commonConfig, commonColors) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragMulti2Draw, commonColors.fragMacros), depth: {
+function createDrawTileMultiAnalyze2Command(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragMulti2Draw, fragMacros), depth: {
             enable: false
-        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
-                var colorScale = _a.colorScale;
-                return colorScale.length;
-            }, sentinelValuesLength: function (_, _a) {
-                var sentinelValues = _a.sentinelValues;
-                return sentinelValues.length;
-            }, filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLength: regl.prop('scaleLength'), sentinelLength: regl.prop('sentinelLength'), scaleColormap: regl.prop('scaleColormap'), sentinelColormap: regl.prop('sentinelColormap'), filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -597,16 +545,10 @@ function createCalcTileMultiAnalyze2Command(regl, commonConfig) {
                 return getTexCoordVertices(textureBoundsB);
             } }) }));
 }
-function createDrawTileMultiAnalyze3Command(regl, commonConfig, commonColors) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti3, frag: defineMacros(fragMulti3Draw, commonColors.fragMacros), depth: {
+function createDrawTileMultiAnalyze3Command(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti3, frag: defineMacros(fragMulti3Draw, fragMacros), depth: {
             enable: false
-        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
-                var colorScale = _a.colorScale;
-                return colorScale.length;
-            }, sentinelValuesLength: function (_, _a) {
-                var sentinelValues = _a.sentinelValues;
-                return sentinelValues.length;
-            }, filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLength: regl.prop('scaleLength'), sentinelLength: regl.prop('sentinelLength'), scaleColormap: regl.prop('scaleColormap'), sentinelColormap: regl.prop('sentinelColormap'), filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -703,16 +645,10 @@ function createCalcTileMultiAnalyze3Command(regl, commonConfig) {
                 return getTexCoordVertices(textureBoundsC);
             } }) }));
 }
-function createDrawTileMultiAnalyze4Command(regl, commonConfig, commonColors) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti4, frag: defineMacros(fragMulti4Draw, commonColors.fragMacros), depth: {
+function createDrawTileMultiAnalyze4Command(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti4, frag: defineMacros(fragMulti4Draw, fragMacros), depth: {
             enable: false
-        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
-                var colorScale = _a.colorScale;
-                return colorScale.length;
-            }, sentinelValuesLength: function (_, _a) {
-                var sentinelValues = _a.sentinelValues;
-                return sentinelValues.length;
-            }, filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLength: regl.prop('scaleLength'), sentinelLength: regl.prop('sentinelLength'), scaleColormap: regl.prop('scaleColormap'), sentinelColormap: regl.prop('sentinelColormap'), filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -839,16 +775,10 @@ function createCalcTileMultiAnalyze4Command(regl, commonConfig) {
                 return getTexCoordVertices(textureBoundsD);
             } }) }));
 }
-function createDrawTileMultiAnalyze5Command(regl, commonConfig, commonColors) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti5, frag: defineMacros(fragMulti5Draw, commonColors.fragMacros), depth: {
+function createDrawTileMultiAnalyze5Command(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti5, frag: defineMacros(fragMulti5Draw, fragMacros), depth: {
             enable: false
-        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
-                var colorScale = _a.colorScale;
-                return colorScale.length;
-            }, sentinelValuesLength: function (_, _a) {
-                var sentinelValues = _a.sentinelValues;
-                return sentinelValues.length;
-            }, filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLength: regl.prop('scaleLength'), sentinelLength: regl.prop('sentinelLength'), scaleColormap: regl.prop('scaleColormap'), sentinelColormap: regl.prop('sentinelColormap'), filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -1005,16 +935,10 @@ function createCalcTileMultiAnalyze5Command(regl, commonConfig) {
                 return getTexCoordVertices(textureBoundsE);
             } }) }));
 }
-function createDrawTileMultiAnalyze6Command(regl, commonConfig, commonColors) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti6, frag: defineMacros(fragMulti6Draw, commonColors.fragMacros), depth: {
+function createDrawTileMultiAnalyze6Command(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertMulti6, frag: defineMacros(fragMulti6Draw, fragMacros), depth: {
             enable: false
-        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
-                var colorScale = _a.colorScale;
-                return colorScale.length;
-            }, sentinelValuesLength: function (_, _a) {
-                var sentinelValues = _a.sentinelValues;
-                return sentinelValues.length;
-            }, filterLowA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLength: regl.prop('scaleLength'), sentinelLength: regl.prop('sentinelLength'), scaleColormap: regl.prop('scaleColormap'), sentinelColormap: regl.prop('sentinelColormap'), filterLowA: function (_, _a) {
                 var filterLowA = _a.filterLowA;
                 return filterLowA;
             }, filterHighA: function (_, _a) {
@@ -1218,16 +1142,10 @@ function createCalcTileDiffCommand(regl, commonConfig) {
                 return getTexCoordVertices(textureBoundsB);
             } }) }));
 }
-function createDrawTileDiffCommand(regl, commonConfig, commonColors) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragDiffDraw, commonColors.fragMacros), depth: {
+function createDrawTileDiffCommand(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragDiffDraw, fragMacros), depth: {
             enable: false
-        }, uniforms: __assign(__assign(__assign(__assign({}, commonConfig.uniforms), commonColors.colorScaleUniforms), commonColors.sentinelValuesUniforms), { colorScaleLength: function (_, _a) {
-                var colorScale = _a.colorScale;
-                return colorScale.length;
-            }, sentinelValuesLength: function (_, _a) {
-                var sentinelValues = _a.sentinelValues;
-                return sentinelValues.length;
-            }, textureA: regl.prop("textureA"), textureB: regl.prop("textureB") }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
+        }, uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLength: regl.prop('scaleLength'), sentinelLength: regl.prop('sentinelLength'), scaleColormap: regl.prop('scaleColormap'), sentinelColormap: regl.prop('sentinelColormap'), textureA: regl.prop("textureA"), textureB: regl.prop("textureB") }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
                 var textureBoundsA = _a.textureBoundsA;
                 return getTexCoordVertices(textureBoundsA);
             }, texCoordB: function (_, _a) {
@@ -1235,20 +1153,8 @@ function createDrawTileDiffCommand(regl, commonConfig, commonColors) {
                 return getTexCoordVertices(textureBoundsB);
             } }) }));
 }
-function createDrawTileInterpolateColorCommand(regl, commonConfig, colorsA, colorsB) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragInterpolateColor, colorsA.fragMacros), uniforms: __assign(__assign(__assign(__assign(__assign(__assign({}, commonConfig.uniforms), colorsA.colorScaleUniforms), colorsA.sentinelValuesUniforms), colorsB.colorScaleUniforms), colorsB.sentinelValuesUniforms), { colorScaleLengthA: function (_, _a) {
-                var colorScaleA = _a.colorScaleA;
-                return colorScaleA.length;
-            }, colorScaleLengthB: function (_, _a) {
-                var colorScaleB = _a.colorScaleB;
-                return colorScaleB.length;
-            }, sentinelValuesLengthA: function (_, _a) {
-                var sentinelValuesA = _a.sentinelValuesA;
-                return sentinelValuesA.length;
-            }, sentinelValuesLengthB: function (_, _a) {
-                var sentinelValuesB = _a.sentinelValuesB;
-                return sentinelValuesB.length;
-            }, textureA: function (_, _a) {
+function createDrawTileInterpolateValueCommand(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragInterpolateValue, fragMacros), uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLength: regl.prop('scaleLength'), sentinelLength: regl.prop('sentinelLength'), scaleColormap: regl.prop('scaleColormap'), sentinelColormap: regl.prop('sentinelColormap'), textureA: function (_, _a) {
                 var textureA = _a.textureA;
                 return textureA;
             }, textureB: function (_, _a) {
@@ -1265,20 +1171,26 @@ function createDrawTileInterpolateColorCommand(regl, commonConfig, colorsA, colo
                 return getTexCoordVertices(textureBoundsB);
             } }) }));
 }
-function createDrawTileInterpolateColorOnlyCommand(regl, commonConfig, colorsA, colorsB) {
-    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragInterpolateColorOnly, colorsA.fragMacros), uniforms: __assign(__assign(__assign(__assign(__assign(__assign({}, commonConfig.uniforms), colorsA.colorScaleUniforms), colorsA.sentinelValuesUniforms), colorsB.colorScaleUniforms), colorsB.sentinelValuesUniforms), { colorScaleLengthA: function (_, _a) {
-                var colorScaleA = _a.colorScaleA;
-                return colorScaleA.length;
-            }, colorScaleLengthB: function (_, _a) {
-                var colorScaleB = _a.colorScaleB;
-                return colorScaleB.length;
-            }, sentinelValuesLengthA: function (_, _a) {
-                var sentinelValuesA = _a.sentinelValuesA;
-                return sentinelValuesA.length;
-            }, sentinelValuesLengthB: function (_, _a) {
-                var sentinelValuesB = _a.sentinelValuesB;
-                return sentinelValuesB.length;
-            }, texture: function (_, _a) {
+function createDrawTileInterpolateColorCommand(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertDouble, frag: defineMacros(fragInterpolateColor, fragMacros), uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLengthA: regl.prop('scaleLengthA'), sentinelLengthA: regl.prop('sentinelLengthA'), scaleColormapA: regl.prop('scaleColormapA'), sentinelColormapA: regl.prop('sentinelColormapA'), scaleLengthB: regl.prop('scaleLengthB'), sentinelLengthB: regl.prop('sentinelLengthB'), scaleColormapB: regl.prop('scaleColormapB'), sentinelColormapB: regl.prop('sentinelColormapB'), textureA: function (_, _a) {
+                var textureA = _a.textureA;
+                return textureA;
+            }, textureB: function (_, _a) {
+                var textureB = _a.textureB;
+                return textureB;
+            }, interpolationFraction: function (_, _a) {
+                var interpolationFraction = _a.interpolationFraction;
+                return interpolationFraction;
+            } }), attributes: __assign(__assign({}, commonConfig.attributes), { texCoordA: function (_, _a) {
+                var textureBoundsA = _a.textureBoundsA;
+                return getTexCoordVertices(textureBoundsA);
+            }, texCoordB: function (_, _a) {
+                var textureBoundsB = _a.textureBoundsB;
+                return getTexCoordVertices(textureBoundsB);
+            } }) }));
+}
+function createDrawTileInterpolateColorOnlyCommand(regl, commonConfig, fragMacros) {
+    return regl(__assign(__assign({}, commonConfig), { vert: vertSingle, frag: defineMacros(fragInterpolateColorOnly, fragMacros), uniforms: __assign(__assign({}, commonConfig.uniforms), { scaleLengthA: regl.prop('scaleLengthA'), sentinelLengthA: regl.prop('sentinelLengthA'), scaleColormapA: regl.prop('scaleColormapA'), sentinelColormapA: regl.prop('sentinelColormapA'), scaleLengthB: regl.prop('scaleLengthB'), sentinelLengthB: regl.prop('sentinelLengthB'), scaleColormapB: regl.prop('scaleColormapB'), sentinelColormapB: regl.prop('sentinelColormapB'), texture: function (_, _a) {
                 var texture = _a.texture;
                 return texture;
             }, interpolationFraction: function (_, _a) {
@@ -1400,7 +1312,7 @@ var TextureManager = (function () {
 }());
 
 var Renderer = (function () {
-    function Renderer(tileSize, nodataValue, colorscaleMaxLength, sentinelMaxLength) {
+    function Renderer(tileSize, nodataValue, scaleInput, sentinelInput, colorscaleMaxLength, sentinelMaxLength) {
         var canvas = DomUtil.create('canvas');
         var maxTextureDimension = MAX_TEXTURE_DIMENSION;
         var regl = REGL({
@@ -1417,21 +1329,29 @@ var Renderer = (function () {
                     else if (regl.limits.maxTextureSize > 4096) {
                         maxTextureDimension = 4096;
                     }
+                    else if (regl.limits.maxTextureSize > 8192) {
+                        maxTextureDimension = 8192;
+                    }
                 }
                 if (regl.limits.maxFragmentUniforms === 261) {
-                    console.log("Software rendering detected and not supported with GLOperations plugin. If you have a GPU, check if drivers are installed ok?");
+                    console.warn("Software rendering detected and not supported with GLOperations plugin. If you have a GPU, check if drivers are installed ok?");
                 }
             }
         });
         var commonDrawConfig = getCommonDrawConfiguration(tileSize, nodataValue);
-        var commonDrawColors = getColorStructArray('colorScale', colorscaleMaxLength, 'sentinelValues', sentinelMaxLength);
-        var interpolateDrawColorsA = getColorStructArray('colorScaleA', colorscaleMaxLength, 'sentinelValuesA', sentinelMaxLength);
-        var interpolateDrawColorsB = getColorStructArray('colorScaleB', colorscaleMaxLength, 'sentinelValuesB', sentinelMaxLength);
+        var fragMacros = {
+            SCALE_MAX_LENGTH: colorscaleMaxLength,
+            SENTINEL_MAX_LENGTH: sentinelMaxLength,
+        };
         Object.assign(this, {
             canvas: canvas,
             regl: regl,
             tileSize: tileSize,
             maxTextureDimension: maxTextureDimension,
+            scaleInput: scaleInput,
+            sentinelInput: sentinelInput,
+            scaleColormap: createColormapTexture(scaleInput, regl),
+            sentinelColormap: createColormapTexture(sentinelInput, regl),
             textureManager: new TextureManager(regl, tileSize, maxTextureDimension, false),
             textureManagerA: new TextureManager(regl, tileSize, maxTextureDimension, false),
             textureManagerB: new TextureManager(regl, tileSize, maxTextureDimension, false),
@@ -1440,37 +1360,29 @@ var Renderer = (function () {
             textureManagerE: new TextureManager(regl, tileSize, maxTextureDimension, false),
             textureManagerF: new TextureManager(regl, tileSize, maxTextureDimension, false),
             textureManagerHillshade: new TextureManager(regl, tileSize, maxTextureDimension, false),
-            drawTile: createDrawTileCommand(regl, commonDrawConfig, commonDrawColors),
-            drawTileHsSimple: createDrawTileHsSimpleCommand(regl, commonDrawConfig, commonDrawColors),
-            drawTileHsPregen: createDrawTileHsPregenCommand(regl, commonDrawConfig, commonDrawColors),
-            drawTileInterpolateColor: createDrawTileInterpolateColorCommand(regl, commonDrawConfig, interpolateDrawColorsA, interpolateDrawColorsB),
-            drawTileInterpolateColorOnly: createDrawTileInterpolateColorOnlyCommand(regl, commonDrawConfig, interpolateDrawColorsA, interpolateDrawColorsB),
-            drawTileInterpolateValue: createDrawTileInterpolateValueCommand(regl, commonDrawConfig, commonDrawColors),
+            drawTile: createDrawTileCommand(regl, commonDrawConfig, fragMacros),
+            drawTileHsSimple: createDrawTileHsSimpleCommand(regl, commonDrawConfig, fragMacros),
+            drawTileHsPregen: createDrawTileHsPregenCommand(regl, commonDrawConfig, fragMacros),
+            drawTileInterpolateColor: createDrawTileInterpolateColorCommand(regl, commonDrawConfig, fragMacros),
+            drawTileInterpolateColorOnly: createDrawTileInterpolateColorOnlyCommand(regl, commonDrawConfig, fragMacros),
+            drawTileInterpolateValue: createDrawTileInterpolateValueCommand(regl, commonDrawConfig, fragMacros),
             calcTileMultiAnalyze1: createCalcTileMultiAnalyze1Command(regl, commonDrawConfig),
-            drawTileMultiAnalyze1: createDrawTileMultiAnalyze1Command(regl, commonDrawConfig, commonDrawColors),
+            drawTileMultiAnalyze1: createDrawTileMultiAnalyze1Command(regl, commonDrawConfig, fragMacros),
             calcTileMultiAnalyze2: createCalcTileMultiAnalyze2Command(regl, commonDrawConfig),
-            drawTileMultiAnalyze2: createDrawTileMultiAnalyze2Command(regl, commonDrawConfig, commonDrawColors),
+            drawTileMultiAnalyze2: createDrawTileMultiAnalyze2Command(regl, commonDrawConfig, fragMacros),
             calcTileMultiAnalyze3: createCalcTileMultiAnalyze3Command(regl, commonDrawConfig),
-            drawTileMultiAnalyze3: createDrawTileMultiAnalyze3Command(regl, commonDrawConfig, commonDrawColors),
+            drawTileMultiAnalyze3: createDrawTileMultiAnalyze3Command(regl, commonDrawConfig, fragMacros),
             calcTileMultiAnalyze4: createCalcTileMultiAnalyze4Command(regl, commonDrawConfig),
-            drawTileMultiAnalyze4: createDrawTileMultiAnalyze4Command(regl, commonDrawConfig, commonDrawColors),
+            drawTileMultiAnalyze4: createDrawTileMultiAnalyze4Command(regl, commonDrawConfig, fragMacros),
             calcTileMultiAnalyze5: createCalcTileMultiAnalyze5Command(regl, commonDrawConfig),
-            drawTileMultiAnalyze5: createDrawTileMultiAnalyze5Command(regl, commonDrawConfig, commonDrawColors),
+            drawTileMultiAnalyze5: createDrawTileMultiAnalyze5Command(regl, commonDrawConfig, fragMacros),
             calcTileMultiAnalyze6: createCalcTileMultiAnalyze6Command(regl, commonDrawConfig),
-            drawTileMultiAnalyze6: createDrawTileMultiAnalyze6Command(regl, commonDrawConfig, commonDrawColors),
-            drawTileDiff: createDrawTileDiffCommand(regl, commonDrawConfig, commonDrawColors),
+            drawTileMultiAnalyze6: createDrawTileMultiAnalyze6Command(regl, commonDrawConfig, fragMacros),
+            drawTileDiff: createDrawTileDiffCommand(regl, commonDrawConfig, fragMacros),
             calcTileDiff: createCalcTileDiffCommand(regl, commonDrawConfig),
             convolutionSmooth: createConvolutionSmoothCommand(regl, commonDrawConfig),
         });
     }
-    Renderer.prototype.setMaxTextureDimension = function (newMaxTextureDimension) {
-        var _a = this, textureManager = _a.textureManager, tileSize = _a.tileSize, regl = _a.regl;
-        textureManager.destroy();
-        Object.assign(this, {
-            maxTextureDimension: newMaxTextureDimension,
-            textureManager: new TextureManager(regl, tileSize, newMaxTextureDimension, false),
-        });
-    };
     Renderer.prototype.findMaxTextureDimension = function () {
         var regl = this.regl;
         var maxTextureDimension = MAX_TEXTURE_DIMENSION;
@@ -1480,9 +1392,32 @@ var Renderer = (function () {
         else if (regl.limits.maxTextureSize > 4096) {
             maxTextureDimension = 4096;
         }
+        else if (regl.limits.maxTextureSize > 8192) {
+            maxTextureDimension = 8192;
+        }
         return maxTextureDimension;
     };
-    Renderer.prototype.renderTile = function (_a, colorScale, sentinelValues, _hillshadeOptions, zoom) {
+    Renderer.prototype.setMaxTextureDimension = function (newMaxTextureDimension) {
+        var _a = this, textureManager = _a.textureManager, tileSize = _a.tileSize, regl = _a.regl;
+        textureManager.destroy();
+        Object.assign(this, {
+            maxTextureDimension: newMaxTextureDimension,
+            textureManager: new TextureManager(regl, tileSize, newMaxTextureDimension, false),
+        });
+    };
+    Renderer.prototype.updateColorscale = function (scaleInput) {
+        this.scaleInputPrevious = this.scaleInput;
+        this.scaleInput = scaleInput;
+        this.scaleColormapPrevious = this.scaleColormap;
+        this.scaleColormap = createColormapTexture(scaleInput, this.regl);
+    };
+    Renderer.prototype.updateSentinels = function (sentinelInput) {
+        this.sentinelInputPrevious = this.sentinelInput;
+        this.sentinelInput = sentinelInput;
+        this.sentinelColormapPrevious = this.sentinelColormap;
+        this.sentinelColormap = createColormapTexture(sentinelInput, this.regl);
+    };
+    Renderer.prototype.renderTile = function (_a, _hillshadeOptions, zoom) {
         var coords = _a.coords, pixelData = _a.pixelData;
         if (zoom === void 0) { zoom = 0; }
         var _b = this, regl = _b.regl, textureManager = _b.textureManager, tileSize = _b.tileSize;
@@ -1494,19 +1429,23 @@ var Renderer = (function () {
         var offset_texcoords = offset_pixels / textureManager.texture.width;
         if (_hillshadeOptions.hillshadeType === 'none') {
             this.drawTile({
-                colorScale: convertColorScale(colorScale),
-                sentinelValues: convertColorScale(sentinelValues),
                 canvasSize: [tileSize, tileSize],
                 canvasCoordinates: [0, 0],
                 textureBounds: textureBounds,
                 texture: textureManager.texture,
+                scaleLength: this.scaleInput.length,
+                sentinelLength: this.sentinelInput.length,
+                scaleColormap: this.scaleColormap,
+                sentinelColormap: this.sentinelColormap,
                 enableSimpleHillshade: false,
             });
         }
         else if (_hillshadeOptions.hillshadeType === 'simple') {
             this.drawTileHsSimple({
-                colorScale: convertColorScale(colorScale),
-                sentinelValues: convertColorScale(sentinelValues),
+                scaleLength: this.scaleInput.length,
+                sentinelLength: this.sentinelInput.length,
+                scaleColormap: this.scaleColormap,
+                sentinelColormap: this.sentinelColormap,
                 canvasSize: [tileSize, tileSize],
                 canvasCoordinates: [0, 0],
                 textureBounds: textureBounds,
@@ -1522,15 +1461,17 @@ var Renderer = (function () {
         }
         return [0, 0];
     };
-    Renderer.prototype.renderTileHsPregen = function (tileDatum, tileDatumHs, colorScale, sentinelValues, _hillshadeOptions) {
+    Renderer.prototype.renderTileHsPregen = function (tileDatum, tileDatumHs, _hillshadeOptions) {
         var _a = this, regl = _a.regl, textureManager = _a.textureManager, textureManagerHillshade = _a.textureManagerHillshade, tileSize = _a.tileSize;
         this.setCanvasSize(tileSize, tileSize);
         var textureBounds = textureManager.addTile(tileDatum.coords, tileDatum.pixelData);
         var textureBoundsHs = textureManagerHillshade.addTile(tileDatumHs.coords, tileDatumHs.pixelData);
         regl.clear({ color: CLEAR_COLOR });
         this.drawTileHsPregen({
-            colorScale: convertColorScale(colorScale),
-            sentinelValues: convertColorScale(sentinelValues),
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize: [tileSize, tileSize],
             canvasCoordinates: [0, 0],
             textureBounds: textureBounds,
@@ -1539,19 +1480,6 @@ var Renderer = (function () {
             hillshadePregenTexture: textureManagerHillshade.texture,
         });
         return [0, 0];
-    };
-    Renderer.prototype.flipReadPixelsFloat = function (width, height, pixels) {
-        var halfHeight = height / 2 | 0;
-        var bytesPerRow = width * 4;
-        var temp = new Float32Array(width * 4);
-        for (var y = 0; y < halfHeight; ++y) {
-            var topOffset = y * bytesPerRow;
-            var bottomOffset = (height - y - 1) * bytesPerRow;
-            temp.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
-            pixels.copyWithin(topOffset, bottomOffset, bottomOffset + bytesPerRow);
-            pixels.set(temp, bottomOffset);
-        }
-        return pixels;
     };
     Renderer.prototype.flipReadPixelsUint = function (width, height, pixels) {
         var halfHeight = height / 2 | 0;
@@ -1566,7 +1494,7 @@ var Renderer = (function () {
         }
         return pixels;
     };
-    Renderer.prototype.renderTileDiff = function (tileDatumA, tileDatumB, colorScale, sentinelValues) {
+    Renderer.prototype.renderTileDiff = function (tileDatumA, tileDatumB) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, tileSize = _a.tileSize;
         this.setCanvasSize(tileSize, tileSize);
@@ -1593,8 +1521,10 @@ var Renderer = (function () {
         });
         resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
         this.drawTileDiff({
-            colorScale: convertColorScale(colorScale),
-            sentinelValues: convertColorScale(sentinelValues),
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize: [tileSize, tileSize],
             canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
@@ -1635,7 +1565,7 @@ var Renderer = (function () {
         fboSmoothed.destroy();
         return resultEncodedPixels;
     };
-    Renderer.prototype.renderTileMulti1 = function (tileDatumA, colorScale, sentinelValues, filterLowA, filterHighA, multiplierA) {
+    Renderer.prototype.renderTileMulti1 = function (tileDatumA, filterLowA, filterHighA, multiplierA) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, tileSize = _a.tileSize;
         this.setCanvasSize(tileSize, tileSize);
@@ -1662,8 +1592,10 @@ var Renderer = (function () {
         });
         resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
         this.drawTileMultiAnalyze1({
-            colorScale: convertColorScale(colorScale),
-            sentinelValues: convertColorScale(sentinelValues),
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize: [tileSize, tileSize],
             canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
@@ -1675,7 +1607,7 @@ var Renderer = (function () {
         fboTile.destroy();
         return [0, 0, resultEncodedPixels];
     };
-    Renderer.prototype.renderTileMulti2 = function (tileDatumA, tileDatumB, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, multiplierA, multiplierB) {
+    Renderer.prototype.renderTileMulti2 = function (tileDatumA, tileDatumB, filterLowA, filterHighA, filterLowB, filterHighB, multiplierA, multiplierB) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, tileSize = _a.tileSize;
         this.setCanvasSize(tileSize, tileSize);
@@ -1708,8 +1640,10 @@ var Renderer = (function () {
         });
         resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
         this.drawTileMultiAnalyze2({
-            colorScale: convertColorScale(colorScale),
-            sentinelValues: convertColorScale(sentinelValues),
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize: [tileSize, tileSize],
             canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
@@ -1726,7 +1660,7 @@ var Renderer = (function () {
         fboTile.destroy();
         return [0, 0, resultEncodedPixels];
     };
-    Renderer.prototype.renderTileMulti3 = function (tileDatumA, tileDatumB, tileDatumC, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, multiplierA, multiplierB, multiplierC) {
+    Renderer.prototype.renderTileMulti3 = function (tileDatumA, tileDatumB, tileDatumC, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, multiplierA, multiplierB, multiplierC) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, textureManagerC = _a.textureManagerC, tileSize = _a.tileSize;
         this.setCanvasSize(tileSize, tileSize);
@@ -1765,8 +1699,10 @@ var Renderer = (function () {
         });
         resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
         this.drawTileMultiAnalyze3({
-            colorScale: convertColorScale(colorScale),
-            sentinelValues: convertColorScale(sentinelValues),
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize: [tileSize, tileSize],
             canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
@@ -1788,7 +1724,7 @@ var Renderer = (function () {
         fboTile.destroy();
         return [0, 0, resultEncodedPixels];
     };
-    Renderer.prototype.renderTileMulti4 = function (tileDatumA, tileDatumB, tileDatumC, tileDatumD, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, multiplierA, multiplierB, multiplierC, multiplierD) {
+    Renderer.prototype.renderTileMulti4 = function (tileDatumA, tileDatumB, tileDatumC, tileDatumD, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, multiplierA, multiplierB, multiplierC, multiplierD) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, textureManagerC = _a.textureManagerC, textureManagerD = _a.textureManagerD, tileSize = _a.tileSize;
         this.setCanvasSize(tileSize, tileSize);
@@ -1833,8 +1769,10 @@ var Renderer = (function () {
         });
         resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
         this.drawTileMultiAnalyze4({
-            colorScale: convertColorScale(colorScale),
-            sentinelValues: convertColorScale(sentinelValues),
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize: [tileSize, tileSize],
             canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
@@ -1861,7 +1799,7 @@ var Renderer = (function () {
         fboTile.destroy();
         return [0, 0, resultEncodedPixels];
     };
-    Renderer.prototype.renderTileMulti5 = function (tileDatumA, tileDatumB, tileDatumC, tileDatumD, tileDatumE, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE) {
+    Renderer.prototype.renderTileMulti5 = function (tileDatumA, tileDatumB, tileDatumC, tileDatumD, tileDatumE, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, textureManagerC = _a.textureManagerC, textureManagerD = _a.textureManagerD, textureManagerE = _a.textureManagerE, tileSize = _a.tileSize;
         this.setCanvasSize(tileSize, tileSize);
@@ -1912,8 +1850,10 @@ var Renderer = (function () {
         });
         resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
         this.drawTileMultiAnalyze5({
-            colorScale: convertColorScale(colorScale),
-            sentinelValues: convertColorScale(sentinelValues),
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize: [tileSize, tileSize],
             canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
@@ -1945,7 +1885,7 @@ var Renderer = (function () {
         fboTile.destroy();
         return [0, 0, resultEncodedPixels];
     };
-    Renderer.prototype.renderTileMulti6 = function (tileDatumA, tileDatumB, tileDatumC, tileDatumD, tileDatumE, tileDatumF, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, filterLowF, filterHighF, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE, multiplierF) {
+    Renderer.prototype.renderTileMulti6 = function (tileDatumA, tileDatumB, tileDatumC, tileDatumD, tileDatumE, tileDatumF, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, filterLowF, filterHighF, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE, multiplierF) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, textureManagerC = _a.textureManagerC, textureManagerD = _a.textureManagerD, textureManagerE = _a.textureManagerE, textureManagerF = _a.textureManagerF, tileSize = _a.tileSize;
         this.setCanvasSize(tileSize, tileSize);
@@ -2002,8 +1942,10 @@ var Renderer = (function () {
         });
         resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
         this.drawTileMultiAnalyze6({
-            colorScale: convertColorScale(colorScale),
-            sentinelValues: convertColorScale(sentinelValues),
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
             canvasSize: [tileSize, tileSize],
             canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
@@ -2040,15 +1982,14 @@ var Renderer = (function () {
         fboTile.destroy();
         return [0, 0, resultEncodedPixels];
     };
-    Renderer.prototype.renderTiles = function (tiles, colorScale, sentinelValues, _hillshadeOptions, zoom) {
+    Renderer.prototype.renderTiles = function (tiles, _hillshadeOptions, zoom) {
+        var _this = this;
         if (zoom === void 0) { zoom = 0; }
         var _a = this, regl = _a.regl, textureManager = _a.textureManager, tileSize = _a.tileSize;
         var _b = this.computeRequiredCanvasDimensions(tiles.length), canvasWidth = _b[0], canvasHeight = _b[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
         var canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tiles.length);
         var tilesWithCanvasCoordinates = zipWith(tiles, canvasCoordinates, function (tile, canvasCoords) { return (__assign(__assign({}, tile), { canvasCoords: canvasCoords })); });
-        var webGLColorScale = convertColorScale(colorScale);
-        var webGLSentinelValues = convertColorScale(sentinelValues);
         var canvasSize = [canvasWidth, canvasHeight];
         textureManager.clearTiles();
         regl.clear({ color: CLEAR_COLOR });
@@ -2065,12 +2006,14 @@ var Renderer = (function () {
                 this_1.drawTile(chunk_1.map(function (_a, index) {
                     var canvasCoords = _a.canvasCoords;
                     return ({
-                        colorScale: webGLColorScale,
-                        sentinelValues: webGLSentinelValues,
                         canvasSize: canvasSize,
                         canvasCoordinates: canvasCoords,
                         textureBounds: textureBounds[index],
                         texture: textureManager.texture,
+                        scaleLength: _this.scaleInput.length,
+                        sentinelLength: _this.sentinelInput.length,
+                        scaleColormap: _this.scaleColormap,
+                        sentinelColormap: _this.sentinelColormap,
                         enableSimpleHillshade: false,
                     });
                 }));
@@ -2079,8 +2022,10 @@ var Renderer = (function () {
                 this_1.drawTileHsSimple(chunk_1.map(function (_a, index) {
                     var canvasCoords = _a.canvasCoords;
                     return ({
-                        colorScale: webGLColorScale,
-                        sentinelValues: webGLSentinelValues,
+                        scaleLength: _this.scaleInput.length,
+                        sentinelLength: _this.sentinelInput.length,
+                        scaleColormap: _this.scaleColormap,
+                        sentinelColormap: _this.sentinelColormap,
                         canvasSize: canvasSize,
                         canvasCoordinates: canvasCoords,
                         textureBounds: textureBounds[index],
@@ -2103,7 +2048,8 @@ var Renderer = (function () {
         }
         return canvasCoordinates;
     };
-    Renderer.prototype.renderTilesHsPregen = function (tiles, tilesHs, colorScale, sentinelValues, _hillshadeOptions) {
+    Renderer.prototype.renderTilesHsPregen = function (tiles, tilesHs, _hillshadeOptions) {
+        var _this = this;
         var _a = this, regl = _a.regl, textureManager = _a.textureManager, textureManagerHillshade = _a.textureManagerHillshade;
         var _b = this.computeRequiredCanvasDimensions(tiles.length), canvasWidth = _b[0], canvasHeight = _b[1];
         this.setCanvasSize(canvasWidth, canvasHeight);
@@ -2114,8 +2060,6 @@ var Renderer = (function () {
             tilesHsPixelData: tilesHs.pixelData,
             canvasCoords: canvasCoords,
         }); });
-        var webGLColorScale = convertColorScale(colorScale);
-        var webGLSentinelValues = convertColorScale(sentinelValues);
         var canvasSize = [canvasWidth, canvasHeight];
         textureManager.clearTiles();
         textureManagerHillshade.clearTiles();
@@ -2133,8 +2077,10 @@ var Renderer = (function () {
             this_2.drawTileHsPregen(chunk_2.map(function (_a, index) {
                 var canvasCoords = _a.canvasCoords;
                 return ({
-                    colorScale: webGLColorScale,
-                    sentinelValues: webGLSentinelValues,
+                    scaleLength: _this.scaleInput.length,
+                    sentinelLength: _this.sentinelInput.length,
+                    scaleColormap: _this.scaleColormap,
+                    sentinelColormap: _this.sentinelColormap,
                     canvasSize: canvasSize,
                     canvasCoordinates: canvasCoords,
                     textureBounds: textureBounds[index],
@@ -2151,7 +2097,7 @@ var Renderer = (function () {
         }
         return canvasCoordinates;
     };
-    Renderer.prototype.renderTilesWithDiff = function (tilesA, tilesB, colorScale, sentinelValues, onFrameRendered) {
+    Renderer.prototype.renderTilesWithDiff = function (tilesA, tilesB, onFrameRendered) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, tileSize = _a.tileSize;
         var canvasSize = this.computeRequiredCanvasDimensions(tilesA.length);
@@ -2164,8 +2110,6 @@ var Renderer = (function () {
             tilesBPixelData: tilesB.pixelData,
             canvasCoords: canvasCoords,
         }); });
-        var webGLColorScale = convertColorScale(colorScale);
-        var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
             var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
@@ -2205,8 +2149,10 @@ var Renderer = (function () {
                     resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
                     tileIndex += 1;
                     _this.drawTileDiff({
-                        colorScale: webGLColorScale,
-                        sentinelValues: webGLSentinelValues,
+                        scaleLength: _this.scaleInput.length,
+                        sentinelLength: _this.sentinelInput.length,
+                        scaleColormap: _this.scaleColormap,
+                        sentinelColormap: _this.sentinelColormap,
                         canvasSize: canvasSize,
                         canvasCoordinates: canvasCoords,
                         textureA: textureManagerA.texture,
@@ -2230,7 +2176,7 @@ var Renderer = (function () {
         this.textureManagerB = new TextureManager(regl, tileSize, MAX_TEXTURE_DIMENSION, false);
         return resultEncodedPixels;
     };
-    Renderer.prototype.renderTilesWithMultiAnalyze1 = function (tilesA, colorScale, sentinelValues, filterLowA, filterHighA, multiplierA, onFrameRendered) {
+    Renderer.prototype.renderTilesWithMultiAnalyze1 = function (tilesA, filterLowA, filterHighA, multiplierA, onFrameRendered) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, tileSize = _a.tileSize;
         var canvasSize = this.computeRequiredCanvasDimensions(tilesA.length);
@@ -2242,8 +2188,6 @@ var Renderer = (function () {
             tilesAPixelData: tilesA.pixelData,
             canvasCoords: canvasCoords,
         }); });
-        var webGLColorScale = convertColorScale(colorScale);
-        var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
             var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
@@ -2280,8 +2224,10 @@ var Renderer = (function () {
                     resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
                     tileIndex += 1;
                     _this.drawTileMultiAnalyze1({
-                        colorScale: webGLColorScale,
-                        sentinelValues: webGLSentinelValues,
+                        scaleLength: _this.scaleInput.length,
+                        sentinelLength: _this.sentinelInput.length,
+                        scaleColormap: _this.scaleColormap,
+                        sentinelColormap: _this.sentinelColormap,
                         canvasSize: canvasSize,
                         canvasCoordinates: canvasCoords,
                         textureA: textureManagerA.texture,
@@ -2304,7 +2250,7 @@ var Renderer = (function () {
         this.textureManagerA = new TextureManager(regl, tileSize, MAX_TEXTURE_DIMENSION, false);
         return resultEncodedPixels;
     };
-    Renderer.prototype.renderTilesWithMultiAnalyze2 = function (tilesA, tilesB, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, multiplierA, multiplierB, onFrameRendered) {
+    Renderer.prototype.renderTilesWithMultiAnalyze2 = function (tilesA, tilesB, filterLowA, filterHighA, filterLowB, filterHighB, multiplierA, multiplierB, onFrameRendered) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, tileSize = _a.tileSize;
         var canvasSize = this.computeRequiredCanvasDimensions(tilesA.length);
@@ -2317,8 +2263,6 @@ var Renderer = (function () {
             tilesBPixelData: tilesB.pixelData,
             canvasCoords: canvasCoords,
         }); });
-        var webGLColorScale = convertColorScale(colorScale);
-        var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
             var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
@@ -2364,8 +2308,10 @@ var Renderer = (function () {
                     resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
                     tileIndex += 1;
                     _this.drawTileMultiAnalyze2({
-                        colorScale: webGLColorScale,
-                        sentinelValues: webGLSentinelValues,
+                        scaleLength: _this.scaleInput.length,
+                        sentinelLength: _this.sentinelInput.length,
+                        scaleColormap: _this.scaleColormap,
+                        sentinelColormap: _this.sentinelColormap,
                         canvasSize: canvasSize,
                         canvasCoordinates: canvasCoords,
                         textureA: textureManagerA.texture,
@@ -2395,7 +2341,7 @@ var Renderer = (function () {
         this.textureManagerB = new TextureManager(regl, tileSize, MAX_TEXTURE_DIMENSION, false);
         return resultEncodedPixels;
     };
-    Renderer.prototype.renderTilesWithMultiAnalyze3 = function (tilesA, tilesB, tilesC, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, multiplierA, multiplierB, multiplierC, onFrameRendered) {
+    Renderer.prototype.renderTilesWithMultiAnalyze3 = function (tilesA, tilesB, tilesC, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, multiplierA, multiplierB, multiplierC, onFrameRendered) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, textureManagerC = _a.textureManagerC, tileSize = _a.tileSize;
         var canvasSize = this.computeRequiredCanvasDimensions(tilesA.length);
@@ -2409,8 +2355,6 @@ var Renderer = (function () {
             tilesCPixelData: tilesC.pixelData,
             canvasCoords: canvasCoords,
         }); });
-        var webGLColorScale = convertColorScale(colorScale);
-        var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
             var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
@@ -2465,8 +2409,10 @@ var Renderer = (function () {
                     resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
                     tileIndex += 1;
                     _this.drawTileMultiAnalyze3({
-                        colorScale: webGLColorScale,
-                        sentinelValues: webGLSentinelValues,
+                        scaleLength: _this.scaleInput.length,
+                        sentinelLength: _this.sentinelInput.length,
+                        scaleColormap: _this.scaleColormap,
+                        sentinelColormap: _this.sentinelColormap,
                         canvasSize: canvasSize,
                         canvasCoordinates: canvasCoords,
                         textureA: textureManagerA.texture,
@@ -2503,7 +2449,7 @@ var Renderer = (function () {
         this.textureManagerC = new TextureManager(regl, tileSize, MAX_TEXTURE_DIMENSION, false);
         return resultEncodedPixels;
     };
-    Renderer.prototype.renderTilesWithMultiAnalyze4 = function (tilesA, tilesB, tilesC, tilesD, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, multiplierA, multiplierB, multiplierC, multiplierD, onFrameRendered) {
+    Renderer.prototype.renderTilesWithMultiAnalyze4 = function (tilesA, tilesB, tilesC, tilesD, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, multiplierA, multiplierB, multiplierC, multiplierD, onFrameRendered) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, textureManagerC = _a.textureManagerC, textureManagerD = _a.textureManagerD, tileSize = _a.tileSize;
         var canvasSize = this.computeRequiredCanvasDimensions(tilesA.length);
@@ -2518,8 +2464,6 @@ var Renderer = (function () {
             tilesDPixelData: tilesD.pixelData,
             canvasCoords: canvasCoords,
         }); });
-        var webGLColorScale = convertColorScale(colorScale);
-        var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
             var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
@@ -2583,8 +2527,10 @@ var Renderer = (function () {
                     resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
                     tileIndex += 1;
                     _this.drawTileMultiAnalyze4({
-                        colorScale: webGLColorScale,
-                        sentinelValues: webGLSentinelValues,
+                        scaleLength: _this.scaleInput.length,
+                        sentinelLength: _this.sentinelInput.length,
+                        scaleColormap: _this.scaleColormap,
+                        sentinelColormap: _this.sentinelColormap,
                         canvasSize: canvasSize,
                         canvasCoordinates: canvasCoords,
                         textureA: textureManagerA.texture,
@@ -2628,7 +2574,7 @@ var Renderer = (function () {
         this.textureManagerD = new TextureManager(regl, tileSize, MAX_TEXTURE_DIMENSION, false);
         return resultEncodedPixels;
     };
-    Renderer.prototype.renderTilesWithMultiAnalyze5 = function (tilesA, tilesB, tilesC, tilesD, tilesE, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE, onFrameRendered) {
+    Renderer.prototype.renderTilesWithMultiAnalyze5 = function (tilesA, tilesB, tilesC, tilesD, tilesE, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE, onFrameRendered) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, textureManagerC = _a.textureManagerC, textureManagerD = _a.textureManagerD, textureManagerE = _a.textureManagerE, tileSize = _a.tileSize;
         var canvasSize = this.computeRequiredCanvasDimensions(tilesA.length);
@@ -2644,8 +2590,6 @@ var Renderer = (function () {
             tilesEPixelData: tilesE.pixelData,
             canvasCoords: canvasCoords,
         }); });
-        var webGLColorScale = convertColorScale(colorScale);
-        var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
             var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
@@ -2718,8 +2662,10 @@ var Renderer = (function () {
                     resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
                     tileIndex += 1;
                     _this.drawTileMultiAnalyze5({
-                        colorScale: webGLColorScale,
-                        sentinelValues: webGLSentinelValues,
+                        scaleLength: _this.scaleInput.length,
+                        sentinelLength: _this.sentinelInput.length,
+                        scaleColormap: _this.scaleColormap,
+                        sentinelColormap: _this.sentinelColormap,
                         canvasSize: canvasSize,
                         canvasCoordinates: canvasCoords,
                         textureA: textureManagerA.texture,
@@ -2770,7 +2716,7 @@ var Renderer = (function () {
         this.textureManagerE = new TextureManager(regl, tileSize, MAX_TEXTURE_DIMENSION, false);
         return resultEncodedPixels;
     };
-    Renderer.prototype.renderTilesWithMultiAnalyze6 = function (tilesA, tilesB, tilesC, tilesD, tilesE, tilesF, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, filterLowF, filterHighF, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE, multiplierF, onFrameRendered) {
+    Renderer.prototype.renderTilesWithMultiAnalyze6 = function (tilesA, tilesB, tilesC, tilesD, tilesE, tilesF, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, filterLowF, filterHighF, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE, multiplierF, onFrameRendered) {
         var _this = this;
         var _a = this, regl = _a.regl, textureManagerA = _a.textureManagerA, textureManagerB = _a.textureManagerB, textureManagerC = _a.textureManagerC, textureManagerD = _a.textureManagerD, textureManagerE = _a.textureManagerE, textureManagerF = _a.textureManagerF, tileSize = _a.tileSize;
         var canvasSize = this.computeRequiredCanvasDimensions(tilesA.length);
@@ -2787,8 +2733,6 @@ var Renderer = (function () {
             tilesFPixelData: tilesF.pixelData,
             canvasCoords: canvasCoords,
         }); });
-        var webGLColorScale = convertColorScale(colorScale);
-        var webGLSentinelValues = convertColorScale(sentinelValues);
         var resultEncodedPixels = [];
         var renderFrame = function () {
             var chunks = chunk(tilesWithCanvasCoordinates, textureManagerA.tileCapacity);
@@ -2870,8 +2814,10 @@ var Renderer = (function () {
                     resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
                     tileIndex += 1;
                     _this.drawTileMultiAnalyze6({
-                        colorScale: webGLColorScale,
-                        sentinelValues: webGLSentinelValues,
+                        scaleLength: _this.scaleInput.length,
+                        sentinelLength: _this.sentinelInput.length,
+                        scaleColormap: _this.scaleColormap,
+                        sentinelColormap: _this.sentinelColormap,
                         canvasSize: canvasSize,
                         canvasCoordinates: canvasCoords,
                         textureA: textureManagerA.texture,
@@ -2929,9 +2875,9 @@ var Renderer = (function () {
         this.textureManagerF = new TextureManager(regl, tileSize, MAX_TEXTURE_DIMENSION, false);
         return resultEncodedPixels;
     };
-    Renderer.prototype.renderTilesWithTransition = function (oldTiles, newTiles, colorScale, sentinelValues, transitionDurationMs, onFrameRendered) {
+    Renderer.prototype.renderTilesWithTransition = function (oldTiles, newTiles, transitionDurationMs, onFrameRendered) {
         return __awaiter(this, void 0, void 0, function () {
-            var _a, regl, textureManager, tileSize, maxTextureDimension, canvasSize, canvasWidth, canvasHeight, canvasCoordinates, tilesWithCanvasCoordinates, newTextureManager, webGLColorScale, webGLSentinelValues, transitionStart, renderFrame, animationHandle;
+            var _a, regl, textureManager, tileSize, maxTextureDimension, canvasSize, canvasWidth, canvasHeight, canvasCoordinates, tilesWithCanvasCoordinates, newTextureManager, transitionStart, renderFrame, animationHandle;
             var _this = this;
             return __generator(this, function (_b) {
                 switch (_b.label) {
@@ -2948,8 +2894,6 @@ var Renderer = (function () {
                             canvasCoords: canvasCoords,
                         }); });
                         newTextureManager = new TextureManager(regl, tileSize, maxTextureDimension, false);
-                        webGLColorScale = convertColorScale(colorScale);
-                        webGLSentinelValues = convertColorScale(sentinelValues);
                         transitionStart = regl.now();
                         renderFrame = function (interpolationFraction) {
                             var chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
@@ -2966,8 +2910,10 @@ var Renderer = (function () {
                                 _this.drawTileInterpolateValue(chunk_10.map(function (_a, index) {
                                     var canvasCoords = _a.canvasCoords;
                                     return ({
-                                        colorScale: webGLColorScale,
-                                        sentinelValues: webGLSentinelValues,
+                                        scaleLength: _this.scaleInput.length,
+                                        sentinelLength: _this.sentinelInput.length,
+                                        scaleColormap: _this.scaleColormap,
+                                        sentinelColormap: _this.sentinelColormap,
                                         canvasSize: canvasSize,
                                         canvasCoordinates: canvasCoords,
                                         textureA: textureManager.texture,
@@ -3002,9 +2948,9 @@ var Renderer = (function () {
             });
         });
     };
-    Renderer.prototype.renderTilesWithTransitionAndNewColorScale = function (oldTiles, newTiles, oldColorScale, newColorScale, oldSentinelValues, newSentinelValues, transitionDurationMs, onFrameRendered) {
+    Renderer.prototype.renderTilesWithTransitionAndNewColorScale = function (oldTiles, newTiles, transitionDurationMs, onFrameRendered) {
         return __awaiter(this, void 0, void 0, function () {
-            var _a, regl, textureManager, tileSize, maxTextureDimension, canvasSize, canvasWidth, canvasHeight, canvasCoordinates, tilesWithCanvasCoordinates, newTextureManager, colorScaleA, colorScaleB, sentinelValuesA, sentinelValuesB, transitionStart, renderFrame, animationHandle;
+            var _a, regl, textureManager, tileSize, maxTextureDimension, canvasSize, canvasWidth, canvasHeight, canvasCoordinates, tilesWithCanvasCoordinates, newTextureManager, transitionStart, renderFrame, animationHandle;
             var _this = this;
             return __generator(this, function (_b) {
                 switch (_b.label) {
@@ -3021,10 +2967,6 @@ var Renderer = (function () {
                             canvasCoords: canvasCoords,
                         }); });
                         newTextureManager = new TextureManager(regl, tileSize, maxTextureDimension, false);
-                        colorScaleA = convertColorScale(oldColorScale);
-                        colorScaleB = convertColorScale(newColorScale);
-                        sentinelValuesA = convertColorScale(oldSentinelValues);
-                        sentinelValuesB = convertColorScale(newSentinelValues);
                         transitionStart = regl.now();
                         renderFrame = function (interpolationFraction) {
                             var chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
@@ -3041,10 +2983,14 @@ var Renderer = (function () {
                                 _this.drawTileInterpolateColor(chunk_11.map(function (_a, index) {
                                     var canvasCoords = _a.canvasCoords;
                                     return ({
-                                        colorScaleA: colorScaleA,
-                                        colorScaleB: colorScaleB,
-                                        sentinelValuesA: sentinelValuesA,
-                                        sentinelValuesB: sentinelValuesB,
+                                        scaleLengthA: _this.scaleInputPrevious.length,
+                                        sentinelLengthA: _this.sentinelInputPrevious.length,
+                                        scaleColormapA: _this.scaleColormapPrevious,
+                                        sentinelColormapA: _this.sentinelColormapPrevious,
+                                        scaleLengthB: _this.scaleInput.length,
+                                        sentinelLengthB: _this.sentinelInput.length,
+                                        scaleColormapB: _this.scaleColormap,
+                                        sentinelColormapB: _this.sentinelColormap,
                                         canvasSize: canvasSize,
                                         canvasCoordinates: canvasCoords,
                                         textureA: textureManager.texture,
@@ -3079,9 +3025,9 @@ var Renderer = (function () {
             });
         });
     };
-    Renderer.prototype.renderTilesWithTransitionAndNewColorScaleOnly = function (tiles, oldColorScale, newColorScale, oldSentinelValues, newSentinelValues, transitionDurationMs, onFrameRendered) {
+    Renderer.prototype.renderTilesWithTransitionAndNewColorScaleOnly = function (tiles, transitionDurationMs, onFrameRendered) {
         return __awaiter(this, void 0, void 0, function () {
-            var _a, regl, textureManager, tileSize, maxTextureDimension, canvasSize, canvasWidth, canvasHeight, canvasCoordinates, tilesWithCanvasCoordinates, newTextureManager, colorScaleA, colorScaleB, sentinelValuesA, sentinelValuesB, transitionStart, renderFrame, animationHandle;
+            var _a, regl, textureManager, tileSize, maxTextureDimension, canvasSize, canvasWidth, canvasHeight, canvasCoordinates, tilesWithCanvasCoordinates, newTextureManager, transitionStart, renderFrame, animationHandle;
             var _this = this;
             return __generator(this, function (_b) {
                 switch (_b.label) {
@@ -3093,10 +3039,6 @@ var Renderer = (function () {
                         canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tiles.length);
                         tilesWithCanvasCoordinates = zipWith(tiles, canvasCoordinates, function (tile, canvasCoords) { return (__assign(__assign({}, tile), { canvasCoords: canvasCoords })); });
                         newTextureManager = new TextureManager(regl, tileSize, maxTextureDimension, false);
-                        colorScaleA = convertColorScale(oldColorScale);
-                        colorScaleB = convertColorScale(newColorScale);
-                        sentinelValuesA = convertColorScale(oldSentinelValues);
-                        sentinelValuesB = convertColorScale(newSentinelValues);
                         transitionStart = regl.now();
                         renderFrame = function (interpolationFraction) {
                             var chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
@@ -3109,10 +3051,14 @@ var Renderer = (function () {
                                 _this.drawTileInterpolateColorOnly(chunk_12.map(function (_a, index) {
                                     var canvasCoords = _a.canvasCoords;
                                     return ({
-                                        colorScaleA: colorScaleA,
-                                        colorScaleB: colorScaleB,
-                                        sentinelValuesA: sentinelValuesA,
-                                        sentinelValuesB: sentinelValuesB,
+                                        scaleLengthA: _this.scaleInputPrevious.length,
+                                        sentinelLengthA: _this.sentinelInputPrevious.length,
+                                        scaleColormapA: _this.scaleColormapPrevious,
+                                        sentinelColormapA: _this.sentinelColormapPrevious,
+                                        scaleLengthB: _this.scaleInput.length,
+                                        sentinelLengthB: _this.sentinelInput.length,
+                                        scaleColormapB: _this.scaleColormap,
+                                        sentinelColormapB: _this.sentinelColormap,
                                         canvasSize: canvasSize,
                                         canvasCoordinates: canvasCoords,
                                         texture: textureManager.texture,
@@ -3260,7 +3206,7 @@ var GLOperations = (function (_super) {
         _this._checkColorScaleAndSentinels();
         var _a = _this.options, nodataValue = _a.nodataValue, preloadUrl = _a.preloadUrl;
         var tileSize = _this._tileSizeAsNumber();
-        var renderer = new Renderer(tileSize, nodataValue, _this.options.colorscaleMaxLength, _this.options.sentinelMaxLength);
+        var renderer = new Renderer(tileSize, nodataValue, _this.options.colorScale, _this.options.sentinelValues, _this.options.colorscaleMaxLength, _this.options.sentinelMaxLength);
         Object.assign(_this, {
             _renderer: renderer,
             _preloadTileCache: undefined,
@@ -3301,7 +3247,7 @@ var GLOperations = (function (_super) {
             if (this.options.debug)
                 console.log("Creating new renderer");
             var tileSize = this._tileSizeAsNumber();
-            var renderer = new Renderer(tileSize, this.options.nodataValue, this.options.colorscaleMaxLength, this.options.sentinelMaxLength);
+            var renderer = new Renderer(tileSize, this.options.nodataValue, this.options.colorScale, this.options.sentinelValues, this.options.colorscaleMaxLength, this.options.sentinelMaxLength);
             this._renderer.regl.destroy();
             delete this._renderer;
             Object.assign(this, {
@@ -3309,6 +3255,12 @@ var GLOperations = (function (_super) {
             });
         }
         this._checkColorScaleAndSentinels();
+        if (this.options.colorScale !== prevColorScale) {
+            this._renderer.updateColorscale(this.options.colorScale);
+        }
+        if (this.options.sentinelValues !== prevSentinelValues) {
+            this._renderer.updateSentinels(this.options.sentinelValues);
+        }
         this._maybePreload(this.options.preloadUrl);
         this.options._hillshadeOptions = {
             hillshadeType: this.options.hillshadeType,
@@ -3495,7 +3447,7 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype.createTile = function (coords, done) {
         var _this = this;
-        var _a = this.options, colorScale = _a.colorScale, sentinelValues = _a.sentinelValues, extraPixelLayers = _a.extraPixelLayers, tileSize = _a.tileSize, url = _a.url, hsPregenUrl = _a.hsPregenUrl, operationUrlA = _a.operationUrlA, operationUrlB = _a.operationUrlB, operationUrlC = _a.operationUrlC, operationUrlD = _a.operationUrlD, operationUrlE = _a.operationUrlE, operationUrlF = _a.operationUrlF, filterLowA = _a.filterLowA, filterHighA = _a.filterHighA, filterLowB = _a.filterLowB, filterHighB = _a.filterHighB, filterLowC = _a.filterLowC, filterHighC = _a.filterHighC, filterLowD = _a.filterLowD, filterHighD = _a.filterHighD, filterLowE = _a.filterLowE, filterHighE = _a.filterHighE, filterLowF = _a.filterLowF, filterHighF = _a.filterHighF, multiplierA = _a.multiplierA, multiplierB = _a.multiplierB, multiplierC = _a.multiplierC, multiplierD = _a.multiplierD, multiplierE = _a.multiplierE, multiplierF = _a.multiplierF;
+        var _a = this.options, extraPixelLayers = _a.extraPixelLayers, tileSize = _a.tileSize, url = _a.url, hsPregenUrl = _a.hsPregenUrl, operationUrlA = _a.operationUrlA, operationUrlB = _a.operationUrlB, operationUrlC = _a.operationUrlC, operationUrlD = _a.operationUrlD, operationUrlE = _a.operationUrlE, operationUrlF = _a.operationUrlF, filterLowA = _a.filterLowA, filterHighA = _a.filterHighA, filterLowB = _a.filterLowB, filterHighB = _a.filterHighB, filterLowC = _a.filterLowC, filterHighC = _a.filterHighC, filterLowD = _a.filterLowD, filterHighD = _a.filterHighD, filterLowE = _a.filterLowE, filterHighE = _a.filterHighE, filterLowF = _a.filterLowF, filterHighF = _a.filterHighF, multiplierA = _a.multiplierA, multiplierB = _a.multiplierB, multiplierC = _a.multiplierC, multiplierD = _a.multiplierD, multiplierE = _a.multiplierE, multiplierF = _a.multiplierF;
         if (this.options.debug)
             console.log("createTile");
         var tileCanvas = DomUtil.create('canvas');
@@ -3521,7 +3473,7 @@ var GLOperations = (function (_super) {
                         console.log("_fetchTileData with pregen hs");
                     var pixelData = pixelDataArray[0];
                     var pixelDataHs = pixelDataArray[1];
-                    var _a = _this._renderer.renderTileHsPregen({ coords: coords, pixelData: pixelData }, { coords: coords, pixelData: pixelDataHs }, colorScale, sentinelValues, _this.options._hillshadeOptions), sourceX = _a[0], sourceY = _a[1];
+                    var _a = _this._renderer.renderTileHsPregen({ coords: coords, pixelData: pixelData }, { coords: coords, pixelData: pixelDataHs }, _this.options._hillshadeOptions), sourceX = _a[0], sourceY = _a[1];
                     tileCanvas.pixelData = pixelData;
                     tileCanvas.pixelDataHsPregen = pixelDataHs;
                     _this._copyToTileCanvas(tileCanvas, sourceX, sourceY);
@@ -3532,7 +3484,7 @@ var GLOperations = (function (_super) {
                 this._fetchTileData(coords, url).then(function (pixelData) {
                     if (_this.options.debug)
                         console.log("_fetchTileData with no operation");
-                    var _a = _this._renderer.renderTile({ coords: coords, pixelData: pixelData }, colorScale, sentinelValues, _this.options._hillshadeOptions, _this._getZoomForUrl()), sourceX = _a[0], sourceY = _a[1];
+                    var _a = _this._renderer.renderTile({ coords: coords, pixelData: pixelData }, _this.options._hillshadeOptions, _this._getZoomForUrl()), sourceX = _a[0], sourceY = _a[1];
                     tileCanvas.pixelData = pixelData;
                     _this._copyToTileCanvas(tileCanvas, sourceX, sourceY);
                     done(undefined, tileCanvas);
@@ -3548,7 +3500,7 @@ var GLOperations = (function (_super) {
                     console.log("_fetchTileData with diff");
                 var pixelDataA = pixelDataArray[0];
                 var pixelDataB = pixelDataArray[1];
-                var _a = _this._renderer.renderTileDiff({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }, colorScale, sentinelValues), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
+                var _a = _this._renderer.renderTileDiff({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
                 tileCanvas.pixelData = resultEncodedPixels;
                 tileCanvas.pixelDataA = pixelDataA;
                 tileCanvas.pixelDataB = pixelDataB;
@@ -3563,7 +3515,7 @@ var GLOperations = (function (_super) {
                 if (_this.options.debug)
                     console.log("_fetchTileData with multi");
                 var pixelDataA = pixelDataArray[0];
-                var _a = _this._renderer.renderTileMulti1({ coords: coords, pixelData: pixelDataA }, colorScale, sentinelValues, filterLowA, filterHighA, multiplierA), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
+                var _a = _this._renderer.renderTileMulti1({ coords: coords, pixelData: pixelDataA }, filterLowA, filterHighA, multiplierA), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
                 tileCanvas.pixelData = resultEncodedPixels;
                 tileCanvas.pixelDataA = pixelDataA;
                 _this._copyToTileCanvas(tileCanvas, sourceX, sourceY);
@@ -3579,7 +3531,7 @@ var GLOperations = (function (_super) {
                     console.log("_fetchTileData with multi");
                 var pixelDataA = pixelDataArray[0];
                 var pixelDataB = pixelDataArray[1];
-                var _a = _this._renderer.renderTileMulti2({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, multiplierA, multiplierB), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
+                var _a = _this._renderer.renderTileMulti2({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }, filterLowA, filterHighA, filterLowB, filterHighB, multiplierA, multiplierB), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
                 tileCanvas.pixelData = resultEncodedPixels;
                 tileCanvas.pixelDataA = pixelDataA;
                 tileCanvas.pixelDataB = pixelDataB;
@@ -3598,7 +3550,7 @@ var GLOperations = (function (_super) {
                 var pixelDataA = pixelDataArray[0];
                 var pixelDataB = pixelDataArray[1];
                 var pixelDataC = pixelDataArray[2];
-                var _a = _this._renderer.renderTileMulti3({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }, { coords: coords, pixelData: pixelDataC }, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, multiplierA, multiplierB, multiplierC), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
+                var _a = _this._renderer.renderTileMulti3({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }, { coords: coords, pixelData: pixelDataC }, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, multiplierA, multiplierB, multiplierC), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
                 tileCanvas.pixelData = resultEncodedPixels;
                 tileCanvas.pixelDataA = pixelDataA;
                 tileCanvas.pixelDataB = pixelDataB;
@@ -3620,7 +3572,7 @@ var GLOperations = (function (_super) {
                 var pixelDataB = pixelDataArray[1];
                 var pixelDataC = pixelDataArray[2];
                 var pixelDataD = pixelDataArray[3];
-                var _a = _this._renderer.renderTileMulti4({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }, { coords: coords, pixelData: pixelDataC }, { coords: coords, pixelData: pixelDataD }, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, multiplierA, multiplierB, multiplierC, multiplierD), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
+                var _a = _this._renderer.renderTileMulti4({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }, { coords: coords, pixelData: pixelDataC }, { coords: coords, pixelData: pixelDataD }, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, multiplierA, multiplierB, multiplierC, multiplierD), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
                 tileCanvas.pixelData = resultEncodedPixels;
                 tileCanvas.pixelDataA = pixelDataA;
                 tileCanvas.pixelDataB = pixelDataB;
@@ -3645,7 +3597,7 @@ var GLOperations = (function (_super) {
                 var pixelDataC = pixelDataArray[2];
                 var pixelDataD = pixelDataArray[3];
                 var pixelDataE = pixelDataArray[4];
-                var _a = _this._renderer.renderTileMulti5({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }, { coords: coords, pixelData: pixelDataC }, { coords: coords, pixelData: pixelDataD }, { coords: coords, pixelData: pixelDataE }, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
+                var _a = _this._renderer.renderTileMulti5({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }, { coords: coords, pixelData: pixelDataC }, { coords: coords, pixelData: pixelDataD }, { coords: coords, pixelData: pixelDataE }, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
                 tileCanvas.pixelData = resultEncodedPixels;
                 tileCanvas.pixelDataA = pixelDataA;
                 tileCanvas.pixelDataB = pixelDataB;
@@ -3673,7 +3625,7 @@ var GLOperations = (function (_super) {
                 var pixelDataD = pixelDataArray[3];
                 var pixelDataE = pixelDataArray[4];
                 var pixelDataF = pixelDataArray[5];
-                var _a = _this._renderer.renderTileMulti6({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }, { coords: coords, pixelData: pixelDataC }, { coords: coords, pixelData: pixelDataD }, { coords: coords, pixelData: pixelDataE }, { coords: coords, pixelData: pixelDataF }, colorScale, sentinelValues, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, filterLowF, filterHighF, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE, multiplierF), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
+                var _a = _this._renderer.renderTileMulti6({ coords: coords, pixelData: pixelDataA }, { coords: coords, pixelData: pixelDataB }, { coords: coords, pixelData: pixelDataC }, { coords: coords, pixelData: pixelDataD }, { coords: coords, pixelData: pixelDataE }, { coords: coords, pixelData: pixelDataF }, filterLowA, filterHighA, filterLowB, filterHighB, filterLowC, filterHighC, filterLowD, filterHighD, filterLowE, filterHighE, filterLowF, filterHighF, multiplierA, multiplierB, multiplierC, multiplierD, multiplierE, multiplierF), sourceX = _a[0], sourceY = _a[1], resultEncodedPixels = _a[2];
                 tileCanvas.pixelData = resultEncodedPixels;
                 tileCanvas.pixelDataA = pixelDataA;
                 tileCanvas.pixelDataB = pixelDataB;
@@ -3720,27 +3672,26 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype._updateTiles = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var activeTiles, tilesData, _a, colorScale, _b, sentinelValues, canvasCoordinates, tilesDataHs;
+            var activeTiles, tilesData, canvasCoordinates, tilesDataHs;
             var _this = this;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
                     case 0:
                         activeTiles = this._getActiveTiles();
                         return [4, this._getTilesData(activeTiles)];
                     case 1:
-                        tilesData = _c.sent();
+                        tilesData = _a.sent();
                         if (this.options.debug)
                             console.log("_updateTiles() with url " + this.options.url);
-                        _a = this.options, colorScale = _a.colorScale, _b = _a.sentinelValues, sentinelValues = _b === void 0 ? [] : _b;
                         if (!(this.options._hillshadeOptions.hillshadeType === 'pregen')) return [3, 3];
                         return [4, this._getTilesData(activeTiles, this.options.hsPregenUrl)];
                     case 2:
-                        tilesDataHs = _c.sent();
-                        canvasCoordinates = this._renderer.renderTilesHsPregen(tilesData, tilesDataHs, colorScale, sentinelValues, this.options._hillshadeOptions);
+                        tilesDataHs = _a.sent();
+                        canvasCoordinates = this._renderer.renderTilesHsPregen(tilesData, tilesDataHs, this.options._hillshadeOptions);
                         return [3, 4];
                     case 3:
-                        canvasCoordinates = this._renderer.renderTiles(tilesData, colorScale, sentinelValues, this.options._hillshadeOptions, this._getZoomForUrl());
-                        _c.label = 4;
+                        canvasCoordinates = this._renderer.renderTiles(tilesData, this.options._hillshadeOptions, this._getZoomForUrl());
+                        _a.label = 4;
                     case 4:
                         canvasCoordinates.forEach(function (_a, index) {
                             var sourceX = _a[0], sourceY = _a[1];
@@ -3758,13 +3709,12 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype._updateTilesColorscaleOnly = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var activeTiles, _a, colorScale, _b, sentinelValues, tilesData, tilesDataHs, canvasCoordinates, tilesData, canvasCoordinates;
+            var activeTiles, tilesData, tilesDataHs, canvasCoordinates, tilesData, canvasCoordinates;
             var _this = this;
-            return __generator(this, function (_c) {
+            return __generator(this, function (_a) {
                 if (this.options.debug)
                     console.log("_updateTilesColorscaleOnly()");
                 activeTiles = this._getActiveTiles();
-                _a = this.options, colorScale = _a.colorScale, _b = _a.sentinelValues, sentinelValues = _b === void 0 ? [] : _b;
                 if (this.options._hillshadeOptions.hillshadeType === 'pregen') {
                     tilesData = activeTiles.map(function (_a) {
                         var coords = _a.coords, el = _a.el;
@@ -3780,7 +3730,7 @@ var GLOperations = (function (_super) {
                             pixelData: el.pixelDataHsPregen,
                         });
                     });
-                    canvasCoordinates = this._renderer.renderTilesHsPregen(tilesData, tilesDataHs, colorScale, sentinelValues, this.options._hillshadeOptions);
+                    canvasCoordinates = this._renderer.renderTilesHsPregen(tilesData, tilesDataHs, this.options._hillshadeOptions);
                     canvasCoordinates.forEach(function (_a, index) {
                         var sourceX = _a[0], sourceY = _a[1];
                         var tile = activeTiles[index];
@@ -3795,7 +3745,7 @@ var GLOperations = (function (_super) {
                             pixelData: el.pixelData,
                         });
                     });
-                    canvasCoordinates = this._renderer.renderTiles(tilesData, colorScale, sentinelValues, this.options._hillshadeOptions, this._getZoomForUrl());
+                    canvasCoordinates = this._renderer.renderTiles(tilesData, this.options._hillshadeOptions, this._getZoomForUrl());
                     canvasCoordinates.forEach(function (_a, index) {
                         var sourceX = _a[0], sourceY = _a[1];
                         var tile = activeTiles[index];
@@ -3838,10 +3788,10 @@ var GLOperations = (function (_super) {
                             });
                         };
                         if (JSON.stringify(newColorScale) === JSON.stringify(prevColorScale) && JSON.stringify(newSentinelValues) === JSON.stringify(prevSentinelValues)) {
-                            this._renderer.renderTilesWithTransition(prevTilesData, newTilesData, newColorScale, newSentinelValues, transitionTimeMs, onFrameRendered);
+                            this._renderer.renderTilesWithTransition(prevTilesData, newTilesData, transitionTimeMs, onFrameRendered);
                         }
                         else {
-                            this._renderer.renderTilesWithTransitionAndNewColorScale(prevTilesData, newTilesData, prevColorScale, newColorScale, prevSentinelValues, newSentinelValues, transitionTimeMs, onFrameRendered);
+                            this._renderer.renderTilesWithTransitionAndNewColorScale(prevTilesData, newTilesData, transitionTimeMs, onFrameRendered);
                         }
                         return [2];
                 }
@@ -3872,7 +3822,7 @@ var GLOperations = (function (_super) {
                     });
                 };
                 if (JSON.stringify(newColorScale) !== JSON.stringify(prevColorScale) || JSON.stringify(newSentinelValues) !== JSON.stringify(prevSentinelValues)) {
-                    this._renderer.renderTilesWithTransitionAndNewColorScaleOnly(tilesData, prevColorScale, newColorScale, prevSentinelValues, newSentinelValues, transitionTimeMs, onFrameRendered);
+                    this._renderer.renderTilesWithTransitionAndNewColorScaleOnly(tilesData, transitionTimeMs, onFrameRendered);
                 }
                 return [2];
             });
@@ -3880,10 +3830,10 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype._updateTilesWithDiff = function (prevGlOperation, prevUrlA, prevUrlB) {
         return __awaiter(this, void 0, void 0, function () {
-            var activeTiles, tilesA, tilesB, _a, newColorScale, _b, newSentinelValues, canvasCoordinates, onFrameRendered, resultEncodedPixels_1;
+            var activeTiles, tilesA, tilesB, canvasCoordinates, onFrameRendered, resultEncodedPixels_1;
             var _this = this;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
                     case 0:
                         if (this.options.debug)
                             console.log("_updateTilesWithDiff()");
@@ -3909,7 +3859,7 @@ var GLOperations = (function (_super) {
                             console.log("_updateTilesWithDiff: new A url. Downloading new tiles");
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlA)];
                     case 2:
-                        tilesA = _c.sent();
+                        tilesA = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataA = tilesA[index].pixelData;
                         });
@@ -3924,14 +3874,14 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataA,
                             });
                         });
-                        _c.label = 4;
+                        _a.label = 4;
                     case 4:
                         if (!(this.options.operationUrlB !== prevUrlB)) return [3, 6];
                         if (this.options.debug)
                             console.log("_updateTilesWithDiff: new B url. Downloading new tiles");
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlB)];
                     case 5:
-                        tilesB = _c.sent();
+                        tilesB = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataB = tilesB[index].pixelData;
                         });
@@ -3946,15 +3896,14 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataB,
                             });
                         });
-                        _c.label = 7;
+                        _a.label = 7;
                     case 7:
-                        _a = this.options, newColorScale = _a.colorScale, _b = _a.sentinelValues, newSentinelValues = _b === void 0 ? [] : _b;
                         if (this.options.glOperation === prevGlOperation &&
                             this.options.operationUrlA === prevUrlA &&
                             this.options.operationUrlB === prevUrlB) {
                             if (this.options.debug)
                                 console.log("_updateTilesWithDiff: both same urls. Running renderTiles()");
-                            canvasCoordinates = this._renderer.renderTiles(tilesA, newColorScale, newSentinelValues, this.options._hillshadeOptions);
+                            canvasCoordinates = this._renderer.renderTiles(tilesA, this.options._hillshadeOptions);
                             canvasCoordinates.forEach(function (_a, index) {
                                 var sourceX = _a[0], sourceY = _a[1];
                                 var tile = activeTiles[index];
@@ -3971,7 +3920,7 @@ var GLOperations = (function (_super) {
                                     _this._copyToTileCanvas(tile.el, sourceX, sourceY);
                                 });
                             };
-                            resultEncodedPixels_1 = this._renderer.renderTilesWithDiff(tilesA, tilesB, newColorScale, newSentinelValues, onFrameRendered);
+                            resultEncodedPixels_1 = this._renderer.renderTilesWithDiff(tilesA, tilesB, onFrameRendered);
                             activeTiles.forEach(function (tile, index) {
                                 tile.el.pixelData = resultEncodedPixels_1[index];
                             });
@@ -3983,15 +3932,14 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype._updateTilesWithMultiAnalyze1 = function (prevGlOperation, prevMultiLayers, prevUrlA, prevFilterLowA, prevFilterHighA, prevMultiplierA) {
         return __awaiter(this, void 0, void 0, function () {
-            var activeTiles, _a, newColorScale, _b, newSentinelValues, tilesA, canvasCoordinates, tilesA_1, onFrameRendered, resultEncodedPixels_2;
+            var activeTiles, tilesA, canvasCoordinates, tilesA_1, onFrameRendered, resultEncodedPixels_2;
             var _this = this;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
                     case 0:
                         if (this.options.debug)
                             console.log("_updateTilesWithMultiAnalyze1()");
                         activeTiles = this._getActiveTiles();
-                        _a = this.options, newColorScale = _a.colorScale, _b = _a.sentinelValues, newSentinelValues = _b === void 0 ? [] : _b;
                         if (!(this.options.glOperation === prevGlOperation &&
                             this.options.operationUrlA === prevUrlA &&
                             this.options.filterLowA === prevFilterLowA &&
@@ -4007,7 +3955,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelData,
                             });
                         });
-                        canvasCoordinates = this._renderer.renderTiles(tilesA, newColorScale, newSentinelValues, this.options._hillshadeOptions);
+                        canvasCoordinates = this._renderer.renderTiles(tilesA, this.options._hillshadeOptions);
                         canvasCoordinates.forEach(function (_a, index) {
                             var sourceX = _a[0], sourceY = _a[1];
                             var tile = activeTiles[index];
@@ -4019,7 +3967,7 @@ var GLOperations = (function (_super) {
                         if (!(this.options.operationUrlA !== prevUrlA)) return [3, 3];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlA)];
                     case 2:
-                        tilesA_1 = _c.sent();
+                        tilesA_1 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataA = tilesA_1[index].pixelData;
                         });
@@ -4032,7 +3980,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataA,
                             });
                         });
-                        _c.label = 4;
+                        _a.label = 4;
                     case 4:
                         onFrameRendered = function (canvasCoordinates) {
                             canvasCoordinates.forEach(function (_a, index) {
@@ -4041,11 +3989,11 @@ var GLOperations = (function (_super) {
                                 _this._copyToTileCanvas(tile.el, sourceX, sourceY);
                             });
                         };
-                        resultEncodedPixels_2 = this._renderer.renderTilesWithMultiAnalyze1(tilesA_1, newColorScale, newSentinelValues, this.options.filterLowA, this.options.filterHighA, this.options.multiplierA, onFrameRendered);
+                        resultEncodedPixels_2 = this._renderer.renderTilesWithMultiAnalyze1(tilesA_1, this.options.filterLowA, this.options.filterHighA, this.options.multiplierA, onFrameRendered);
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelData = resultEncodedPixels_2[index];
                         });
-                        _c.label = 5;
+                        _a.label = 5;
                     case 5: return [2];
                 }
             });
@@ -4053,15 +4001,14 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype._updateTilesWithMultiAnalyze2 = function (prevGlOperation, prevMultiLayers, prevUrlA, prevUrlB, prevFilterLowA, prevFilterHighA, prevFilterLowB, prevFilterHighB, prevMultiplierA, prevMultiplierB) {
         return __awaiter(this, void 0, void 0, function () {
-            var activeTiles, _a, newColorScale, _b, newSentinelValues, tilesA, canvasCoordinates, tilesA_2, tilesB_1, onFrameRendered, resultEncodedPixels_3;
+            var activeTiles, tilesA, canvasCoordinates, tilesA_2, tilesB_1, onFrameRendered, resultEncodedPixels_3;
             var _this = this;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
                     case 0:
                         if (this.options.debug)
                             console.log("_updateTilesWithMultiAnalyze2()");
                         activeTiles = this._getActiveTiles();
-                        _a = this.options, newColorScale = _a.colorScale, _b = _a.sentinelValues, newSentinelValues = _b === void 0 ? [] : _b;
                         if (!(this.options.glOperation === prevGlOperation &&
                             this.options.operationUrlA === prevUrlA &&
                             this.options.operationUrlB === prevUrlB &&
@@ -4081,7 +4028,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelData,
                             });
                         });
-                        canvasCoordinates = this._renderer.renderTiles(tilesA, newColorScale, newSentinelValues, this.options._hillshadeOptions);
+                        canvasCoordinates = this._renderer.renderTiles(tilesA, this.options._hillshadeOptions);
                         canvasCoordinates.forEach(function (_a, index) {
                             var sourceX = _a[0], sourceY = _a[1];
                             var tile = activeTiles[index];
@@ -4094,7 +4041,7 @@ var GLOperations = (function (_super) {
                         if (!(this.options.operationUrlA !== prevUrlA)) return [3, 3];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlA)];
                     case 2:
-                        tilesA_2 = _c.sent();
+                        tilesA_2 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataA = tilesA_2[index].pixelData;
                         });
@@ -4107,12 +4054,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataA,
                             });
                         });
-                        _c.label = 4;
+                        _a.label = 4;
                     case 4:
                         if (!(this.options.operationUrlB !== prevUrlB)) return [3, 6];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlB)];
                     case 5:
-                        tilesB_1 = _c.sent();
+                        tilesB_1 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataB = tilesB_1[index].pixelData;
                         });
@@ -4125,7 +4072,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataB,
                             });
                         });
-                        _c.label = 7;
+                        _a.label = 7;
                     case 7:
                         onFrameRendered = function (canvasCoordinates) {
                             canvasCoordinates.forEach(function (_a, index) {
@@ -4134,11 +4081,11 @@ var GLOperations = (function (_super) {
                                 _this._copyToTileCanvas(tile.el, sourceX, sourceY);
                             });
                         };
-                        resultEncodedPixels_3 = this._renderer.renderTilesWithMultiAnalyze2(tilesA_2, tilesB_1, newColorScale, newSentinelValues, this.options.filterLowA, this.options.filterHighA, this.options.filterLowB, this.options.filterHighB, this.options.multiplierA, this.options.multiplierB, onFrameRendered);
+                        resultEncodedPixels_3 = this._renderer.renderTilesWithMultiAnalyze2(tilesA_2, tilesB_1, this.options.filterLowA, this.options.filterHighA, this.options.filterLowB, this.options.filterHighB, this.options.multiplierA, this.options.multiplierB, onFrameRendered);
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelData = resultEncodedPixels_3[index];
                         });
-                        _c.label = 8;
+                        _a.label = 8;
                     case 8: return [2];
                 }
             });
@@ -4146,15 +4093,14 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype._updateTilesWithMultiAnalyze3 = function (prevGlOperation, prevMultiLayers, prevUrlA, prevUrlB, prevUrlC, prevFilterLowA, prevFilterHighA, prevFilterLowB, prevFilterHighB, prevFilterLowC, prevFilterHighC, prevMultiplierA, prevMultiplierB, prevMultiplierC) {
         return __awaiter(this, void 0, void 0, function () {
-            var activeTiles, _a, newColorScale, _b, newSentinelValues, tilesA, canvasCoordinates, tilesA_3, tilesB_2, tilesC_1, onFrameRendered, resultEncodedPixels_4;
+            var activeTiles, tilesA, canvasCoordinates, tilesA_3, tilesB_2, tilesC_1, onFrameRendered, resultEncodedPixels_4;
             var _this = this;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
                     case 0:
                         if (this.options.debug)
                             console.log("_updateTilesWithMultiAnalyze3()");
                         activeTiles = this._getActiveTiles();
-                        _a = this.options, newColorScale = _a.colorScale, _b = _a.sentinelValues, newSentinelValues = _b === void 0 ? [] : _b;
                         if (!(this.options.glOperation === prevGlOperation &&
                             this.options.operationUrlA === prevUrlA &&
                             this.options.operationUrlB === prevUrlB &&
@@ -4178,7 +4124,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelData,
                             });
                         });
-                        canvasCoordinates = this._renderer.renderTiles(tilesA, newColorScale, newSentinelValues, this.options._hillshadeOptions);
+                        canvasCoordinates = this._renderer.renderTiles(tilesA, this.options._hillshadeOptions);
                         canvasCoordinates.forEach(function (_a, index) {
                             var sourceX = _a[0], sourceY = _a[1];
                             var tile = activeTiles[index];
@@ -4192,7 +4138,7 @@ var GLOperations = (function (_super) {
                         if (!(this.options.operationUrlA !== prevUrlA)) return [3, 3];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlA)];
                     case 2:
-                        tilesA_3 = _c.sent();
+                        tilesA_3 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataA = tilesA_3[index].pixelData;
                         });
@@ -4205,12 +4151,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataA,
                             });
                         });
-                        _c.label = 4;
+                        _a.label = 4;
                     case 4:
                         if (!(this.options.operationUrlB !== prevUrlB)) return [3, 6];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlB)];
                     case 5:
-                        tilesB_2 = _c.sent();
+                        tilesB_2 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataB = tilesB_2[index].pixelData;
                         });
@@ -4223,12 +4169,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataB,
                             });
                         });
-                        _c.label = 7;
+                        _a.label = 7;
                     case 7:
                         if (!(this.options.operationUrlC !== prevUrlC)) return [3, 9];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlC)];
                     case 8:
-                        tilesC_1 = _c.sent();
+                        tilesC_1 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataC = tilesC_1[index].pixelData;
                         });
@@ -4241,7 +4187,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataC,
                             });
                         });
-                        _c.label = 10;
+                        _a.label = 10;
                     case 10:
                         onFrameRendered = function (canvasCoordinates) {
                             canvasCoordinates.forEach(function (_a, index) {
@@ -4250,11 +4196,11 @@ var GLOperations = (function (_super) {
                                 _this._copyToTileCanvas(tile.el, sourceX, sourceY);
                             });
                         };
-                        resultEncodedPixels_4 = this._renderer.renderTilesWithMultiAnalyze3(tilesA_3, tilesB_2, tilesC_1, newColorScale, newSentinelValues, this.options.filterLowA, this.options.filterHighA, this.options.filterLowB, this.options.filterHighB, this.options.filterLowC, this.options.filterHighC, this.options.multiplierA, this.options.multiplierB, this.options.multiplierC, onFrameRendered);
+                        resultEncodedPixels_4 = this._renderer.renderTilesWithMultiAnalyze3(tilesA_3, tilesB_2, tilesC_1, this.options.filterLowA, this.options.filterHighA, this.options.filterLowB, this.options.filterHighB, this.options.filterLowC, this.options.filterHighC, this.options.multiplierA, this.options.multiplierB, this.options.multiplierC, onFrameRendered);
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelData = resultEncodedPixels_4[index];
                         });
-                        _c.label = 11;
+                        _a.label = 11;
                     case 11: return [2];
                 }
             });
@@ -4262,15 +4208,14 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype._updateTilesWithMultiAnalyze4 = function (prevGlOperation, prevMultiLayers, prevUrlA, prevUrlB, prevUrlC, prevUrlD, prevFilterLowA, prevFilterHighA, prevFilterLowB, prevFilterHighB, prevFilterLowC, prevFilterHighC, prevFilterLowD, prevFilterHighD, prevMultiplierA, prevMultiplierB, prevMultiplierC, prevMultiplierD) {
         return __awaiter(this, void 0, void 0, function () {
-            var activeTiles, _a, newColorScale, _b, newSentinelValues, tilesA, canvasCoordinates, tilesA_4, tilesB_3, tilesC_2, tilesD_1, onFrameRendered, resultEncodedPixels_5;
+            var activeTiles, tilesA, canvasCoordinates, tilesA_4, tilesB_3, tilesC_2, tilesD_1, onFrameRendered, resultEncodedPixels_5;
             var _this = this;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
                     case 0:
                         if (this.options.debug)
                             console.log("_updateTilesWithMultiAnalyze4()");
                         activeTiles = this._getActiveTiles();
-                        _a = this.options, newColorScale = _a.colorScale, _b = _a.sentinelValues, newSentinelValues = _b === void 0 ? [] : _b;
                         if (!(this.options.glOperation === prevGlOperation &&
                             this.options.operationUrlA === prevUrlA &&
                             this.options.operationUrlB === prevUrlB &&
@@ -4298,7 +4243,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelData,
                             });
                         });
-                        canvasCoordinates = this._renderer.renderTiles(tilesA, newColorScale, newSentinelValues, this.options._hillshadeOptions);
+                        canvasCoordinates = this._renderer.renderTiles(tilesA, this.options._hillshadeOptions);
                         canvasCoordinates.forEach(function (_a, index) {
                             var sourceX = _a[0], sourceY = _a[1];
                             var tile = activeTiles[index];
@@ -4313,7 +4258,7 @@ var GLOperations = (function (_super) {
                         if (!(this.options.operationUrlA !== prevUrlA)) return [3, 3];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlA)];
                     case 2:
-                        tilesA_4 = _c.sent();
+                        tilesA_4 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataA = tilesA_4[index].pixelData;
                         });
@@ -4326,12 +4271,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataA,
                             });
                         });
-                        _c.label = 4;
+                        _a.label = 4;
                     case 4:
                         if (!(this.options.operationUrlB !== prevUrlB)) return [3, 6];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlB)];
                     case 5:
-                        tilesB_3 = _c.sent();
+                        tilesB_3 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataB = tilesB_3[index].pixelData;
                         });
@@ -4344,12 +4289,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataB,
                             });
                         });
-                        _c.label = 7;
+                        _a.label = 7;
                     case 7:
                         if (!(this.options.operationUrlC !== prevUrlC)) return [3, 9];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlC)];
                     case 8:
-                        tilesC_2 = _c.sent();
+                        tilesC_2 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataC = tilesC_2[index].pixelData;
                         });
@@ -4362,12 +4307,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataC,
                             });
                         });
-                        _c.label = 10;
+                        _a.label = 10;
                     case 10:
                         if (!(this.options.operationUrlD !== prevUrlD)) return [3, 12];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlD)];
                     case 11:
-                        tilesD_1 = _c.sent();
+                        tilesD_1 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataD = tilesD_1[index].pixelData;
                         });
@@ -4380,7 +4325,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataD,
                             });
                         });
-                        _c.label = 13;
+                        _a.label = 13;
                     case 13:
                         onFrameRendered = function (canvasCoordinates) {
                             canvasCoordinates.forEach(function (_a, index) {
@@ -4389,11 +4334,11 @@ var GLOperations = (function (_super) {
                                 _this._copyToTileCanvas(tile.el, sourceX, sourceY);
                             });
                         };
-                        resultEncodedPixels_5 = this._renderer.renderTilesWithMultiAnalyze4(tilesA_4, tilesB_3, tilesC_2, tilesD_1, newColorScale, newSentinelValues, this.options.filterLowA, this.options.filterHighA, this.options.filterLowB, this.options.filterHighB, this.options.filterLowC, this.options.filterHighC, this.options.filterLowD, this.options.filterHighD, this.options.multiplierA, this.options.multiplierB, this.options.multiplierC, this.options.multiplierD, onFrameRendered);
+                        resultEncodedPixels_5 = this._renderer.renderTilesWithMultiAnalyze4(tilesA_4, tilesB_3, tilesC_2, tilesD_1, this.options.filterLowA, this.options.filterHighA, this.options.filterLowB, this.options.filterHighB, this.options.filterLowC, this.options.filterHighC, this.options.filterLowD, this.options.filterHighD, this.options.multiplierA, this.options.multiplierB, this.options.multiplierC, this.options.multiplierD, onFrameRendered);
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelData = resultEncodedPixels_5[index];
                         });
-                        _c.label = 14;
+                        _a.label = 14;
                     case 14: return [2];
                 }
             });
@@ -4401,15 +4346,14 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype._updateTilesWithMultiAnalyze5 = function (prevGlOperation, prevMultiLayers, prevUrlA, prevUrlB, prevUrlC, prevUrlD, prevUrlE, prevFilterLowA, prevFilterHighA, prevFilterLowB, prevFilterHighB, prevFilterLowC, prevFilterHighC, prevFilterLowD, prevFilterHighD, prevFilterLowE, prevFilterHighE, prevMultiplierA, prevMultiplierB, prevMultiplierC, prevMultiplierD, prevMultiplierE) {
         return __awaiter(this, void 0, void 0, function () {
-            var activeTiles, _a, newColorScale, _b, newSentinelValues, tilesA, canvasCoordinates, tilesA_5, tilesB_4, tilesC_3, tilesD_2, tilesE_1, onFrameRendered, resultEncodedPixels_6;
+            var activeTiles, tilesA, canvasCoordinates, tilesA_5, tilesB_4, tilesC_3, tilesD_2, tilesE_1, onFrameRendered, resultEncodedPixels_6;
             var _this = this;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
                     case 0:
                         if (this.options.debug)
                             console.log("_updateTilesWithMultiAnalyze5()");
                         activeTiles = this._getActiveTiles();
-                        _a = this.options, newColorScale = _a.colorScale, _b = _a.sentinelValues, newSentinelValues = _b === void 0 ? [] : _b;
                         if (!(this.options.glOperation === prevGlOperation &&
                             this.options.operationUrlA === prevUrlA &&
                             this.options.operationUrlB === prevUrlB &&
@@ -4441,7 +4385,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelData,
                             });
                         });
-                        canvasCoordinates = this._renderer.renderTiles(tilesA, newColorScale, newSentinelValues, this.options._hillshadeOptions);
+                        canvasCoordinates = this._renderer.renderTiles(tilesA, this.options._hillshadeOptions);
                         canvasCoordinates.forEach(function (_a, index) {
                             var sourceX = _a[0], sourceY = _a[1];
                             var tile = activeTiles[index];
@@ -4457,7 +4401,7 @@ var GLOperations = (function (_super) {
                         if (!(this.options.operationUrlA !== prevUrlA)) return [3, 3];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlA)];
                     case 2:
-                        tilesA_5 = _c.sent();
+                        tilesA_5 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataA = tilesA_5[index].pixelData;
                         });
@@ -4470,12 +4414,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataA,
                             });
                         });
-                        _c.label = 4;
+                        _a.label = 4;
                     case 4:
                         if (!(this.options.operationUrlB !== prevUrlB)) return [3, 6];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlB)];
                     case 5:
-                        tilesB_4 = _c.sent();
+                        tilesB_4 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataB = tilesB_4[index].pixelData;
                         });
@@ -4488,12 +4432,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataB,
                             });
                         });
-                        _c.label = 7;
+                        _a.label = 7;
                     case 7:
                         if (!(this.options.operationUrlC !== prevUrlC)) return [3, 9];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlC)];
                     case 8:
-                        tilesC_3 = _c.sent();
+                        tilesC_3 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataC = tilesC_3[index].pixelData;
                         });
@@ -4506,12 +4450,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataC,
                             });
                         });
-                        _c.label = 10;
+                        _a.label = 10;
                     case 10:
                         if (!(this.options.operationUrlD !== prevUrlD)) return [3, 12];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlD)];
                     case 11:
-                        tilesD_2 = _c.sent();
+                        tilesD_2 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataD = tilesD_2[index].pixelData;
                         });
@@ -4524,12 +4468,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataD,
                             });
                         });
-                        _c.label = 13;
+                        _a.label = 13;
                     case 13:
                         if (!(this.options.operationUrlE !== prevUrlE)) return [3, 15];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlE)];
                     case 14:
-                        tilesE_1 = _c.sent();
+                        tilesE_1 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataE = tilesE_1[index].pixelData;
                         });
@@ -4542,7 +4486,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataE,
                             });
                         });
-                        _c.label = 16;
+                        _a.label = 16;
                     case 16:
                         onFrameRendered = function (canvasCoordinates) {
                             canvasCoordinates.forEach(function (_a, index) {
@@ -4551,11 +4495,11 @@ var GLOperations = (function (_super) {
                                 _this._copyToTileCanvas(tile.el, sourceX, sourceY);
                             });
                         };
-                        resultEncodedPixels_6 = this._renderer.renderTilesWithMultiAnalyze5(tilesA_5, tilesB_4, tilesC_3, tilesD_2, tilesE_1, newColorScale, newSentinelValues, this.options.filterLowA, this.options.filterHighA, this.options.filterLowB, this.options.filterHighB, this.options.filterLowC, this.options.filterHighC, this.options.filterLowD, this.options.filterHighD, this.options.filterLowE, this.options.filterHighE, this.options.multiplierA, this.options.multiplierB, this.options.multiplierC, this.options.multiplierD, this.options.multiplierE, onFrameRendered);
+                        resultEncodedPixels_6 = this._renderer.renderTilesWithMultiAnalyze5(tilesA_5, tilesB_4, tilesC_3, tilesD_2, tilesE_1, this.options.filterLowA, this.options.filterHighA, this.options.filterLowB, this.options.filterHighB, this.options.filterLowC, this.options.filterHighC, this.options.filterLowD, this.options.filterHighD, this.options.filterLowE, this.options.filterHighE, this.options.multiplierA, this.options.multiplierB, this.options.multiplierC, this.options.multiplierD, this.options.multiplierE, onFrameRendered);
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelData = resultEncodedPixels_6[index];
                         });
-                        _c.label = 17;
+                        _a.label = 17;
                     case 17: return [2];
                 }
             });
@@ -4563,15 +4507,14 @@ var GLOperations = (function (_super) {
     };
     GLOperations.prototype._updateTilesWithMultiAnalyze6 = function (prevGlOperation, prevMultiLayers, prevUrlA, prevUrlB, prevUrlC, prevUrlD, prevUrlE, prevUrlF, prevFilterLowA, prevFilterHighA, prevFilterLowB, prevFilterHighB, prevFilterLowC, prevFilterHighC, prevFilterLowD, prevFilterHighD, prevFilterLowE, prevFilterHighE, prevFilterLowF, prevFilterHighF, prevMultiplierA, prevMultiplierB, prevMultiplierC, prevMultiplierD, prevMultiplierE, prevMultiplierF) {
         return __awaiter(this, void 0, void 0, function () {
-            var activeTiles, _a, newColorScale, _b, newSentinelValues, tilesA, canvasCoordinates, tilesA_6, tilesB_5, tilesC_4, tilesD_3, tilesE_2, tilesF_1, onFrameRendered, resultEncodedPixels_7;
+            var activeTiles, tilesA, canvasCoordinates, tilesA_6, tilesB_5, tilesC_4, tilesD_3, tilesE_2, tilesF_1, onFrameRendered, resultEncodedPixels_7;
             var _this = this;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
                     case 0:
                         if (this.options.debug)
                             console.log("_updateTilesWithMultiAnalyze6()");
                         activeTiles = this._getActiveTiles();
-                        _a = this.options, newColorScale = _a.colorScale, _b = _a.sentinelValues, newSentinelValues = _b === void 0 ? [] : _b;
                         if (!(this.options.glOperation === prevGlOperation &&
                             this.options.operationUrlA === prevUrlA &&
                             this.options.operationUrlB === prevUrlB &&
@@ -4607,7 +4550,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelData,
                             });
                         });
-                        canvasCoordinates = this._renderer.renderTiles(tilesA, newColorScale, newSentinelValues, this.options._hillshadeOptions);
+                        canvasCoordinates = this._renderer.renderTiles(tilesA, this.options._hillshadeOptions);
                         canvasCoordinates.forEach(function (_a, index) {
                             var sourceX = _a[0], sourceY = _a[1];
                             var tile = activeTiles[index];
@@ -4624,7 +4567,7 @@ var GLOperations = (function (_super) {
                         if (!(this.options.operationUrlA !== prevUrlA)) return [3, 3];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlA)];
                     case 2:
-                        tilesA_6 = _c.sent();
+                        tilesA_6 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataA = tilesA_6[index].pixelData;
                         });
@@ -4637,12 +4580,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataA,
                             });
                         });
-                        _c.label = 4;
+                        _a.label = 4;
                     case 4:
                         if (!(this.options.operationUrlB !== prevUrlB)) return [3, 6];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlB)];
                     case 5:
-                        tilesB_5 = _c.sent();
+                        tilesB_5 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataB = tilesB_5[index].pixelData;
                         });
@@ -4655,12 +4598,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataB,
                             });
                         });
-                        _c.label = 7;
+                        _a.label = 7;
                     case 7:
                         if (!(this.options.operationUrlC !== prevUrlC)) return [3, 9];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlC)];
                     case 8:
-                        tilesC_4 = _c.sent();
+                        tilesC_4 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataC = tilesC_4[index].pixelData;
                         });
@@ -4673,12 +4616,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataC,
                             });
                         });
-                        _c.label = 10;
+                        _a.label = 10;
                     case 10:
                         if (!(this.options.operationUrlD !== prevUrlD)) return [3, 12];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlD)];
                     case 11:
-                        tilesD_3 = _c.sent();
+                        tilesD_3 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataD = tilesD_3[index].pixelData;
                         });
@@ -4691,12 +4634,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataD,
                             });
                         });
-                        _c.label = 13;
+                        _a.label = 13;
                     case 13:
                         if (!(this.options.operationUrlE !== prevUrlE)) return [3, 15];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlE)];
                     case 14:
-                        tilesE_2 = _c.sent();
+                        tilesE_2 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataE = tilesE_2[index].pixelData;
                         });
@@ -4709,12 +4652,12 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataE,
                             });
                         });
-                        _c.label = 16;
+                        _a.label = 16;
                     case 16:
                         if (!(this.options.operationUrlF !== prevUrlF)) return [3, 18];
                         return [4, this._getTilesData(activeTiles, this.options.operationUrlF)];
                     case 17:
-                        tilesF_1 = _c.sent();
+                        tilesF_1 = _a.sent();
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelDataF = tilesF_1[index].pixelData;
                         });
@@ -4727,7 +4670,7 @@ var GLOperations = (function (_super) {
                                 pixelData: el.pixelDataF,
                             });
                         });
-                        _c.label = 19;
+                        _a.label = 19;
                     case 19:
                         onFrameRendered = function (canvasCoordinates) {
                             canvasCoordinates.forEach(function (_a, index) {
@@ -4736,11 +4679,11 @@ var GLOperations = (function (_super) {
                                 _this._copyToTileCanvas(tile.el, sourceX, sourceY);
                             });
                         };
-                        resultEncodedPixels_7 = this._renderer.renderTilesWithMultiAnalyze6(tilesA_6, tilesB_5, tilesC_4, tilesD_3, tilesE_2, tilesF_1, newColorScale, newSentinelValues, this.options.filterLowA, this.options.filterHighA, this.options.filterLowB, this.options.filterHighB, this.options.filterLowC, this.options.filterHighC, this.options.filterLowD, this.options.filterHighD, this.options.filterLowE, this.options.filterHighE, this.options.filterLowF, this.options.filterHighF, this.options.multiplierA, this.options.multiplierB, this.options.multiplierC, this.options.multiplierD, this.options.multiplierE, this.options.multiplierF, onFrameRendered);
+                        resultEncodedPixels_7 = this._renderer.renderTilesWithMultiAnalyze6(tilesA_6, tilesB_5, tilesC_4, tilesD_3, tilesE_2, tilesF_1, this.options.filterLowA, this.options.filterHighA, this.options.filterLowB, this.options.filterHighB, this.options.filterLowC, this.options.filterHighC, this.options.filterLowD, this.options.filterHighD, this.options.filterLowE, this.options.filterHighE, this.options.filterLowF, this.options.filterHighF, this.options.multiplierA, this.options.multiplierB, this.options.multiplierC, this.options.multiplierD, this.options.multiplierE, this.options.multiplierF, onFrameRendered);
                         activeTiles.forEach(function (tile, index) {
                             tile.el.pixelData = resultEncodedPixels_7[index];
                         });
-                        _c.label = 20;
+                        _a.label = 20;
                     case 20: return [2];
                 }
             });

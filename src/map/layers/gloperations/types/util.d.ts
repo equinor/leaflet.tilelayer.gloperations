@@ -1,8 +1,5 @@
 import REGL from 'regl';
-import { Color, Dictionary, TextureBounds, TileCoordinates, WebGLColorStop } from './types';
-export declare function convertColorScale(colorScale: Color[]): WebGLColorStop[];
-export declare function colorStringToWebGLFloats(rgb: string): REGL.Vec4;
-export declare function bindStructArray<Struct extends Dictionary<any>, Props extends Dictionary<any[]> = {}>(structPropertyNames: Array<keyof Struct>, defaultValue: Struct, maxArrayLength: number, glslIdentifier: string, propName?: keyof Props): Dictionary<any>;
+import { Color, SentinelValue, TextureBounds, TileCoordinates } from './types';
 export declare function machineIsLittleEndian(): boolean;
 export declare function range(...args: number[]): number[];
 export declare function fetchPNGData(url: string, nodataValue: number, tileDimension: number): Promise<Uint8Array>;
@@ -21,3 +18,7 @@ export declare function PingPong(regl: REGL.Regl, opts: REGL.FramebufferOptions)
     pong: () => REGL.Framebuffer2D;
     swap: () => void;
 };
+export declare const hexToRGB: (hex: string) => number[];
+export declare function colorStringToInts(colorstring: string): number[];
+export declare const colormapToFlatArray: (colormap: Color[]) => number[];
+export declare function createColormapTexture(colormapInput: Color[] | SentinelValue[], regl: REGL.Regl): REGL.Texture2D;
