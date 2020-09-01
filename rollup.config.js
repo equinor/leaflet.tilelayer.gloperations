@@ -30,12 +30,14 @@ export default [
         file: pkg.main,
         format: 'cjs',
         sourcemap: true,
+        exports: 'auto',
       },
       // ES Module bundle
       {
         file: pkg.module,
         format: 'es',
         sourcemap: true,
+        exports: 'auto',
       },
     ],
     onwarn: function (warning, warn) {

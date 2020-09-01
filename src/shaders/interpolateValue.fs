@@ -6,17 +6,14 @@ precision mediump float;
 
 #define TRANSPARENT vec4(0.0)
 
-#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
-
 #pragma glslify: computeColor = require(./util/computeColor.glsl)
 #pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
-#pragma glslify: ScaleStop = require(./util/ScaleStop.glsl)
+#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
 
-uniform ScaleStop colorScale[SCALE_MAX_LENGTH];
-uniform int colorScaleLength;
-
-uniform ScaleStop sentinelValues[SENTINEL_MAX_LENGTH];
-uniform int sentinelValuesLength;
+uniform int scaleLength;
+uniform int sentinelLength;
+uniform sampler2D scaleColormap;
+uniform sampler2D sentinelColormap;
 
 uniform float nodataValue;
 uniform sampler2D textureA;
@@ -27,12 +24,16 @@ uniform float interpolationFraction;
 varying vec2 vTexCoordA;
 varying vec2 vTexCoordB;
 
-bool isSentinelValue(ScaleStop sentinelValues[SENTINEL_MAX_LENGTH], int len, float value) {
+bool isSentinelValue(sampler2D sentinelColormap, int len, float value) {
   for (int i = 0; i < SENTINEL_MAX_LENGTH; ++i) {
     if (i == len) {
       break;
     }
-    if (isCloseEnough(sentinelValues[i].offset, value)) {
+    float i_f = float(i);
+    float lenFloat = float(len);
+    vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / lenFloat, 0.75));
+    float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);
+    if (isCloseEnough(sentinelOffset, value)) {
       return true;
     }
   }
@@ -46,14 +47,28 @@ void main() {
     if (isCloseEnough(texelFloat, nodataValue)) {
       discard;
     }
-    gl_FragColor = computeColor(texelFloat, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);
+    gl_FragColor = computeColor(
+      texelFloat,
+      scaleColormap,
+      sentinelColormap,
+      scaleLength,
+      sentinelLength,
+      littleEndian
+    );
   } else if (interpolationFraction >= 1.0) {
     vec4 texelRgba = texture2D(textureB, vTexCoordB);
     float texelFloat = rgbaToFloat(texelRgba, littleEndian);
     if (isCloseEnough(texelFloat, nodataValue)) {
       discard;
     }
-    gl_FragColor = computeColor(texelFloat, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);
+    gl_FragColor = computeColor(
+      texelFloat,
+      scaleColormap,
+      sentinelColormap,
+      scaleLength,
+      sentinelLength,
+      littleEndian
+    );
   } else {
     // retrieve and decode pixel value from both tiles
     vec4 texelRgbaA = texture2D(textureA, vTexCoordA);
@@ -67,24 +82,45 @@ void main() {
     } else if (
       aIsNodata
       || bIsNodata
-      || colorScaleLength == 0
-      || isSentinelValue(sentinelValues, sentinelValuesLength, texelFloatA)
-      || isSentinelValue(sentinelValues, sentinelValuesLength, texelFloatB)
+      || scaleLength == 0
+      || isSentinelValue(sentinelColormap, sentinelLength, texelFloatA)
+      || isSentinelValue(sentinelColormap, sentinelLength, texelFloatB)
     ) {
       vec4 colorA = (
         aIsNodata
         ? TRANSPARENT
-        : computeColor(texelFloatA, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength)
+        : computeColor(
+            texelFloatA,
+            scaleColormap,
+            sentinelColormap,
+            scaleLength,
+            sentinelLength,
+            littleEndian
+          )
       );
       vec4 colorB = (
         bIsNodata
         ? TRANSPARENT
-        : computeColor(texelFloatB, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength)
+        : computeColor(
+            texelFloatB,
+            scaleColormap,
+            sentinelColormap,
+            scaleLength,
+            sentinelLength,
+            littleEndian
+          )
       );
       gl_FragColor = mix(colorA, colorB, interpolationFraction);
     } else {
       float interpolated = mix(texelFloatA, texelFloatB, interpolationFraction);
-      gl_FragColor = computeColor(interpolated, colorScale, sentinelValues, colorScaleLength, sentinelValuesLength);
+      gl_FragColor = computeColor(
+        interpolated,
+        scaleColormap,
+        sentinelColormap,
+        scaleLength,
+        sentinelLength,
+        littleEndian
+      );
     }
   }
 }
