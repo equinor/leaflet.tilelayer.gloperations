@@ -57,6 +57,7 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-export-default-from": "^7.10.4",
-    "@babel/plugin-proposal-export-namespace-from": "^7.10.4"
+    "@babel/plugin-proposal-export-namespace-from": "^7.10.4",
+    "@use-it/event-listener": "^0.1.5"
   }
 }

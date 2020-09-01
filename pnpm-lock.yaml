@@ -46,6 +46,7 @@ dependencies:
 devDependencies:
   '@babel/plugin-proposal-export-default-from': 7.10.4_@babel+core@7.11.4
   '@babel/plugin-proposal-export-namespace-from': 7.10.4_@babel+core@7.11.4
+  '@use-it/event-listener': 0.1.5_react@16.13.1
 lockfileVersion: 5.1
 packages:
   /@ant-design/colors/3.2.2:
@@ -1239,6 +1240,14 @@ packages:
     dev: false
     resolution:
       integrity: sha512-1HcDas8SEj4z1Wc696tH56G8OlRaH/sqZOynNNB+HF0WOeXPaxTtbYzJY2oEfiUxjSKjhCKr+MvR7dCHcEelug==
+  /@use-it/event-listener/0.1.5_react@16.13.1:
+    dependencies:
+      react: 16.13.1
+    dev: true
+    peerDependencies:
+      react: ^16.8.0
+    resolution:
+      integrity: sha512-SWbhB0iFcoNL1BEldApGTqfB9aoGpU82iZUVTBtZaTFNrVKAGwuQTF15N9MzRvTgyuOASWf1pCKXbdVtKZgeRg==
   /@webassemblyjs/ast/1.9.0:
     dependencies:
       '@webassemblyjs/helper-module-context': 1.9.0
@@ -4792,7 +4801,6 @@ packages:
   /loose-envify/1.4.0:
     dependencies:
       js-tokens: 4.0.0
-    dev: false
     hasBin: true
     resolution:
       integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==
@@ -5353,7 +5361,6 @@ packages:
     resolution:
       integrity: sha512-fexhUFFPTGV8ybAtSIGbV6gOkSv8UtRbDBnAyLQw4QPKkgNlsH2ByPGtMUqdWkos6YCRmAqViwgZrJc/mRDzZQ==
   /object-assign/4.1.1:
-    dev: false
     engines:
       node: '>=0.10.0'
     resolution:
@@ -6159,7 +6166,6 @@ packages:
       loose-envify: 1.4.0
       object-assign: 4.1.1
       react-is: 16.13.1
-    dev: false
     resolution:
       integrity: sha512-8QQikdH7//R2vurIJSutZ1smHYTcLpRWEOlHnzcWHmBYrOGUysKwSsrC89BCiFj3CbrfJ/nXFdJepOVrY1GCHQ==
   /prr/1.0.1:
@@ -6844,7 +6850,6 @@ packages:
     resolution:
       integrity: sha512-jQJgYCA3S0j+cuOwzuCd1OjmBmnZLdqQdiLKRYrsMMzbjUrVDS5RvJUDwJqA7sKuksDuzFtm6hZGKFu7Mjk5aw==
   /react-is/16.13.1:
-    dev: false
     resolution:
       integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==
   /react-lifecycles-compat/3.0.4:
@@ -6869,7 +6874,6 @@ packages:
       loose-envify: 1.4.0
       object-assign: 4.1.1
       prop-types: 15.7.2
-    dev: false
     engines:
       node: '>=0.10.0'
     resolution:
@@ -8647,6 +8651,7 @@ specifiers:
   '@babel/plugin-proposal-export-namespace-from': ^7.10.4
   '@babel/preset-env': ^7.11.0
   '@babel/preset-react': ^7.10.4
+  '@use-it/event-listener': ^0.1.5
   antd: ^4.6.1
   babel-loader: ^8.1.0
   chroma-js: ^2.1.0
