@@ -7,6 +7,28 @@ import {
   values,
   zipWith,
 } from 'lodash-es';
+import { ContourMultiPolygon } from 'd3-contour';
+import * as util from './util';
+import { select, selectAll } from "d3-selection";
+import { scaleLinear } from "d3-scale";
+import { geoPath } from "d3-geo";
+import { contours } from "d3-contour";
+import { json } from "d3-request";
+import { min, max, scan, range } from "d3-array";
+import { interpolateHcl } from "d3-interpolate";
+const d3 = {
+  select,
+  selectAll,
+  scaleLinear,
+  geoPath,
+  contours,
+  interpolateHcl,
+  json,
+  min,
+  max,
+  scan,
+  range,
+};
 
 import './index.css';
 
@@ -29,17 +51,6 @@ import {
   ContourData,
   Dictionary,
 } from './types';
-import { ContourMultiPolygon } from 'd3-contour';
-import * as util from './util';
-import { select, selectAll } from "d3-selection";
-import { scaleLinear } from "d3-scale";
-import { geoPath } from "d3-geo";
-import { contours } from "d3-contour";
-import { json } from "d3-request";
-import { min, max, scan, range } from "d3-array";
-import { interpolateHcl } from "d3-interpolate";
-const d3 = { select, selectAll, scaleLinear, geoPath, contours, interpolateHcl,
-  json, min, max, scan, range }
 
 /**
  * Augment Leaflet GridLayer definition to include some helpful "private" properties.
@@ -112,7 +123,8 @@ export interface Options extends L.GridLayerOptions {
 
   // Hillshading
   hillshadeType: string;
-  hsElevationScale?: number;
+  hsValueScale?: number|Dictionary<number>;
+  hsPixelScale?: number;
   hsSimpleZoomdelta?: number;
   hsSimpleSlopescale?: number;
   hsSimpleAzimuth?: number;
@@ -201,7 +213,7 @@ const defaultOptions = {
   detectRetina: false,
   crossOrigin: false,
 
-  //multi-analyze default options
+  // multi-analyze default options
   glOperation: 'none',
   multiLayers: 0,
   operationUrlA: '',
@@ -231,15 +243,16 @@ const defaultOptions = {
 
   // Hillshading default options
   hillshadeType: 'none', // none, simple or pregen
-  hsElevationScale: 1.0,
+  hsValueScale: 1.0,
+  hsPixelScale: 100,
   hsSimpleZoomdelta: 0,
   hsSimpleSlopescale: 3.0,
   hsSimpleAzimuth: 315,
   hsSimpleAltitude: 70,
-  hsAdvSoftIterations: 128,
-  hsAdvAmbientIterations: 40,
+  hsAdvSoftIterations: 10,
+  hsAdvAmbientIterations: 10,
   hsAdvSunRadiusMultiplier: 100,
-  hsAdvFinalSoftMultiplier: 4.0,
+  hsAdvFinalSoftMultiplier: 1.0,
   hsAdvFinalAmbientMultiplier: 0.25,
   hsPregenUrl: '',
   _hillshadeOptions: { hillshadeType: 'none' },
@@ -306,6 +319,7 @@ export default class GLOperations extends L.GridLayer {
 
     const tileSize: number = this._tileSizeAsNumber();
     const renderer = new Renderer(
+      this,
       tileSize,
       nodataValue,
       this.options.colorScale,
@@ -322,12 +336,16 @@ export default class GLOperations extends L.GridLayer {
 
     this._maybePreload(preloadUrl);
 
+    // generate vec3 directions for advanced hillshading with default iterations
+    this._renderer.generateAmbientDirections(this.options.hsAdvAmbientIterations);
+    this._renderer.generateSunDirections(this.options.hsAdvSoftIterations, this.options.hsAdvSunRadiusMultiplier);
+
     // Listen for 'tileunload' event to remove the tile from the texture.
     this.on('tileunload', this._onTileRemove.bind(this));
 
     // Listen for all visible tiles loaded. If using contours then run update
     this.on('load', _ => setTimeout(() => {
-      if (this.options.debug) console.log("all tiles loaded. Updating contours if enabled.")
+      if (this.options.debug) console.log("all tiles loaded. Updating contours if enabled.");
       this._maybeUpdateMergedArrayAndDrawContours();
       // delay due to: https://github.com/Leaflet/Leaflet/blob/master/src/map/Map.js#L1696
     }, 300));
@@ -336,8 +354,8 @@ export default class GLOperations extends L.GridLayer {
     setTimeout(() => {
       this._map.on('zoomend', _ => setTimeout(async () => {
         if (this.options.contourType !== 'none') {
-          if (this.options.debug) console.log("zoom changed. Moving contour canvas.")
-          let activeTilesBounds: ActiveTilesBounds = await this._getActivetilesBounds();
+          if (this.options.debug) console.log("zoom changed. Moving contour canvas.");
+          const activeTilesBounds: ActiveTilesBounds = await this._getActivetilesBounds();
           this._moveContourCanvas(activeTilesBounds);
         }
       }, 50));
@@ -384,7 +402,14 @@ export default class GLOperations extends L.GridLayer {
       multiLayers: prevMultiLayers,
       hsPregenUrl: prevHsPregenUrl,
       hillshadeType: prevHillshadeType,
+      hsValueScale: prevHsValueScale,
+      hsPixelScale: prevHsPixelScale,
       hsSimpleSlopescale: prevHsSimpleSlopescale,
+      hsAdvSoftIterations: prevHsAdvSoftIterations,
+      hsAdvAmbientIterations: prevHsAdvAmbientIterations,
+      hsAdvSunRadiusMultiplier: prevHsAdvSunRadiusMultiplier,
+      hsAdvFinalSoftMultiplier: prevHsAdvFinalSoftMultiplier,
+      hsAdvFinalAmbientMultiplier: prevHsAdvFinalAmbientMultiplier,
       contourInterval: prevContourInterval,
       contourIndexInterval: prevContourIndexInterval,
       contourLineColor: prevContourLineColor,
@@ -417,6 +442,7 @@ export default class GLOperations extends L.GridLayer {
       if (this.options.debug) console.log("Creating new renderer");
       const tileSize: number = this._tileSizeAsNumber();
       const renderer = new Renderer(
+        this,
         tileSize,
         this.options.nodataValue,
         this.options.colorScale,
@@ -440,10 +466,20 @@ export default class GLOperations extends L.GridLayer {
     if (this.options.sentinelValues !== prevSentinelValues) {
       this._renderer.updateSentinels(this.options.sentinelValues);
     }
+    if (this.options.hsAdvAmbientIterations !== prevHsAdvAmbientIterations) {
+      this._renderer.generateAmbientDirections(this.options.hsAdvAmbientIterations);
+    }
+    if (
+      this.options.hsAdvSoftIterations !== prevHsAdvSoftIterations ||
+      this.options.hsAdvSunRadiusMultiplier !== prevHsAdvSunRadiusMultiplier
+      ) {
+      this._renderer.generateSunDirections(this.options.hsAdvSoftIterations, this.options.hsAdvSunRadiusMultiplier);
+    }
     this._maybePreload(this.options.preloadUrl);
     this.options._hillshadeOptions = {
       hillshadeType: this.options.hillshadeType,
-      hsElevationScale: this.options.hsElevationScale,
+      hsValueScale: this.options.hsValueScale,
+      hsPixelScale: this.options.hsPixelScale,
       hsSimpleSlopescale: this.options.hsSimpleSlopescale,
       hsSimpleAzimuth: this.options.hsSimpleAzimuth,
       hsSimpleAltitude: this.options.hsSimpleAltitude,
@@ -459,16 +495,21 @@ export default class GLOperations extends L.GridLayer {
     if (this.options.extraPixelLayers > 0 && this.options.glOperation === 'none') {
       this._maybeLoadExtraLayers(prevUrlA, prevUrlB, prevUrlC, prevUrlD);
     }
-    // TODO: Fix shader so hillshading works ok with larger texture than tileSize
+    // TODO: Fix shader so simple hillshading works ok with larger texture than tileSize
     if (this.options.hillshadeType !== prevHillshadeType) {
       // reduce textureManager size as simple hillshading type currently gets "edges" around the tiles with larger texture.
       if (this.options.hillshadeType === 'simple') {
         this._renderer.setMaxTextureDimension(this._tileSizeAsNumber());
       } else if (prevHillshadeType === 'simple') {
-        let maxTextureDimension = this._renderer.findMaxTextureDimension();
-        this._renderer.setMaxTextureDimension(maxTextureDimension);
+        this._renderer.setMaxTextureDimension(this._renderer.findMaxTextureDimension());
       }
     }
+
+    if (this.options.url !== prevUrl) {
+      // need to clear tiles so they are not reused with adv.hs.
+      this._renderer.textureManager.clearTiles();
+    }
+
     if (this.options.glOperation === 'none') {
       if (this.options.transitions) {
         if (this.options.url !== prevUrl) {
@@ -479,15 +520,27 @@ export default class GLOperations extends L.GridLayer {
           if (this.options.debug) console.log("Running GLOperations with transition on colorscale only");
         }
       } else {
-        if (this.options.url !== prevUrl || this.options.hillshadeType !== prevHillshadeType || this.options.hsPregenUrl !== prevHsPregenUrl || this.options.hsSimpleSlopescale !== prevHsSimpleSlopescale) {
-          this._updateTiles();
-          if (this.options.debug) console.log("Running GLOperations with new url, no transition and no operation");
-        } else {
-          if (JSON.stringify(this.options.colorScale) !== JSON.stringify(prevColorScale)) {
-            this._updateTilesColorscaleOnly();
-            if (this.options.debug) console.log("Running GLOperations with same url, no transition and no operation");
+          if (
+            this.options.url !== prevUrl ||
+            this.options.hillshadeType !== prevHillshadeType ||
+            this.options.hsPregenUrl !== prevHsPregenUrl ||
+            this.options.hsSimpleSlopescale !== prevHsSimpleSlopescale ||
+            this.options.hsAdvSunRadiusMultiplier !== prevHsAdvSunRadiusMultiplier ||
+            this.options.hsAdvFinalSoftMultiplier !== prevHsAdvFinalSoftMultiplier ||
+            this.options.hsAdvFinalAmbientMultiplier !== prevHsAdvFinalAmbientMultiplier ||
+            this.options.hsAdvSoftIterations !== prevHsAdvSoftIterations ||
+            this.options.hsAdvAmbientIterations !== prevHsAdvAmbientIterations ||
+            this.options.hsValueScale !== prevHsValueScale ||
+            this.options.hsPixelScale !== prevHsPixelScale
+          ) {
+            this._updateTiles();
+            if (this.options.debug) console.log("Running GLOperations with new url, no transition and no operation");
+          } else {
+            if (JSON.stringify(this.options.colorScale) !== JSON.stringify(prevColorScale)) {
+              this._updateTilesColorscaleOnly();
+              if (this.options.debug) console.log("Running GLOperations with same url, no transition and no operation");
+            }
           }
-        }
       }
     } else if (this.options.glOperation === 'multi') {
       if (this.options.multiLayers === 1) {
@@ -515,7 +568,7 @@ export default class GLOperations extends L.GridLayer {
           prevFilterLowA, prevFilterHighA, prevFilterLowB, prevFilterHighB, prevFilterLowC, prevFilterHighC,
           prevFilterLowD, prevFilterHighD, prevFilterLowE, prevFilterHighE, prevFilterLowF, prevFilterHighF,
           prevMultiplierA, prevMultiplierB, prevMultiplierC, prevMultiplierD, prevMultiplierE, prevMultiplierF);
-      };
+      }
       if (this.options.debug) console.log("Running GLOperations with multiAnalyze");
     } else if (this.options.glOperation === 'diff') {
       this._updateTilesWithDiff(prevGlOperation, prevUrlA, prevUrlB);
@@ -579,7 +632,7 @@ export default class GLOperations extends L.GridLayer {
       this._clearContours();
       this._contourData.mergedTileArray = undefined;
     }
-  };
+  }
 
 
   /**
@@ -587,7 +640,7 @@ export default class GLOperations extends L.GridLayer {
    * does this automatically for any handlers returned from the optional method `getEvents`.
    *
    * We enhance the `MouseEvent` object Leaflet provides to these handlers with an additional
-   * property containing the value of the pixel under the cursor.
+   * property containing the value of the pixel(s) under the cursor.
    */
   getEvents() {
     const {
@@ -649,7 +702,6 @@ export default class GLOperations extends L.GridLayer {
    */
   redraw() {
     if (this._map) {
-      if (this.options.debug) console.log("redraw() called");
       this._removeAllTiles();
       this._update();
     }
@@ -692,8 +744,6 @@ export default class GLOperations extends L.GridLayer {
       multiplierF,
     } = this.options;
 
-    if (this.options.debug) console.log("createTile");
-
     // Create a <canvas> element to contain the rendered image.
     const tileCanvas = L.DomUtil.create('canvas') as TileElement;
     // Configure the element.
@@ -710,7 +760,7 @@ export default class GLOperations extends L.GridLayer {
           if (this.options.debug) console.log("createTile - extraPixelLayers === 1");
           tileCanvas.pixelDataA = pixelDataA;
         });
-      };
+      }
 
       if (this.options._hillshadeOptions.hillshadeType === 'pregen') {
         Promise.all([
@@ -718,9 +768,9 @@ export default class GLOperations extends L.GridLayer {
           this._fetchTileData(coords, hsPregenUrl),
         ]).then((pixelDataArray) => {
           // Render in `renderer`'s WebGL context.
-          if (this.options.debug) console.log("_fetchTileData with pregen hs")
-          var pixelData: Uint8Array = pixelDataArray[0];
-          var pixelDataHs: Uint8Array = pixelDataArray[1];
+          if (this.options.debug) console.log("_fetchTileData with pregen hs");
+          const pixelData: Uint8Array = pixelDataArray[0];
+          const pixelDataHs: Uint8Array = pixelDataArray[1];
 
           const [sourceX, sourceY] = this._renderer.renderTileHsPregen(
             { coords: coords, pixelData: pixelData },
@@ -736,11 +786,59 @@ export default class GLOperations extends L.GridLayer {
           this._copyToTileCanvas(tileCanvas, sourceX, sourceY);
           done(undefined, tileCanvas);
         });
+      } else if (this.options._hillshadeOptions.hillshadeType === 'advanced') {
+        (async () => {
+          try {
+            // Retrieve and decode Float-32 PNG.
+            let pixelData: Uint8Array;
+            const hashKey = this._renderer.textureManager.hashTileCoordinates(coords);
+            if (this._renderer.textureManager.contents.has(hashKey)) {
+              // TODO: Not working properly. Seems to
+              try {
+                // @ts-ignore
+                pixelData = this._tiles[hashKey].el.pixelData;
+              } catch(err){
+                pixelData = await this._fetchTileData(coords, url);
+                this._renderer.textureManager.addTile(coords, pixelData);
+              }
+            } else {
+              pixelData = await this._fetchTileData(coords, url);
+              this._renderer.textureManager.addTile(coords, pixelData);
+            }
+
+            // if tile is just nodataValue, do not do anything
+            const nodataTile = util.createNoDataTile(this.options.nodataValue, this._tileSizeAsNumber());
+            if (!util.typedArraysAreEqual(pixelData, nodataTile)) {
+              const textureCoords = await util.getAdjacentTilesTexCoords(
+                this,
+                this._renderer.textureManager,
+                coords,
+                url
+              );
+
+              // Adjacent tiles as now available in TextureManager. Start rendering
+              const [sourceX, sourceY] = this._renderer.renderTileHsAdvanced(
+                this.options._hillshadeOptions,
+                this._getZoomForUrl(),
+                textureCoords,
+              );
+
+              // Copy pixel data to a property on tile canvas element (for later retrieval).
+              tileCanvas.pixelData = pixelData;
+
+              // Copy contents to tileCanvas.
+              this._copyToTileCanvas(tileCanvas, sourceX, sourceY);
+            }
+            done(undefined, tileCanvas);
+          } catch(err){
+            console.log(err);
+          }
+        })();
       } else {
         // Retrieve and decode Float-32 PNG.
         this._fetchTileData(coords, url).then((pixelData) => {
           // Render in `renderer`'s WebGL context.
-          if (this.options.debug) console.log("_fetchTileData with no operation")
+          if (this.options.debug) console.log("_fetchTileData with no operation");
           const [sourceX, sourceY] = this._renderer.renderTile(
             { coords, pixelData },
             this.options._hillshadeOptions,
@@ -762,14 +860,14 @@ export default class GLOperations extends L.GridLayer {
       ]).then((pixelDataArray) => {
         // Render in `renderer`'s WebGL context.
         if (this.options.debug) console.log("_fetchTileData with diff");
-        var pixelDataA: Uint8Array = pixelDataArray[0];
-        var pixelDataB: Uint8Array = pixelDataArray[1];
+        const pixelDataA: Uint8Array = pixelDataArray[0];
+        const pixelDataB: Uint8Array = pixelDataArray[1];
         const [sourceX, sourceY, resultEncodedPixels] = this._renderer.renderTileDiff(
           { coords: coords, pixelData: pixelDataA },
           { coords: coords, pixelData: pixelDataB },
         );
 
-        tileCanvas.pixelData = <Uint8Array>resultEncodedPixels;
+        tileCanvas.pixelData = resultEncodedPixels as Uint8Array;
         tileCanvas.pixelDataA = pixelDataA;
         tileCanvas.pixelDataB = pixelDataB;
 
@@ -783,7 +881,7 @@ export default class GLOperations extends L.GridLayer {
       ]).then((pixelDataArray) => {
         // Render in `renderer`'s WebGL context.
         if (this.options.debug) console.log("_fetchTileData with multi");
-        var pixelDataA: Uint8Array = pixelDataArray[0];
+        const pixelDataA: Uint8Array = pixelDataArray[0];
         const [sourceX, sourceY, resultEncodedPixels] = this._renderer.renderTileMulti1(
           { coords: coords, pixelData: pixelDataA },
           filterLowA,
@@ -806,8 +904,8 @@ export default class GLOperations extends L.GridLayer {
       ]).then((pixelDataArray) => {
         // Render in `renderer`'s WebGL context.
         if (this.options.debug) console.log("_fetchTileData with multi");
-        var pixelDataA: Uint8Array = pixelDataArray[0];
-        var pixelDataB: Uint8Array = pixelDataArray[1];
+        const pixelDataA: Uint8Array = pixelDataArray[0];
+        const pixelDataB: Uint8Array = pixelDataArray[1];
         const [sourceX, sourceY, resultEncodedPixels] = this._renderer.renderTileMulti2(
           { coords: coords, pixelData: pixelDataA },
           { coords: coords, pixelData: pixelDataB },
@@ -836,9 +934,9 @@ export default class GLOperations extends L.GridLayer {
       ]).then((pixelDataArray) => {
         // Render in `renderer`'s WebGL context.
         if (this.options.debug) console.log("_fetchTileData with multi");
-        var pixelDataA: Uint8Array = pixelDataArray[0];
-        var pixelDataB: Uint8Array = pixelDataArray[1];
-        var pixelDataC: Uint8Array = pixelDataArray[2];
+        const pixelDataA: Uint8Array = pixelDataArray[0];
+        const pixelDataB: Uint8Array = pixelDataArray[1];
+        const pixelDataC: Uint8Array = pixelDataArray[2];
         const [sourceX, sourceY, resultEncodedPixels] = this._renderer.renderTileMulti3(
           { coords: coords, pixelData: pixelDataA },
           { coords: coords, pixelData: pixelDataB },
@@ -873,10 +971,10 @@ export default class GLOperations extends L.GridLayer {
       ]).then((pixelDataArray) => {
         // Render in `renderer`'s WebGL context.
         if (this.options.debug) console.log("_fetchTileData with multi");
-        var pixelDataA: Uint8Array = pixelDataArray[0];
-        var pixelDataB: Uint8Array = pixelDataArray[1];
-        var pixelDataC: Uint8Array = pixelDataArray[2];
-        var pixelDataD: Uint8Array = pixelDataArray[3];
+        const pixelDataA: Uint8Array = pixelDataArray[0];
+        const pixelDataB: Uint8Array = pixelDataArray[1];
+        const pixelDataC: Uint8Array = pixelDataArray[2];
+        const pixelDataD: Uint8Array = pixelDataArray[3];
         const [sourceX, sourceY, resultEncodedPixels] = this._renderer.renderTileMulti4(
           { coords: coords, pixelData: pixelDataA },
           { coords: coords, pixelData: pixelDataB },
@@ -917,11 +1015,11 @@ export default class GLOperations extends L.GridLayer {
       ]).then((pixelDataArray) => {
         // Render in `renderer`'s WebGL context.
         if (this.options.debug) console.log("_fetchTileData with multi");
-        var pixelDataA: Uint8Array = pixelDataArray[0];
-        var pixelDataB: Uint8Array = pixelDataArray[1];
-        var pixelDataC: Uint8Array = pixelDataArray[2];
-        var pixelDataD: Uint8Array = pixelDataArray[3];
-        var pixelDataE: Uint8Array = pixelDataArray[4];
+        const pixelDataA: Uint8Array = pixelDataArray[0];
+        const pixelDataB: Uint8Array = pixelDataArray[1];
+        const pixelDataC: Uint8Array = pixelDataArray[2];
+        const pixelDataD: Uint8Array = pixelDataArray[3];
+        const pixelDataE: Uint8Array = pixelDataArray[4];
         const [sourceX, sourceY, resultEncodedPixels] = this._renderer.renderTileMulti5(
           { coords: coords, pixelData: pixelDataA },
           { coords: coords, pixelData: pixelDataB },
@@ -968,12 +1066,12 @@ export default class GLOperations extends L.GridLayer {
       ]).then((pixelDataArray) => {
         // Render in `renderer`'s WebGL context.
         if (this.options.debug) console.log("_fetchTileData with multi");
-        var pixelDataA: Uint8Array = pixelDataArray[0];
-        var pixelDataB: Uint8Array = pixelDataArray[1];
-        var pixelDataC: Uint8Array = pixelDataArray[2];
-        var pixelDataD: Uint8Array = pixelDataArray[3];
-        var pixelDataE: Uint8Array = pixelDataArray[4];
-        var pixelDataF: Uint8Array = pixelDataArray[5];
+        const pixelDataA: Uint8Array = pixelDataArray[0];
+        const pixelDataB: Uint8Array = pixelDataArray[1];
+        const pixelDataC: Uint8Array = pixelDataArray[2];
+        const pixelDataD: Uint8Array = pixelDataArray[3];
+        const pixelDataE: Uint8Array = pixelDataArray[4];
+        const pixelDataF: Uint8Array = pixelDataArray[5];
         const [sourceX, sourceY, resultEncodedPixels] = this._renderer.renderTileMulti6(
           { coords: coords, pixelData: pixelDataA },
           { coords: coords, pixelData: pixelDataB },
@@ -1098,6 +1196,17 @@ export default class GLOperations extends L.GridLayer {
         tilesDataHs,
         this.options._hillshadeOptions,
       );
+    } else if (this.options._hillshadeOptions.hillshadeType === 'advanced') {
+      // canvasCoordinates = this._renderer.renderTilesHsAdvanced(
+      //   tilesData,
+      //   this.options._hillshadeOptions,
+      //   this.options.url,
+      //   this._getZoomForUrl(),
+      // );
+      // TODO: make this work without redraw?
+      if (this.options.debug) console.log("_updateTiles() with advanced hs");
+      this.redraw();
+      return;
     } else {
       canvasCoordinates = this._renderer.renderTiles(
         tilesData,
@@ -1139,7 +1248,7 @@ export default class GLOperations extends L.GridLayer {
         pixelData: el.pixelDataHsPregen as Uint8Array,
       }));
 
-      let canvasCoordinates = this._renderer.renderTilesHsPregen(
+      const canvasCoordinates = this._renderer.renderTilesHsPregen(
         tilesData,
         tilesDataHs,
         this.options._hillshadeOptions,
@@ -1150,6 +1259,10 @@ export default class GLOperations extends L.GridLayer {
         const tile = activeTiles[index];
         this._copyToTileCanvas(tile.el, sourceX, sourceY);
       });
+    } else if (this.options._hillshadeOptions.hillshadeType === 'advanced') {
+      if (this.options.debug) console.log("_updateTilesColorscaleOnly() with advanced hs");
+      this.redraw();
+      return;
     } else {
       // Fetch data from the existing tiles.
       const tilesData: TileDatum[] = activeTiles.map(({ coords, el }) => ({
@@ -1157,7 +1270,7 @@ export default class GLOperations extends L.GridLayer {
         pixelData: el.pixelData as Uint8Array,
       }));
 
-      let canvasCoordinates = this._renderer.renderTiles(
+      const canvasCoordinates = this._renderer.renderTiles(
         tilesData,
         this.options._hillshadeOptions,
         this._getZoomForUrl(),
@@ -1342,6 +1455,7 @@ export default class GLOperations extends L.GridLayer {
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
         this.options._hillshadeOptions,
+        this._getZoomForUrl()
       );
 
       canvasCoordinates.forEach(([sourceX, sourceY], index) => {
@@ -1363,8 +1477,7 @@ export default class GLOperations extends L.GridLayer {
         });
       };
 
-      let resultEncodedPixels: Uint8Array[];
-      resultEncodedPixels = this._renderer.renderTilesWithDiff(
+      const resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithDiff(
         tilesA,
         tilesB,
         onFrameRendered,
@@ -1402,7 +1515,7 @@ export default class GLOperations extends L.GridLayer {
     ) {
       if (this.options.debug) console.log("_updateTilesWithMultiAnalyze1: all same urls. Fetching from existing tiles. Running renderTiles()");
       // Fetch data from the existing tiles.
-      let tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
+      const tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
         coords,
         pixelData: el.pixelData as Uint8Array,
       }));
@@ -1410,6 +1523,7 @@ export default class GLOperations extends L.GridLayer {
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
         this.options._hillshadeOptions,
+        this._getZoomForUrl()
       );
 
       canvasCoordinates.forEach(([sourceX, sourceY], index) => {
@@ -1446,7 +1560,7 @@ export default class GLOperations extends L.GridLayer {
       };
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
-      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze1(
+      const resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze1(
         tilesA,
         this.options.filterLowA,
         this.options.filterHighA,
@@ -1494,7 +1608,7 @@ export default class GLOperations extends L.GridLayer {
     ) {
       if (this.options.debug) console.log("_updateTilesWithMultiAnalyze2: all same urls. Fetching from existing tiles. Running renderTiles()");
       // Fetch data from the existing tiles.
-      let tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
+      const tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
         coords,
         pixelData: el.pixelData as Uint8Array,
       }));
@@ -1502,6 +1616,7 @@ export default class GLOperations extends L.GridLayer {
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
         this.options._hillshadeOptions,
+        this._getZoomForUrl()
       );
 
       canvasCoordinates.forEach(([sourceX, sourceY], index) => {
@@ -1555,7 +1670,7 @@ export default class GLOperations extends L.GridLayer {
       };
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
-      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze2(
+      const resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze2(
         tilesA,
         tilesB,
         this.options.filterLowA,
@@ -1615,7 +1730,7 @@ export default class GLOperations extends L.GridLayer {
     ) {
       if (this.options.debug) console.log("_updateTilesWithMultiAnalyze3: all same urls. Fetching from existing tiles. Running renderTiles()");
       // Fetch data from the existing tiles.
-      let tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
+      const tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
         coords,
         pixelData: el.pixelData as Uint8Array,
       }));
@@ -1623,6 +1738,7 @@ export default class GLOperations extends L.GridLayer {
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
         this.options._hillshadeOptions,
+        this._getZoomForUrl()
       );
 
       canvasCoordinates.forEach(([sourceX, sourceY], index) => {
@@ -1693,7 +1809,7 @@ export default class GLOperations extends L.GridLayer {
       };
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
-      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze3(
+      const resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze3(
         tilesA,
         tilesB,
         tilesC,
@@ -1765,7 +1881,7 @@ export default class GLOperations extends L.GridLayer {
     ) {
       if (this.options.debug) console.log("_updateTilesWithMultiAnalyze4: all same urls. Fetching from existing tiles. Running renderTiles()");
       // Fetch data from the existing tiles.
-      let tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
+      const tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
         coords,
         pixelData: el.pixelData as Uint8Array,
       }));
@@ -1773,6 +1889,7 @@ export default class GLOperations extends L.GridLayer {
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
         this.options._hillshadeOptions,
+        this._getZoomForUrl()
       );
 
       canvasCoordinates.forEach(([sourceX, sourceY], index) => {
@@ -1860,7 +1977,7 @@ export default class GLOperations extends L.GridLayer {
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
       // let resultEncodedPixels: Float32Array[] = this._renderer.renderTilesWithMultiAnalyze4(
-      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze4(
+      const resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze4(
         tilesA,
         tilesB,
         tilesC,
@@ -1943,7 +2060,7 @@ export default class GLOperations extends L.GridLayer {
     ) {
       if (this.options.debug) console.log("_updateTilesWithMultiAnalyze5: all same urls. Fetching from existing tiles. Running renderTiles()");
       // Fetch data from the existing tiles.
-      let tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
+      const tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
         coords,
         pixelData: el.pixelData as Uint8Array,
       }));
@@ -1951,6 +2068,7 @@ export default class GLOperations extends L.GridLayer {
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
         this.options._hillshadeOptions,
+        this._getZoomForUrl()
       );
 
       canvasCoordinates.forEach(([sourceX, sourceY], index) => {
@@ -2055,7 +2173,7 @@ export default class GLOperations extends L.GridLayer {
       };
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
-      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze5(
+      const resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze5(
         tilesA,
         tilesB,
         tilesC,
@@ -2151,7 +2269,7 @@ export default class GLOperations extends L.GridLayer {
     ) {
       if (this.options.debug) console.log("_updateTilesWithMultiAnalyze6: all same urls. Fetching from existing tiles. Running renderTiles()");
       // Fetch data from the existing tiles.
-      let tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
+      const tilesA: TileDatum[] = activeTiles.map(({ coords, el }) => ({
         coords,
         pixelData: el.pixelData as Uint8Array,
       }));
@@ -2159,6 +2277,7 @@ export default class GLOperations extends L.GridLayer {
       const canvasCoordinates = this._renderer.renderTiles(
         tilesA,
         this.options._hillshadeOptions,
+        this._getZoomForUrl()
       );
 
       canvasCoordinates.forEach(([sourceX, sourceY], index) => {
@@ -2281,7 +2400,7 @@ export default class GLOperations extends L.GridLayer {
       };
 
       // Renderer hooks the render calls to requestAnimationFrame, calling `onFrameRendered` after each is drawn.
-      let resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze6(
+      const resultEncodedPixels: Uint8Array[] = this._renderer.renderTilesWithMultiAnalyze6(
         tilesA,
         tilesB,
         tilesC,
@@ -2343,7 +2462,7 @@ export default class GLOperations extends L.GridLayer {
       activeTiles = this._getActiveTiles();
 
       if (prevUrlA !== this.options.operationUrlA) {
-        let tilesA = await this._getTilesData(activeTiles, this.options.operationUrlA);
+        const tilesA = await this._getTilesData(activeTiles, this.options.operationUrlA);
         // Copy new pixel data to tiles.
         activeTiles.forEach((tile, index) => {
           tile.el.pixelDataA = tilesA[index].pixelData;
@@ -2353,7 +2472,7 @@ export default class GLOperations extends L.GridLayer {
 
     if ( this.options.extraPixelLayers >= 2) {
       if (prevUrlB !== this.options.operationUrlB) {
-        let tilesB = await this._getTilesData(activeTiles, this.options.operationUrlB);
+        const tilesB = await this._getTilesData(activeTiles, this.options.operationUrlB);
         // Copy new pixel data to tiles.
         activeTiles.forEach((tile, index) => {
           tile.el.pixelDataB = tilesB[index].pixelData;
@@ -2363,7 +2482,7 @@ export default class GLOperations extends L.GridLayer {
 
     if ( this.options.extraPixelLayers >= 3) {
       if (prevUrlC !== this.options.operationUrlC) {
-        let tilesC = await this._getTilesData(activeTiles, this.options.operationUrlC);
+        const tilesC = await this._getTilesData(activeTiles, this.options.operationUrlC);
         // Copy new pixel data to tiles.
         activeTiles.forEach((tile, index) => {
           tile.el.pixelDataC = tilesC[index].pixelData;
@@ -2373,7 +2492,7 @@ export default class GLOperations extends L.GridLayer {
 
     if ( this.options.extraPixelLayers >= 4) {
       if (prevUrlD !== this.options.operationUrlD) {
-        let tilesD = await this._getTilesData(activeTiles, this.options.operationUrlD);
+        const tilesD = await this._getTilesData(activeTiles, this.options.operationUrlD);
         // Copy new pixel data to tiles.
         activeTiles.forEach((tile, index) => {
           tile.el.pixelDataD = tilesD[index].pixelData;
@@ -2476,7 +2595,6 @@ export default class GLOperations extends L.GridLayer {
    * Copy pixels from the Renderer's (offscreen) <canvas> to a tile's (onscreen) canvas.
    */
   protected _copyToTileCanvas(tile: TileElement, sourceX: number, sourceY: number) {
-    if (this.options.debug) console.log("_copyToTileCanvas()")
     const tileSize = this._tileSizeAsNumber();
     const tileCanvas2DContext = tile.getContext('2d');
     if (tileCanvas2DContext === null) {
@@ -2519,64 +2637,64 @@ export default class GLOperations extends L.GridLayer {
       }
     });
 
-    let xTiles = xMax - xMin + 1;
-    let yTiles = yMax - yMin + 1;
+    const xTiles = xMax - xMin + 1;
+    const yTiles = yMax - yMin + 1;
 
-    let activeTilesBounds: ActiveTilesBounds = {
+    const activeTilesBounds: ActiveTilesBounds = {
       xMin: xMin,
       xMax: xMax,
       yMin: yMin,
       yMax: yMax,
       xTiles: xTiles,
       yTiles: yTiles
-    }
+    };
 
-    return activeTilesBounds
+    return activeTilesBounds;
   }
 
   /**
    * Get pixelData from each tile and merge to a single array
    */
   protected async _mergePixelData(activeTilesBounds: ActiveTilesBounds, tileSize: number) {
-    if (this.options.debug) console.log("_mergePixelData()")
-    let z = this._tileZoom;
+    if (this.options.debug) console.log("_mergePixelData()");
+    const z = this._tileZoom;
     const canvasMerged = document.createElement("canvas");
     this._contourData.width = activeTilesBounds.xTiles * tileSize;
     this._contourData.height = activeTilesBounds.yTiles * tileSize;
-    canvasMerged.width = this._contourData.width
-    canvasMerged.height = this._contourData.height
+    canvasMerged.width = this._contourData.width;
+    canvasMerged.height = this._contourData.height;
     const ctx = canvasMerged.getContext("2d");
 
-    let nodataTile: Uint8Array = util.createNoDataTile(
+    const nodataTile: Uint8Array = util.createNoDataTile(
       this.options.nodataValue,
       tileSize
     );
 
     // draw pixelData for all active tiles to a single canvas
     for (let i = 0; i <= activeTilesBounds.xTiles; i++) {
-      let x = activeTilesBounds.xMin + i;
+      const x = activeTilesBounds.xMin + i;
       for (let j = 0; j <= activeTilesBounds.yTiles; j++) {
-        let y = activeTilesBounds.yMin + j;
+        const y = activeTilesBounds.yMin + j;
 
         let uint8: Uint8Array;
         try {
-          let element: TileElement = <TileElement>this._tiles[`${x}:${y}:${z}`].el
-          uint8 = <Uint8Array>element.pixelData
+          const element: TileElement = <TileElement>this._tiles[`${x}:${y}:${z}`].el;
+          uint8 = <Uint8Array>element.pixelData;
         } catch(err) {
           uint8 = nodataTile;
         }
-        var uac = new Uint8ClampedArray(uint8);
+        const uac = new Uint8ClampedArray(uint8);
         // TODO: uint8 length = 262400. 4 * tileSize * tileSize = 262144. Why different?
-        var uac2 = new Uint8ClampedArray(uac.buffer, 0, 4 * tileSize * tileSize)
-        var idata = new ImageData(uac2, tileSize, tileSize);
+        const uac2 = new Uint8ClampedArray(uac.buffer, 0, 4 * tileSize * tileSize);
+        const idata = new ImageData(uac2, tileSize, tileSize);
 
         ctx!.putImageData(idata, i * tileSize, j * tileSize);
       }
     }
 
     // extract float values from canvas
-    var imageData = ctx!.getImageData(0, 0, activeTilesBounds.xTiles * tileSize, activeTilesBounds.yTiles * tileSize);
-    var mergedPixelData = new Float32Array(imageData.data.buffer);
+    const imageData = ctx!.getImageData(0, 0, activeTilesBounds.xTiles * tileSize, activeTilesBounds.yTiles * tileSize);
+    let mergedPixelData = new Float32Array(imageData.data.buffer);
 
     // replace noDataValues with NaN
     mergedPixelData = mergedPixelData.map(function(item) {
@@ -2588,13 +2706,13 @@ export default class GLOperations extends L.GridLayer {
       return item;
     }, this);
 
-    let mergedPixelArray: number[] = Array.from(mergedPixelData);
+    const mergedPixelArray: number[] = Array.from(mergedPixelData);
 
     const arrSum = function(arr: number[]){
       return arr.reduce(function(a,b){
-        return (isNaN(a) ? 0 : a) + (isNaN(b) ? 0 : b)
+        return (isNaN(a) ? 0 : a) + (isNaN(b) ? 0 : b);
       }, 0);
-    }
+    };
     if (this.options.debug) {console.log("sum mergedPixelArray"); console.log(arrSum(mergedPixelArray));}
 
     let contourCanvas: HTMLCanvasElement;
@@ -2603,14 +2721,14 @@ export default class GLOperations extends L.GridLayer {
       contourCanvas.width = this._contourData.width;
       contourCanvas.height = this._contourData.height;
     } else {
-      console.log("Error: contourCanvas not specified.")
-      return
+      console.log("Error: contourCanvas not specified.");
+      return;
     }
 
     this._contourData.mergedTileArray = mergedPixelArray;
     this._contourData.smoothedTileArray = undefined;
 
-    return
+    return;
   }
 
   /**
@@ -2620,12 +2738,12 @@ export default class GLOperations extends L.GridLayer {
     if (this.options.contourType === 'none') return;
 
     this._map.fire('contourDrawing', {status: true});
-    if (this.options.debug) console.log("_maybeUpdateMergedArrayAndDrawContours()")
+    if (this.options.debug) console.log("_maybeUpdateMergedArrayAndDrawContours()");
 
     await this._clearContours();
 
     setTimeout(async () => {
-      let activeTilesBounds: ActiveTilesBounds = await this._getActivetilesBounds();
+      const activeTilesBounds: ActiveTilesBounds = await this._getActivetilesBounds();
       const tileSize = this._tileSizeAsNumber();
 
       await this._mergePixelData(activeTilesBounds, tileSize);
@@ -2642,15 +2760,15 @@ export default class GLOperations extends L.GridLayer {
    */
   protected async _smoothContourInput() {
     if (this.options.debug) console.log("_smoothContourInput()");
-    let valuesNan = <number[]>this._contourData.mergedTileArray;
-    let valuesNoNan = valuesNan.map(function(item) {
+    const valuesNan = <number[]>this._contourData.mergedTileArray;
+    const valuesNoNan = valuesNan.map(function(item) {
       //TODO: fix for other noDataValues
       if(isNaN(item)) {
         item = this.options.nodataValue;
       }
       return item;
     }, this);
-    let valuesNoNanUint = new Uint8Array(Float32Array.from(valuesNoNan).buffer);
+    const valuesNoNanUint = new Uint8Array(Float32Array.from(valuesNoNan).buffer);
 
     const resultEncodedPixels = this._renderer.renderConvolutionSmooth(
       valuesNoNanUint,
@@ -2661,7 +2779,7 @@ export default class GLOperations extends L.GridLayer {
 
     //TODO fix for nodataValue other than default
     //Replace nodata with NaN
-    let newArr = [];
+    const newArr = [];
     for(let x = 0; x < resultEncodedPixels.length; x += 1) {
       let value = resultEncodedPixels[x];
       if(value === this.options.nodataValue) {
@@ -2679,7 +2797,7 @@ export default class GLOperations extends L.GridLayer {
     if (this.options.contourType === 'none') return;
 
     this._map.fire('contourDrawing', {status: true});
-    if (this.options.debug) console.log("_calculateAndDrawContours()")
+    if (this.options.debug) console.log("_calculateAndDrawContours()");
     await this._clearContours();
     await this._calculateContours();
     setTimeout(() => {
@@ -2710,7 +2828,7 @@ export default class GLOperations extends L.GridLayer {
    * Calculate contours
    */
   protected async _calculateContours() {
-    if (this.options.debug) console.log("_calculateContours()")
+    if (this.options.debug) console.log("_calculateContours()");
 
     let values;
     if (this.options.contourSmoothInput) {
@@ -2723,40 +2841,40 @@ export default class GLOperations extends L.GridLayer {
       values = values.map(x => x * this.options.contourScaleFactor);
     }
 
-    if (this.options.debug) {console.log("valuesArray"); console.log(values)};
+    if (this.options.debug) {console.log("valuesArray"); console.log(values);}
 
     let max = <number>d3.max(values, d => d !== this.options.nodataValue ? d : NaN);
     let min = <number>d3.min(values, d => d !== this.options.nodataValue ? d : NaN);
     max = Math.ceil(max/this.options.contourInterval) * this.options.contourInterval;
     min = Math.floor(min/this.options.contourInterval) * this.options.contourInterval;
-    if (this.options.debug) {console.log("Contours: max"); console.log(max)};
-    if (this.options.debug) {console.log("Contours: min"); console.log(min)};
+    if (this.options.debug) {console.log("Contours: max"); console.log(max);}
+    if (this.options.debug) {console.log("Contours: min"); console.log(min);}
 
     // countour line values
-    let thresholds = [];
-    for (var i = min; i <= max; i += this.options.contourInterval) {
+    const thresholds = [];
+    for (let i = min; i <= max; i += this.options.contourInterval) {
       thresholds.push(i);
     }
-    if (this.options.debug) {console.log("Contour thresholds"); console.log(thresholds)};
+    if (this.options.debug) {console.log("Contour thresholds"); console.log(thresholds);}
 
-    let contour = d3.contours()
+    const contour = d3.contours()
       .size([<number>this._contourData.width, <number>this._contourData.height]);
 
     contour.thresholds(thresholds);
-    contour.smooth(this.options.contourSmoothLines)
+    contour.smooth(this.options.contourSmoothLines);
 
-    let contoursGeoData = contour(values);
+    const contoursGeoData = contour(values);
     this._contourData.contoursGeoData = contoursGeoData;
-    if (this.options.debug) {console.log("contoursGeoData"); console.log(contoursGeoData)};
+    if (this.options.debug) {console.log("contoursGeoData"); console.log(contoursGeoData);}
 
-    return
+    return;
   }
 
   /**
    * Clear contours canvas after turning off contours
    */
   protected async _clearContours() {
-    if (this.options.debug) console.log("_clearContours()")
+    if (this.options.debug) console.log("_clearContours()");
 
     let contourCanvas: HTMLCanvasElement;
     let contourCtx: CanvasRenderingContext2D;
@@ -2764,8 +2882,8 @@ export default class GLOperations extends L.GridLayer {
       contourCanvas = this.options.contourCanvas;
       contourCtx = <CanvasRenderingContext2D>contourCanvas.getContext('2d');
     } else {
-      console.log("Error: contourCanvas not specified.")
-      return
+      console.log("Error: contourCanvas not specified.");
+      return;
     }
 
     contourCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2777,29 +2895,29 @@ export default class GLOperations extends L.GridLayer {
    * Move contours canvas to fit active tiles
    */
   protected async _moveContourCanvas(activeTilesBounds: ActiveTilesBounds) {
-    if (this.options.debug) console.log("_moveContourCanvas()")
+    if (this.options.debug) console.log("_moveContourCanvas()");
 
     let contourCanvas: HTMLCanvasElement;
     if (this.options.contourCanvas) {
       contourCanvas = this.options.contourCanvas;
     } else {
-      console.log("Error: contourCanvas not specified.")
-      return
+      console.log("Error: contourCanvas not specified.");
+      return;
     }
 
     let contourPane: HTMLElement;
     if (this.options.contourPane) {
       contourPane = this.options.contourPane;
     } else {
-      console.log("Error: contourPane not specified.")
-      return
+      console.log("Error: contourPane not specified.");
+      return;
     }
 
-    let scale = this._map.getZoomScale(this._map.getZoom(), this._level.zoom);
-    let pixelOrigin = this._map.getPixelOrigin();
-    let transformPane = this._level.origin.multiplyBy(scale)
+    const scale = this._map.getZoomScale(this._map.getZoom(), this._level.zoom);
+    const pixelOrigin = this._map.getPixelOrigin();
+    const transformPane = this._level.origin.multiplyBy(scale)
                         .subtract(pixelOrigin);
-    let activeTilesPos = this._getTilePos(this._keyToTileCoords(`${activeTilesBounds.xMin}:${activeTilesBounds.yMin}:${this._level.zoom}`));
+    const activeTilesPos = this._getTilePos(this._keyToTileCoords(`${activeTilesBounds.xMin}:${activeTilesBounds.yMin}:${this._level.zoom}`));
 
     L.DomUtil.setTransform(contourPane, transformPane, scale);
     L.DomUtil.setTransform(contourCanvas, activeTilesPos);
@@ -2809,10 +2927,10 @@ export default class GLOperations extends L.GridLayer {
    * Draw contours on seperate canvas
    */
   protected async _drawContours() {
-    if (this.options.debug) console.log("_drawContours()")
+    if (this.options.debug) console.log("_drawContours()");
 
-    let width = <number>this._contourData.width
-    let height = <number>this._contourData.height
+    const width = <number>this._contourData.width;
+    const height = <number>this._contourData.height;
 
     let contourCanvas: HTMLCanvasElement;
     let contourCtx: CanvasRenderingContext2D;
@@ -2820,27 +2938,27 @@ export default class GLOperations extends L.GridLayer {
       contourCanvas = this.options.contourCanvas;
       contourCtx = <CanvasRenderingContext2D>contourCanvas.getContext('2d');
     } else {
-      console.log("Error: contourCanvas not specified.")
-      return
+      console.log("Error: contourCanvas not specified.");
+      return;
     }
 
-    let path = d3.geoPath().context(contourCtx);
+    const path = d3.geoPath().context(contourCtx);
 
-    let bathyColor = d3.scaleLinear<string>()
+    const bathyColor = d3.scaleLinear<string>()
       .domain(this.options.contourBathyDomain)
       .range(this.options.contourBathyColors);
-    let hypsoColor = d3.scaleLinear<string>()
+      const hypsoColor = d3.scaleLinear<string>()
       .domain(this.options.contourHypsoDomain)
       .range(this.options.contourHypsoColors)
       .interpolate(d3.interpolateHcl);
 
-    let contoursGeoData = <ContourMultiPolygon[]>this._contourData.contoursGeoData;
+    const contoursGeoData = <ContourMultiPolygon[]>this._contourData.contoursGeoData;
 
-    let contourIndexInterval = this.options.contourIndexInterval;
-    let bathyHigh = this.options.contourBathyDomain[this.options.contourBathyDomain.length - 1];
+    const contourIndexInterval = this.options.contourIndexInterval;
+    const bathyHigh = this.options.contourBathyDomain[this.options.contourBathyDomain.length - 1];
 
     contourCtx.clearRect(0, 0, width, height);
-    contourCtx.save()
+    contourCtx.save();
 
     if (this.options.contourType == 'lines') {
       contourCtx.lineWidth = this.options.contourLineWeight;
@@ -2855,7 +2973,7 @@ export default class GLOperations extends L.GridLayer {
       } else {
         contoursGeoData.forEach(function (c) {
           contourCtx.beginPath();
-          var fill;
+          let fill;
           if (c.value >= bathyHigh || !this.options.contourBathy) {
             if (this.options.contourHypso) fill = hypsoColor(c.value);
           } else {
@@ -2881,9 +2999,9 @@ export default class GLOperations extends L.GridLayer {
           contourCtx.stroke();
         } else {
           // calculate label positions and a mask around each
-          let labels: ContourLabel[] = [];
+          const labels: ContourLabel[] = [];
           for (const c of contoursGeoData) {
-            const threshold = c.value
+            const threshold = c.value;
 
             if (c.value % this.options.contourIndexInterval == 0) {
               // TODO: New TS errors occuring. Figure out why
@@ -3025,7 +3143,7 @@ export default class GLOperations extends L.GridLayer {
         byteIndex = (coordsInTile!.y * this._tileSizeAsNumber() + coordsInTile!.x) * BYTES_PER_WORD;
       }
 
-      let pixelValues: PixelValues = {};
+      const pixelValues: PixelValues = {};
       if (byteIndex === undefined) {
         pixelValues['pixelValue'] = undefined;
       } else {

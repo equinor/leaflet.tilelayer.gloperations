@@ -2,7 +2,6 @@ uniform mat4 transformMatrix;
 
 attribute vec2 position;
 attribute vec2 texCoordA;
-// use same coords for all textures?
 attribute vec2 texCoordB;
 
 varying vec2 vTexCoordA;

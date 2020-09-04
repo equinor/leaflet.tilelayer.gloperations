@@ -37,17 +37,33 @@ import {
   TileCoordinates,
   TileDatum,
   HillshadeOptions,
+  HsAdvMergeAndScaleTiles,
+  HsAdvCalcNormals,
+  HsAdvDirectLightning,
+  HsAdvSoftShadows,
+  HsAdvAmbientShadows,
+  HsAdvFinal,
 } from './types';
+
 import * as util from './util';
+
+import {
+  EARTH_SUN_DISTANCE,
+  SUN_RADIUS,
+} from './constants';
 
 import {
   Color,
   SentinelValue,
 } from './types';
 
+import { vec3 } from "gl-matrix";
+
 export default class Renderer {
+  gloperations: any;
   canvas: HTMLCanvasElement;
   regl: REGL.Regl;
+  nodataValue: number;
   textureManager: TextureManager;
   textureManagerA: TextureManager;
   textureManagerB: TextureManager;
@@ -65,8 +81,9 @@ export default class Renderer {
   scaleInputPrevious: Color[];
   sentinelInput: SentinelValue[];
   sentinelInputPrevious: SentinelValue[];
-  fboTile: Framebuffer2D;
   maxTextureDimension: number;
+  sunDirections: vec3[];
+  ambientDirections: vec3[];
 
   // Regl draw commands.
   drawTile: REGL.DrawCommand<REGL.DefaultContext, DrawTile.Props>;
@@ -90,8 +107,15 @@ export default class Renderer {
   calcTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze6.Props>;
   drawTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze6.Props>;
   convolutionSmooth: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
+  HsAdvMergeAndScaleTiles: REGL.DrawCommand<REGL.DefaultContext, HsAdvMergeAndScaleTiles.Props>;
+  HsAdvCalcNormals: REGL.DrawCommand<REGL.DefaultContext, HsAdvCalcNormals.Props>;
+  HsAdvDirectLightning: REGL.DrawCommand<REGL.DefaultContext, HsAdvDirectLightning.Props>;
+  HsAdvSoftShadows: REGL.DrawCommand<REGL.DefaultContext, HsAdvSoftShadows.Props>;
+  HsAdvAmbientShadows: REGL.DrawCommand<REGL.DefaultContext, HsAdvAmbientShadows.Props>;
+  HsAdvFinal: REGL.DrawCommand<REGL.DefaultContext, HsAdvFinal.Props>;
 
   constructor(
+    gloperations: any,
     tileSize: number,
     nodataValue: number,
     scaleInput: Color[],
@@ -105,42 +129,36 @@ export default class Renderer {
     const regl = REGL({
       canvas: canvas,
       // profile: true,
+      // extension only used for advanced hillshading
+      // TODO: add fallback to rgba if writing to float fails
+      optionalExtensions: ['OES_texture_float', 'WEBGL_color_buffer_float'],
       onDone: function (err: Error, regl: REGL.Regl) {
         if (err) {
-          console.log(err)
-          return
+          console.log(err);
+          return;
         } else {
-          // maxTextureDimension = this.findMaxTextureDimension()
-          //TODO: fix maxTextureSize logic
-          if (regl.limits.maxTextureSize > 2048) {
-            maxTextureDimension = 2048;
-          } else if (regl.limits.maxTextureSize > 4096) {
-            maxTextureDimension = 4096;
-          } else if (regl.limits.maxTextureSize > 8192) {
-            maxTextureDimension = 8192;
-          };
+          maxTextureDimension = regl.limits.maxTextureSize;
         }
         // TODO: Improve software rendering detection
         if (regl.limits.maxFragmentUniforms === 261) {
-          console.warn("Software rendering detected and not supported with GLOperations plugin. If you have a GPU, check if drivers are installed ok?");
+          console.warn("Software rendering detected. Many features of this plugin will fail. If you have a GPU, check if drivers are installed ok?");
         }
       }
     });
 
     const commonDrawConfig = commands.getCommonDrawConfiguration(tileSize, nodataValue);
-    // const commonDrawColors = commands.getColorStructArray('colorScale', colorscaleMaxLength, 'sentinelValues', sentinelMaxLength);
-    // const interpolateDrawColorsA = commands.getColorStructArray('colorScaleA', colorscaleMaxLength, 'sentinelValuesA', sentinelMaxLength);
-    // const interpolateDrawColorsB = commands.getColorStructArray('colorScaleB', colorscaleMaxLength, 'sentinelValuesB', sentinelMaxLength);
     const fragMacros = {
       SCALE_MAX_LENGTH: colorscaleMaxLength,
       SENTINEL_MAX_LENGTH: sentinelMaxLength,
-    }
+    };
 
     // Assign object "instance" properties.
     Object.assign(this, {
-      canvas,
-      regl,
-      tileSize,
+      gloperations: gloperations,
+      canvas: canvas,
+      regl: regl,
+      tileSize: tileSize,
+      nodataValue: nodataValue,
       maxTextureDimension: maxTextureDimension,
       scaleInput: scaleInput,
       sentinelInput: sentinelInput,
@@ -175,6 +193,12 @@ export default class Renderer {
       drawTileDiff: commands.createDrawTileDiffCommand(regl, commonDrawConfig, fragMacros),
       calcTileDiff: commands.createCalcTileDiffCommand(regl, commonDrawConfig),
       convolutionSmooth: commands.createConvolutionSmoothCommand(regl, commonDrawConfig),
+      HsAdvMergeAndScaleTiles: commands.createHsAdvMergeAndScaleTiles(regl),
+      HsAdvCalcNormals: commands.createHsAdvCalcNormals(regl, commonDrawConfig),
+      HsAdvDirectLightning: commands.createHsAdvDirectLightning(regl, commonDrawConfig),
+      HsAdvSoftShadows: commands.createHsAdvSoftShadows(regl, commonDrawConfig),
+      HsAdvAmbientShadows: commands.createHsAdvAmbientShadows(regl, commonDrawConfig),
+      HsAdvFinal: commands.createHsAdvFinal(regl, commonDrawConfig),
     });
   }
 
@@ -184,17 +208,9 @@ export default class Renderer {
       regl,
     } = this;
 
-    let maxTextureDimension = MAX_TEXTURE_DIMENSION;
+    const maxTextureDimension = regl.limits.maxTextureSize;
 
-    if (regl.limits.maxTextureSize > 2048) {
-      maxTextureDimension = 2048;
-    } else if (regl.limits.maxTextureSize > 4096) {
-      maxTextureDimension = 4096;
-    } else if (regl.limits.maxTextureSize > 8192) {
-      maxTextureDimension = 8192;
-    };
-
-    return maxTextureDimension
+    return maxTextureDimension;
   }
 
   setMaxTextureDimension(newMaxTextureDimension: number) {
@@ -223,12 +239,12 @@ export default class Renderer {
     this.sentinelInput = sentinelInput;
     this.sentinelColormapPrevious = this.sentinelColormap;
     this.sentinelColormap = util.createColormapTexture(sentinelInput, this.regl);
-  }  
+  }
 
   renderTile(
     { coords, pixelData }: TileDatum,
     _hillshadeOptions: HillshadeOptions,
-    zoom: number = 0,
+    zoom: number,
   ): Pair<number> {
     const {
       regl,
@@ -241,10 +257,10 @@ export default class Renderer {
 
     regl.clear({ color: CLEAR_COLOR });
 
-    let zoomdelta = _hillshadeOptions.hsSimpleZoomdelta || 0;
+    const zoomdelta = _hillshadeOptions.hsSimpleZoomdelta || 0;
 
-    let offset_pixels = Math.max(0.5, 2 ** (zoom + zoomdelta) / 2048);
-    let offset_texcoords = offset_pixels / textureManager.texture.width;
+    const offset_pixels = Math.max(0.5, 2 ** (zoom + zoomdelta) / 2048);
+    const offset_texcoords = offset_pixels / textureManager.texture.width;
 
     if (_hillshadeOptions.hillshadeType === 'none') {
       this.drawTile({
@@ -327,14 +343,14 @@ export default class Renderer {
     height: number,
     pixels: Uint8Array,
   ) {
-    let halfHeight = height / 2 | 0;  // the | 0 keeps the result an int
-    let bytesPerRow = width * 4;
+    const halfHeight = height / 2 | 0;  // the | 0 keeps the result an int
+    const bytesPerRow = width * 4;
 
     // make a temp buffer to hold one row
-    var temp = new Uint8Array(width * 4);
-    for (var y = 0; y < halfHeight; ++y) {
-      var topOffset = y * bytesPerRow;
-      var bottomOffset = (height - y - 1) * bytesPerRow;
+    const temp = new Uint8Array(width * 4);
+    for (let y = 0; y < halfHeight; ++y) {
+      const topOffset = y * bytesPerRow;
+      const bottomOffset = (height - y - 1) * bytesPerRow;
       // make copy of a row on the top half
       temp.set(pixels.subarray(topOffset, topOffset + bytesPerRow));
       // copy a row from the bottom half to the top
@@ -342,7 +358,7 @@ export default class Renderer {
       // copy the copy of the top half row to the bottom half
       pixels.set(temp, bottomOffset);
     }
-    return pixels
+    return pixels;
   }
 
   renderTileDiff(
@@ -361,7 +377,7 @@ export default class Renderer {
     const textureBoundsA = textureManagerA.addTile(tileDatumA.coords, tileDatumA.pixelData);
     const textureBoundsB = textureManagerB.addTile(tileDatumB.coords, tileDatumB.pixelData);
 
-    let fboTile = regl.framebuffer({
+    const fboTile: Framebuffer2D = regl.framebuffer({
       width: tileSize,
       height: tileSize,
       depth: false,
@@ -424,7 +440,7 @@ export default class Renderer {
       flipY: false,
     });
 
-    let fboSmoothed = regl.framebuffer({
+    const fboSmoothed = regl.framebuffer({
       width: width,
       height: height,
       depth: false,
@@ -451,6 +467,144 @@ export default class Renderer {
     return resultEncodedPixels;
   }
 
+  renderTileHsAdvanced(
+    _hillshadeOptions: HillshadeOptions,
+    zoom: number,
+    textureCoords: number[][],
+  ): Pair<number> {
+    const {
+      regl,
+      textureManager,
+      tileSize,
+    } = this;
+
+    this.setCanvasSize(tileSize, tileSize);
+
+    const fboFloats = regl.framebuffer({
+      width: tileSize * 3,
+      height: tileSize * 3,
+      depth: false,
+      colorType: "float",
+    });
+
+    const fboNormals = regl.framebuffer({
+      width: tileSize * 3,
+      height: tileSize * 3,
+      depth: false,
+      colorType: "float",
+    });
+
+    const fboSoftShadowPP = util.PingPong(regl, {
+      width: tileSize,
+      height: tileSize,
+      colorType: "float"
+    });
+
+    const fboAmbientShadowPP = util.PingPong(regl, {
+      width: tileSize,
+      height: tileSize,
+      colorType: "float"
+    });
+
+    const pixelScale = _hillshadeOptions.hsPixelScale! / (tileSize * (2**zoom));
+    let hsValueScale = 1.0;
+    if (typeof _hillshadeOptions.hsValueScale == 'number'){
+      hsValueScale = _hillshadeOptions.hsValueScale;
+    } else if (_hillshadeOptions.hsValueScale!.constructor == Object) {
+      hsValueScale = _hillshadeOptions.hsValueScale![zoom];
+    }
+
+    this.HsAdvMergeAndScaleTiles({
+      canvasSize: [tileSize * 3, tileSize * 3],
+      texture: textureManager.texture,
+      fbo: fboFloats,
+      floatScale: hsValueScale,
+      texCoord: textureCoords,
+      nodataValue: this.nodataValue,
+    });
+
+    this.HsAdvCalcNormals({
+      canvasSize: [tileSize * 3, tileSize * 3],
+      canvasCoordinates: [0, 0],
+      tInput: fboFloats,
+      pixelScale: pixelScale,
+      onePixel: 1 / (tileSize * 3),
+      fbo: fboNormals,
+    });
+
+    // this.HsAdvDirectLightning({
+    //   scaleLength: this.scaleInput.length,
+    //   sentinelLength: this.sentinelInput.length,
+    //   scaleColormap: this.scaleColormap,
+    //   sentinelColormap: this.sentinelColormap,
+    //   canvasSize: [tileSize, tileSize],
+    //   canvasCoordinates: [0, 0],
+    //   tInput: fboFloats,
+    //   tNormal: fboNormals,
+    //   textureBounds: textureBounds,
+    //   floatScale: elevationScales[zoom],
+    //   sunDirection: vec3.normalize(vec3.create(), [1, 1, 1]),
+    // });
+
+    // Soft Shadows
+    for (let i = 0; i < _hillshadeOptions.hsAdvSoftIterations!; i++) {
+      this.HsAdvSoftShadows({
+        canvasSize: [tileSize, tileSize],
+        canvasCoordinates: [0, 0],
+        tInput: fboFloats,
+        tNormal: fboNormals,
+        tSrc: fboSoftShadowPP.ping(),
+        softIterations: _hillshadeOptions.hsAdvSoftIterations,
+        resolution: [tileSize, tileSize],
+        pixelScale: pixelScale,
+        sunDirection: this.sunDirections[i],
+        // fbo: i === _hillshadeOptions.hsAdvSoftIterations! - 1 ? undefined : fboSoftShadowPP.pong() // to show shadows
+        fbo: fboSoftShadowPP.pong()
+      });
+      fboSoftShadowPP.swap();
+    }
+
+    for (let i = 0; i < _hillshadeOptions.hsAdvAmbientIterations!; i++) {
+      this.HsAdvAmbientShadows({
+        canvasSize: [tileSize, tileSize],
+        canvasCoordinates: [0, 0],
+        tInput: fboFloats,
+        tNormal: fboNormals,
+        tSrc: fboAmbientShadowPP.ping(),
+        ambientIterations: _hillshadeOptions.hsAdvAmbientIterations,
+        direction: this.ambientDirections[i],
+        resolution: [tileSize, tileSize],
+        pixelScale: pixelScale,
+        // fbo: i === _hillshadeOptions.hsAdvAmbientIterations! - 1 ? undefined : fboAmbientShadowPP.pong() // to show shadows
+        fbo: fboAmbientShadowPP.pong()
+      });
+      fboAmbientShadowPP.swap();
+    }
+
+    this.HsAdvFinal({
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
+      canvasSize: [tileSize, tileSize],
+      canvasCoordinates: [0, 0],
+      tInput: fboFloats,
+      tSoftShadow: fboSoftShadowPP.ping(),
+      tAmbient: fboAmbientShadowPP.ping(),
+      floatScale: hsValueScale,
+      finalSoftMultiplier: _hillshadeOptions.hsAdvFinalSoftMultiplier,
+      finalAmbientMultiplier: _hillshadeOptions.hsAdvFinalAmbientMultiplier,
+    });
+
+    fboFloats.destroy();
+    fboNormals.destroy();
+    fboSoftShadowPP.destroy();
+    fboAmbientShadowPP.destroy();
+
+    // Since the tile will fill the whole canvas, the offset is simply [0, 0].
+    return [0, 0];
+  }
+
   renderTileMulti1(
     tileDatumA: TileDatum,
     filterLowA: number,
@@ -468,7 +622,7 @@ export default class Renderer {
     // Add image to the texture and retrieve its texture coordinates.
     const textureBoundsA = textureManagerA.addTile(tileDatumA.coords, tileDatumA.pixelData);
 
-    let fboTile = regl.framebuffer({
+    const fboTile = regl.framebuffer({
       width: tileSize,
       height: tileSize,
       depth: false,
@@ -539,7 +693,7 @@ export default class Renderer {
     const textureBoundsA = textureManagerA.addTile(tileDatumA.coords, tileDatumA.pixelData);
     const textureBoundsB = textureManagerB.addTile(tileDatumB.coords, tileDatumB.pixelData);
 
-    let fboTile = regl.framebuffer({
+    const fboTile = regl.framebuffer({
       width: tileSize,
       height: tileSize,
       depth: false,
@@ -626,7 +780,7 @@ export default class Renderer {
     const textureBoundsB = textureManagerB.addTile(tileDatumB.coords, tileDatumB.pixelData);
     const textureBoundsC = textureManagerC.addTile(tileDatumC.coords, tileDatumC.pixelData);
 
-    let fboTile = regl.framebuffer({
+    const fboTile = regl.framebuffer({
       width: tileSize,
       height: tileSize,
       depth: false,
@@ -728,7 +882,7 @@ export default class Renderer {
     const textureBoundsC = textureManagerC.addTile(tileDatumC.coords, tileDatumC.pixelData);
     const textureBoundsD = textureManagerD.addTile(tileDatumD.coords, tileDatumD.pixelData);
 
-    let fboTile = regl.framebuffer({
+    const fboTile = regl.framebuffer({
       width: tileSize,
       height: tileSize,
       depth: false,
@@ -847,7 +1001,7 @@ export default class Renderer {
     const textureBoundsD = textureManagerD.addTile(tileDatumD.coords, tileDatumD.pixelData);
     const textureBoundsE = textureManagerE.addTile(tileDatumE.coords, tileDatumE.pixelData);
 
-    let fboTile = regl.framebuffer({
+    const fboTile = regl.framebuffer({
       width: tileSize,
       height: tileSize,
       depth: false,
@@ -981,7 +1135,7 @@ export default class Renderer {
     const textureBoundsE = textureManagerE.addTile(tileDatumE.coords, tileDatumE.pixelData);
     const textureBoundsF = textureManagerE.addTile(tileDatumF.coords, tileDatumF.pixelData);
 
-    let fboTile = regl.framebuffer({
+    const fboTile = regl.framebuffer({
       width: tileSize,
       height: tileSize,
       depth: false,
@@ -1082,7 +1236,7 @@ export default class Renderer {
   renderTiles(
     tiles: TileDatum[],
     _hillshadeOptions: HillshadeOptions,
-    zoom: number = 0,
+    zoom: number,
   ): Array<Pair<number>> {
     const {
       regl,
@@ -1120,7 +1274,7 @@ export default class Renderer {
     // tiles than will fit in the texture, we have to render in batches.
     const chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
 
-    let zoomdelta = _hillshadeOptions.hsSimpleZoomdelta || 0;
+    const zoomdelta = _hillshadeOptions.hsSimpleZoomdelta || 0;
 
     // Render chunk by chunk.
     for (const chunk of chunks) {
@@ -1129,8 +1283,8 @@ export default class Renderer {
         ({ coords, pixelData }) => textureManager.addTile(coords, pixelData),
       );
 
-      let offset_pixels = Math.max(0.5, 2 ** (zoom + zoomdelta) / 2048);
-      let offset_texcoords = offset_pixels / textureManager.texture.width;
+      const offset_pixels = Math.max(0.5, 2 ** (zoom + zoomdelta) / 2048);
+      const offset_texcoords = offset_pixels / textureManager.texture.width;
 
       if (_hillshadeOptions.hillshadeType === 'none') {
         this.drawTile(chunk.map(({ canvasCoords }, index) => ({
@@ -1246,6 +1400,187 @@ export default class Renderer {
     return canvasCoordinates;
   }
 
+  renderTilesHsAdvanced(
+    tiles: TileDatum[],
+    _hillshadeOptions: HillshadeOptions,
+    url: string,
+    zoom: number,
+  ): Array<Pair<number>> {
+    const {
+      regl,
+      textureManager,
+      tileSize,
+      nodataValue
+    } = this;
+
+    // Compute required canvas dimensions, then resize the canvas.
+    const [canvasWidth, canvasHeight] = this.computeRequiredCanvasDimensions(tiles.length);
+    this.setCanvasSize(canvasWidth, canvasHeight);
+
+    // Compute the coordinates at which each tile will be rendered in the canvas.
+    const canvasCoordinates = this.getCanvasCoordinates(canvasWidth, canvasHeight, tiles.length);
+
+    type TileWithCanvasCoords = TileDatum & { canvasCoords: Pair<number> };
+
+    // Form an array combining each tile datum with the coordinates at which it will be rendered.
+    const tilesWithCanvasCoordinates = zipWith<TileDatum | Pair<number>, TileWithCanvasCoords>(
+      tiles,
+      canvasCoordinates,
+      (tile: TileDatum, canvasCoords: Pair<number>) => ({
+        ...tile,
+        canvasCoords,
+      }),
+    );
+
+    const canvasSize = [canvasWidth, canvasHeight] as Pair<number>;
+
+    // Clear existing tiles from cache.
+    textureManager.clearTiles();
+
+    // Clear the canvas.
+    regl.clear({ color: CLEAR_COLOR });
+
+    // Split the tiles array into chunks the size of the texture capacity. If we need to render more
+    // tiles than will fit in the texture, we have to render in batches.
+    const chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
+
+    const nodataTile = util.createNoDataTile(nodataValue, tileSize);
+    const pixelScale = _hillshadeOptions.hsPixelScale! / (tileSize * (2**zoom));
+    let hsValueScale = 1.0;
+    if (typeof _hillshadeOptions.hsValueScale == 'number'){
+      hsValueScale = _hillshadeOptions.hsValueScale;
+    } else if (_hillshadeOptions.hsValueScale!.constructor == Object) {
+      hsValueScale = _hillshadeOptions.hsValueScale![zoom];
+    }
+
+    // Render chunk by chunk.
+    (async () => {
+      for (const chunk of chunks) {
+        for (const tile of chunk) {
+          const {
+            coords,
+            pixelData,
+            canvasCoords,
+          } = tile;
+
+          textureManager.addTile(coords, pixelData);
+          // if tile is just noData, don't do anything
+          if (util.typedArraysAreEqual(pixelData, nodataTile)) {
+            // console.log("nodata tile. exiting");
+          } else {
+            let textureCoords: number[][] = [];
+            textureCoords = await util.getAdjacentTilesTexCoords(
+              this.gloperations,
+              this.textureManager,
+              coords,
+              url
+            );
+
+            const fboFloats = regl.framebuffer({
+              width: tileSize * 3,
+              height: tileSize * 3,
+              depth: false,
+              colorType: "float",
+            });
+
+            const fboNormals = regl.framebuffer({
+              width: tileSize * 3,
+              height: tileSize * 3,
+              depth: false,
+              colorType: "float",
+            });
+
+            const fboSoftShadowPP = util.PingPong(regl, {
+              width: tileSize,
+              height: tileSize,
+              colorType: "float"
+            });
+
+            const fboAmbientShadowPP = util.PingPong(regl, {
+              width: tileSize,
+              height: tileSize,
+              colorType: "float"
+            });
+
+            this.HsAdvMergeAndScaleTiles({
+              canvasSize: [tileSize * 3, tileSize * 3],
+              texture: textureManager.texture,
+              fbo: fboFloats,
+              floatScale: hsValueScale,
+              texCoord: textureCoords,
+              nodataValue: nodataValue,
+            });
+
+            this.HsAdvCalcNormals({
+              canvasSize: [tileSize * 3, tileSize * 3],
+              canvasCoordinates: [0, 0],
+              tInput: fboFloats,
+              pixelScale: pixelScale,
+              onePixel: 1 / (tileSize * 3),
+              fbo: fboNormals,
+            });
+
+            // Soft Shadows
+            for (let i = 0; i < _hillshadeOptions.hsAdvSoftIterations!; i++) {
+              this.HsAdvSoftShadows({
+                canvasSize: [tileSize, tileSize],
+                canvasCoordinates: [0, 0],
+                tInput: fboFloats,
+                tNormal: fboNormals,
+                tSrc: fboSoftShadowPP.ping(),
+                softIterations: _hillshadeOptions.hsAdvSoftIterations,
+                resolution: [tileSize, tileSize],
+                pixelScale: pixelScale,
+                sunDirection: this.sunDirections[i],
+                // fbo: i === _hillshadeOptions.hsAdvSoftIterations! - 1 ? undefined : fboSoftShadowPP.pong() // to show shadows
+                fbo: fboSoftShadowPP.pong()
+              });
+              fboSoftShadowPP.swap();
+            }
+
+            for (let i = 0; i < _hillshadeOptions.hsAdvAmbientIterations!; i++) {
+              this.HsAdvAmbientShadows({
+                canvasSize: [tileSize, tileSize],
+                canvasCoordinates: [0, 0],
+                tInput: fboFloats,
+                tNormal: fboNormals,
+                tSrc: fboAmbientShadowPP.ping(),
+                ambientIterations: _hillshadeOptions.hsAdvAmbientIterations,
+                direction: this.ambientDirections[i],
+                resolution: [tileSize, tileSize],
+                pixelScale: pixelScale,
+                // fbo: i === _hillshadeOptions.hsAdvAmbientIterations! - 1 ? undefined : fboAmbientShadowPP.pong() // to show shadows
+                fbo: fboAmbientShadowPP.pong()
+              });
+              fboAmbientShadowPP.swap();
+            }
+
+            this.HsAdvFinal({
+              scaleLength: this.scaleInput.length,
+              sentinelLength: this.sentinelInput.length,
+              scaleColormap: this.scaleColormap,
+              sentinelColormap: this.sentinelColormap,
+              canvasSize: canvasSize,
+              canvasCoordinates: canvasCoords,
+              tInput: fboFloats,
+              tSoftShadow: fboSoftShadowPP.ping(),
+              tAmbient: fboAmbientShadowPP.ping(),
+              floatScale: hsValueScale,
+              finalSoftMultiplier: _hillshadeOptions.hsAdvFinalSoftMultiplier,
+              finalAmbientMultiplier: _hillshadeOptions.hsAdvFinalAmbientMultiplier,
+            });
+
+            fboFloats.destroy();
+            fboNormals.destroy();
+            fboSoftShadowPP.destroy();
+            fboAmbientShadowPP.destroy();
+          }
+        }
+      }
+      })();
+    return canvasCoordinates;
+  }
+
   renderTilesWithDiff(
     tilesA: TileDatum[],
     tilesB: TileDatum[],
@@ -1287,7 +1622,7 @@ export default class Renderer {
     );
 
     // let resultEncodedPixels: Float32Array[] = [];
-    let resultEncodedPixels: Uint8Array[] = [];
+    const resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -1297,7 +1632,7 @@ export default class Renderer {
       // Clear the canvas.
       regl.clear({ color: CLEAR_COLOR });
 
-      let tileIndex: number = 0;
+      let tileIndex = 0;
 
       // Render chunk by chunk.
       for (const chunk of chunks) {
@@ -1310,7 +1645,7 @@ export default class Renderer {
         );
 
         chunk.forEach(({ canvasCoords }, index) => {
-          let fboTile = regl.framebuffer({
+          const fboTile = regl.framebuffer({
             width: tileSize,
             height: tileSize,
             depth: false,
@@ -1352,7 +1687,7 @@ export default class Renderer {
 
           fboTile.destroy();
         });
-      };
+      }
 
       // Invoke the callback with the canvas coordinates of the rendered tiles.
       onFrameRendered(canvasCoordinates);
@@ -1407,7 +1742,7 @@ export default class Renderer {
       }),
     );
 
-    let resultEncodedPixels: Uint8Array[] = [];
+    const resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -1417,7 +1752,7 @@ export default class Renderer {
       // Clear the canvas.
       regl.clear({ color: CLEAR_COLOR });
 
-      let tileIndex: number = 0;
+      let tileIndex = 0;
 
       // Render chunk by chunk.
       for (const chunk of chunks) {
@@ -1427,7 +1762,7 @@ export default class Renderer {
         );
 
         chunk.forEach(({ canvasCoords }, index) => {
-          let fboTile = regl.framebuffer({
+          const fboTile = regl.framebuffer({
             width: tileSize,
             height: tileSize,
             depth: false,
@@ -1534,7 +1869,7 @@ export default class Renderer {
       }),
     );
 
-    let resultEncodedPixels: Uint8Array[] = [];
+    const resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -1544,7 +1879,7 @@ export default class Renderer {
       // Clear the canvas.
       regl.clear({ color: CLEAR_COLOR });
 
-      let tileIndex: number = 0;
+      let tileIndex = 0;
 
       // Render chunk by chunk.
       for (const chunk of chunks) {
@@ -1557,7 +1892,7 @@ export default class Renderer {
         );
 
         chunk.forEach(({ canvasCoords }, index) => {
-          let fboTile = regl.framebuffer({
+          const fboTile = regl.framebuffer({
             width: tileSize,
             height: tileSize,
             depth: false,
@@ -1685,7 +2020,7 @@ export default class Renderer {
       }),
     );
 
-    let resultEncodedPixels: Uint8Array[] = [];
+    const resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -1695,7 +2030,7 @@ export default class Renderer {
       // Clear the canvas.
       regl.clear({ color: CLEAR_COLOR });
 
-      let tileIndex: number = 0;
+      let tileIndex = 0;
 
       // Render chunk by chunk.
       for (const chunk of chunks) {
@@ -1711,7 +2046,7 @@ export default class Renderer {
         );
 
         chunk.forEach(({ canvasCoords }, index) => {
-          let fboTile = regl.framebuffer({
+          const fboTile = regl.framebuffer({
             width: tileSize,
             height: tileSize,
             depth: false,
@@ -1860,7 +2195,7 @@ export default class Renderer {
       }),
     );
 
-    let resultEncodedPixels: Uint8Array[] = [];
+    const resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -1870,7 +2205,7 @@ export default class Renderer {
       // Clear the canvas.
       regl.clear({ color: CLEAR_COLOR });
 
-      let tileIndex: number = 0;
+      let tileIndex = 0;
 
       // Render chunk by chunk.
       for (const chunk of chunks) {
@@ -1889,7 +2224,7 @@ export default class Renderer {
         );
 
         chunk.forEach(({ canvasCoords }, index) => {
-          let fboTile = regl.framebuffer({
+          const fboTile = regl.framebuffer({
             width: tileSize,
             height: tileSize,
             depth: false,
@@ -2056,7 +2391,7 @@ export default class Renderer {
       }),
     );
 
-    let resultEncodedPixels: Uint8Array[] = [];
+    const resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -2066,7 +2401,7 @@ export default class Renderer {
       // Clear the canvas.
       regl.clear({ color: CLEAR_COLOR });
 
-      let tileIndex: number = 0;
+      let tileIndex = 0;
 
       // Render chunk by chunk.
       for (const chunk of chunks) {
@@ -2088,7 +2423,7 @@ export default class Renderer {
         );
 
         chunk.forEach(({ canvasCoords }, index) => {
-          let fboTile = regl.framebuffer({
+          const fboTile = regl.framebuffer({
             width: tileSize,
             height: tileSize,
             depth: false,
@@ -2275,7 +2610,7 @@ export default class Renderer {
       }),
     );
 
-    let resultEncodedPixels: Uint8Array[] = [];
+    const resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
       // Split the tiles array into chunks the size of the texture capacity. If we need to render more
@@ -2285,7 +2620,7 @@ export default class Renderer {
       // Clear the canvas.
       regl.clear({ color: CLEAR_COLOR });
 
-      let tileIndex: number = 0;
+      let tileIndex = 0;
 
       // Render chunk by chunk.
       for (const chunk of chunks) {
@@ -2310,7 +2645,7 @@ export default class Renderer {
         );
 
         chunk.forEach(({ canvasCoords }, index) => {
-          let fboTile = regl.framebuffer({
+          const fboTile = regl.framebuffer({
             width: tileSize,
             height: tileSize,
             depth: false,
@@ -2732,6 +3067,29 @@ export default class Renderer {
     // Clean up the old TextureManager and replace it with the new one.
     this.textureManager.destroy();
     this.textureManager = newTextureManager;
+  }
+
+  generateSunDirections(iterations: number, sunRadiusMultiplier: number): void {
+    const sunDirections = [];
+    for (let i = 0; i < iterations; i++) {
+      const direction = vec3.normalize(vec3.create(),
+        vec3.add(vec3.create(),
+          vec3.scale(vec3.create(), vec3.normalize(vec3.create(), [1, 1, 1]), EARTH_SUN_DISTANCE),
+          vec3.random(vec3.create(), SUN_RADIUS * sunRadiusMultiplier)
+        )
+      );
+      sunDirections.push(direction);
+    }
+    this.sunDirections = sunDirections;
+  }
+
+  generateAmbientDirections(iterations: number): void {
+    const ambientDirections = [];
+    for (let i = 0; i < iterations; i++) {
+      const direction = vec3.random(vec3.create(), Math.random());
+      ambientDirections.push(direction);
+    }
+    this.ambientDirections = ambientDirections;
   }
 
   removeTile(tileCoordinates: TileCoordinates): void {

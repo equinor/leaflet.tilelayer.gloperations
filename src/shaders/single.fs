@@ -6,7 +6,8 @@ precision mediump float;
 
 #pragma glslify: computeColor = require(./util/computeColor.glsl)
 #pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
-#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
+#pragma glslify: getTexelValue = require(./util/getTexelValue.glsl)
+// #pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
 
 uniform int scaleLength;
 uniform int sentinelLength;
@@ -30,12 +31,6 @@ uniform float deg2rad;
 uniform float azimuth;
 uniform float altitude;
 
-float getTexelValue(vec2 pos) {
-  vec4 texelRgba = texture2D(texture, pos);
-  float texelFloat = rgbaToFloat(texelRgba, littleEndian);
-  return texelFloat;
-}
-
 float getRelativeHeight(vec2 pos, float v, vec4 textureBounds) {
   // if (pos.x < textureBounds[0]) {
   //   pos = vec2(textureBounds[0], pos.y);
@@ -49,7 +44,7 @@ float getRelativeHeight(vec2 pos, float v, vec4 textureBounds) {
   // if (pos.y > textureBounds[3]) {
   //   pos = vec2(pos.x, textureBounds[3]);
   // }
-  float pixelFloatValue = getTexelValue(pos);
+  float pixelFloatValue = getTexelValue(pos, texture, littleEndian);
   float test = step(0.0, pixelFloatValue);
   float testReturn = ((test * pixelFloatValue) + ((1.0 - test) * v)) * (slopescale*slopeFactor);
   return testReturn;
@@ -80,7 +75,7 @@ float hillshade(vec2 pos, float v, float offset, vec4 textureBounds) {
 }
 
 void main() {
-  float texelFloat = getTexelValue(vTexCoord);
+  float texelFloat = getTexelValue(vTexCoord, texture, littleEndian);
 
   if (isCloseEnough(texelFloat, nodataValue)) {
     discard;

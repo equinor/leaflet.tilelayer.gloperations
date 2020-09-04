@@ -9,6 +9,13 @@ import {
   TileCoordinates,
 } from './types';
 
+import {
+  RGB_REGEX,
+  HEX_REGEX,
+} from './constants';
+
+import TextureManager from './TextureManager';
+
 export function machineIsLittleEndian() {
   const uint8Array = new Uint8Array([0xAA, 0xBB]);
   const uint16array = new Uint16Array(uint8Array.buffer);
@@ -35,6 +42,9 @@ export function range(...args: number[]) {
   }
 }
 
+/**
+ * Fetch a png and decode data. If png does not exist return an array with nodataValue.
+ */
 export async function fetchPNGData(url: string, nodataValue: number, tileDimension: number): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -48,6 +58,14 @@ export async function fetchPNGData(url: string, nodataValue: number, tileDimensi
   }).then((data: ArrayBuffer) => {
     return new Uint8Array(decode(data).data);
   }).catch(() => createNoDataTile(nodataValue, tileDimension));
+}
+
+/**
+ * Check if two TypedArrays are equal
+ */
+export function typedArraysAreEqual(a: Uint8Array, b: Uint8Array) {
+  if (a.byteLength !== b.byteLength) return false;
+  return a.every((val, i) => val === b[i]);
 }
 
 /**
@@ -81,13 +99,29 @@ export function getTransformMatrix(
  * From a TextureBounds object, this function generates the four vertices WebGL needs to draw the
  * corresponding rectangle (as two conjoined triangles generated with the triangle strip primitive).
  */
-export function getTexCoordVertices(textureBounds: TextureBounds): REGL.Vec2[] {
+export function getTexCoordVerticesTriangleStripQuad(textureBounds: TextureBounds): REGL.Vec2[] {
   const [{ x: left, y: top }, { x: right, y: bottom }] = textureBounds;
   return [
     [left,  top   ],
     [right, top   ],
     [left,  bottom],
     [right, bottom],
+  ];
+}
+
+/**
+ * From a TextureBounds object, this function generates the six vertices WebGL needs to draw the
+ * corresponding rectangle (as two triangles).
+ */
+export function getTexCoordVerticesTriangleQuad(textureBounds: TextureBounds): REGL.Vec2[] {
+  const [{ x: left, y: top }, { x: right, y: bottom }] = textureBounds;
+  return [
+    [left,  top   ],
+    [right, top   ],
+    [left,  bottom],
+    [right, bottom],
+    [right, top   ],
+    [left,  bottom],
   ];
 }
 
@@ -129,7 +163,7 @@ export function sameTiles(a: TileCoordinates[], b: TileCoordinates[]): boolean {
   );
 }
 
-export const createNoDataTile: any = memoize((nodataValue: number, tileDimension: number = 256): Uint8Array => {
+export const createNoDataTile: any = memoize((nodataValue: number, tileDimension = 256): Uint8Array => {
   // Create a float 32 array.
   const float32Tile = new Float32Array(tileDimension * tileDimension);
   // Fill the tile array with the no data value
@@ -175,18 +209,21 @@ export function PingPong(regl: REGL.Regl, opts: REGL.FramebufferOptions) {
     index = 1 - index;
   }
 
+  function destroy() {
+    fbos[0].destroy();
+    fbos[1].destroy();
+  }
+
   return {
     ping,
     pong,
-    swap
+    swap,
+    destroy
   };
 }
 
 /**
- * hexToRGB converts a color from hex format to rgb-format.
- * @param {String} hex - A color in hex format
- *
- * @example
+ * hexToRGB converts a color from hex format to rgba.
  * const [r, g, b, a] = hexToRGB("#ffeeaaff")
  */
 export const hexToRGB = (hex: string) => {
@@ -199,9 +236,6 @@ export const hexToRGB = (hex: string) => {
   const a = hasAlpha ? (bigint >> (start - 24)) & 255 : 255;
   return [r, g, b, a];
 };
-
-const RGB_REGEX = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/;
-const HEX_REGEX = /(?:#)[0-9a-f]{8}|(?:#)[0-9a-f]{6}|(?:#)[0-9a-f]{4}|(?:#)[0-9a-f]{3}/ig;
 
 /**
  * Parses a color string of the form 'rgb({rVal}, {gVal}, {bVal})' and converts the resulting values
@@ -217,7 +251,6 @@ export function colorStringToInts(colorstring: string): number[] {
     const [, r, g, b] = rgbmatch;
     return [+r, +g, +b, 255];
   } else if (hexmatch !== null) {
-    // const [, r, g, b] = rgbmatch;
     return hexToRGB(colorstring);
   } else {
     throw new Error(`'${colorstring}' is not a valid RGB or hex color expression.`);
@@ -225,16 +258,16 @@ export function colorStringToInts(colorstring: string): number[] {
 }
 
 /**
- * colormapToFlatArray takes the input colormap and returns a flat array to be 
+ * colormapToFlatArray takes the input colormap and returns a flat array to be
  * used as input to a texture. The first row in the array contains the colors.
  * The second row contains the encoded offset values.
  */
 export const colormapToFlatArray = (colormap: Color[]) => {
-  let offsets: number[] = [];
+  const offsets: number[] = [];
   let colors: number[] = [];
   for (let i = 0; i < colormap.length; i++) {
     offsets.push(colormap[i].offset);
-    let colorsnew = colorStringToInts(colormap[i].color)
+    const colorsnew = colorStringToInts(colormap[i].color);
     colors = colors.concat(colorsnew);
   }
 
@@ -250,20 +283,64 @@ export const colormapToFlatArray = (colormap: Color[]) => {
  * Creates a texture with colors on first row and offsets on second row
  */
 export function createColormapTexture(colormapInput: Color[]|SentinelValue[], regl: REGL.Regl) {
-  let colormapFlatArray = colormapToFlatArray(colormapInput);
+  const colormapFlatArray = colormapToFlatArray(colormapInput);
   let colormapTexture: REGL.Texture2D;
   if (colormapInput.length === 0) {
     // empty texture
     colormapTexture = regl.texture({
       shape: [2, 2]
-    })
+    });
   } else {
     colormapTexture = regl.texture({
       width: colormapInput.length,
       height: 2,
       data: colormapFlatArray
-    })
-  };
+    });
+  }
 
   return colormapTexture;
+}
+
+/**
+ * Fetch 8 adjacent tiles, if not already existing in tileManager.
+ * Return array with texture coord vertices for all tiles.
+ */
+export async function getAdjacentTilesTexCoords(
+  gloperations: any,
+  textureManager: TextureManager,
+  coords: TileCoordinates,
+  url: string,
+  ): Promise<number[][]> {
+  // Get existing tiles in TextureManager
+  const textureContents = textureManager.contents;
+
+  // use 3x3 tiles for adv. hillshading
+  // TODO: add as plugin option?
+  const adjacentTiles = 3;
+  let textureCoords: number[][] = [];
+
+    for (let i = 0; i < adjacentTiles; i++) {
+      const _x = coords['x'] + (i - 1);
+      for (let j = 0; j < adjacentTiles; j++) {
+        const _y = coords['y'] + (j - 1);
+        const coordsAdjacent = {
+          x: _x,
+          y: _y,
+          z: coords['z'],
+        };
+
+        // Fetch data for adjacent tile if not already existing in TextureManager
+        const hashKey = textureManager.hashTileCoordinates(coordsAdjacent);
+        if (!textureContents.has(hashKey)) {
+          // Retrieve and add data to TextureManager
+          const pixelDataAdjacent = await gloperations._fetchTileData(coordsAdjacent, url);
+          const textureBounds = gloperations._renderer.textureManager.addTile(coordsAdjacent, pixelDataAdjacent);
+          textureCoords = textureCoords.concat(getTexCoordVerticesTriangleQuad(textureBounds));
+        } else {
+          const textureBounds = gloperations._renderer.textureManager.getTextureCoordinates(coordsAdjacent);
+          textureCoords = textureCoords.concat(getTexCoordVerticesTriangleQuad(textureBounds));
+        }
+      }
+    }
+    return textureCoords;
 }

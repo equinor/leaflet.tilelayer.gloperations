@@ -6,7 +6,7 @@ import vertMulti3 from './shaders/multi3.vs';
 import vertMulti4 from './shaders/multi4.vs';
 import vertMulti5 from './shaders/multi5.vs';
 import vertMulti6 from './shaders/multi6.vs';
-import vertSmooth from './shaders/smooth.vs';
+import vertSingleNotTransformed from './shaders/singleNotTransformed.vs';
 
 import fragInterpolateColor from './shaders/interpolateColor.fs';
 import fragInterpolateColorOnly from './shaders/interpolateColorOnly.fs';
@@ -28,6 +28,12 @@ import fragMulti6Draw from './shaders/multiAnalyze6Draw.fs';
 import fragDiffCalc from './shaders/diffCalc.fs';
 import fragDiffDraw from './shaders/diffDraw.fs';
 import fragConvolutionSmooth from './shaders/convolutionSmooth.fs';
+import fragHsAdvMergeAndScaleTiles from './shaders/hillshading/hsAdvMergeAndScaleTiles.fs';
+import fragHsAdvNormals from './shaders/hillshading/hsAdvNormals.fs';
+import fragHsAdvDirectLight from './shaders/hillshading/hsAdvDirect.fs';
+import fragHsAdvSoftShadows from './shaders/hillshading/hsAdvSoftShadows.fs';
+import fragHsAdvAmbientShadows from './shaders/hillshading/hsAdvAmbientShadows.fs';
+import fragHsAdvFinal from './shaders/hillshading/hsAdvFinal.fs';
 
 import {
   Dictionary,
@@ -53,7 +59,19 @@ import {
   CalcTileDiff,
   DrawTileDiff,
   ConvolutionSmooth,
+  HsAdvMergeAndScaleTiles,
+  HsAdvCalcNormals,
+  HsAdvDirectLightning,
+  HsAdvSoftShadows,
+  HsAdvAmbientShadows,
+  HsAdvFinal,
 } from './types';
+
+import {
+  DEG2RAD,
+  SLOPEFACTOR,
+} from './constants';
+
 import * as util from './util';
 
 const littleEndian = util.machineIsLittleEndian();
@@ -95,10 +113,6 @@ export function getCommonDrawConfiguration(
   };
 }
 
-// Hillshading (simple) parameters
-const deg2rad = 0.017453292519943295;
-const slopeFactor = 0.0333334;
-
 /**
  * The resulting Regl DrawCommand is used to draw a single tile. The fragment shader decodes the
  * Float32 value of a pixel and colorizes it with the given color scale (and/or sentinel values).
@@ -124,15 +138,15 @@ export function createDrawTileCommand(
       azimuth: 0,
       altitude: 0,
       slopescale: 0,
-      deg2rad: deg2rad,
-      slopeFactor: slopeFactor,
+      deg2rad: DEG2RAD,
+      slopeFactor: SLOPEFACTOR,
       tileSize: 0,
       textureSize: 0,
       textureBounds: [0, 0, 0, 0],
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoord: (_, { textureBounds }) => util.getTexCoordVertices(textureBounds),
+      texCoord: (_, { textureBounds }) => util.getTexCoordVerticesTriangleStripQuad(textureBounds),
     },
   });
 }
@@ -162,8 +176,8 @@ export function createDrawTileHsSimpleCommand(
       azimuth: (_, { azimuth }) => azimuth,
       altitude: (_, { altitude }) => altitude,
       slopescale: (_, { slopescale }) => slopescale,
-      deg2rad: deg2rad,
-      slopeFactor: slopeFactor,
+      deg2rad: DEG2RAD,
+      slopeFactor: SLOPEFACTOR,
       offset: (_, { offset }) => offset,
       textureBounds: (_, { textureBounds }) => {
         return [
@@ -171,14 +185,14 @@ export function createDrawTileHsSimpleCommand(
           [textureBounds[0].y],
           [textureBounds[1].x],
           [textureBounds[1].y]
-        ]
+        ];
       },
       textureSize: (_, { textureSize }) => textureSize,
       tileSize: (_, { tileSize }) => tileSize,
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoord: (_, { textureBounds }) => util.getTexCoordVertices(textureBounds),
+      texCoord: (_, { textureBounds }) => util.getTexCoordVerticesTriangleStripQuad(textureBounds),
     },
   });
 }
@@ -208,8 +222,8 @@ export function createDrawTileHsPregenCommand(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBounds }) => util.getTexCoordVertices(textureBounds),
-      texCoordB: (_, { textureBoundsHs }) => util.getTexCoordVertices(textureBoundsHs),
+      texCoordA: (_, { textureBounds }) => util.getTexCoordVerticesTriangleStripQuad(textureBounds),
+      texCoordB: (_, { textureBoundsHs }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsHs),
     },
   });
 }
@@ -243,7 +257,7 @@ export function createDrawTileMultiAnalyze1Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoord: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
+      texCoord: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
     },
   });
 }
@@ -272,7 +286,7 @@ export function createCalcTileMultiAnalyze1Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoord: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
+      texCoord: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
     },
   });
 }
@@ -310,8 +324,8 @@ export function createDrawTileMultiAnalyze2Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
     },
   });
 }
@@ -344,8 +358,8 @@ export function createCalcTileMultiAnalyze2Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
     },
   });
 }
@@ -387,9 +401,9 @@ export function createDrawTileMultiAnalyze3Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVertices(textureBoundsC),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
+      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
     },
   });
 }
@@ -426,9 +440,9 @@ export function createCalcTileMultiAnalyze3Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVertices(textureBoundsC),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
+      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
     },
   });
 }
@@ -474,10 +488,10 @@ export function createDrawTileMultiAnalyze4Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVertices(textureBoundsC),
-      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVertices(textureBoundsD),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
+      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
+      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsD),
     },
   });
 }
@@ -518,10 +532,10 @@ export function createCalcTileMultiAnalyze4Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVertices(textureBoundsC),
-      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVertices(textureBoundsD),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
+      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
+      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsD),
     },
   });
 }
@@ -571,11 +585,11 @@ export function createDrawTileMultiAnalyze5Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVertices(textureBoundsC),
-      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVertices(textureBoundsD),
-      texCoordE: (_, { textureBoundsE }) => util.getTexCoordVertices(textureBoundsE),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
+      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
+      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsD),
+      texCoordE: (_, { textureBoundsE }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsE),
     },
   });
 }
@@ -620,11 +634,11 @@ export function createCalcTileMultiAnalyze5Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVertices(textureBoundsC),
-      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVertices(textureBoundsD),
-      texCoordE: (_, { textureBoundsE }) => util.getTexCoordVertices(textureBoundsE),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
+      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
+      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsD),
+      texCoordE: (_, { textureBoundsE }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsE),
     },
   });
 }
@@ -678,12 +692,12 @@ export function createDrawTileMultiAnalyze6Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVertices(textureBoundsC),
-      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVertices(textureBoundsD),
-      texCoordE: (_, { textureBoundsE }) => util.getTexCoordVertices(textureBoundsE),
-      texCoordF: (_, { textureBoundsF }) => util.getTexCoordVertices(textureBoundsF)
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
+      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
+      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsD),
+      texCoordE: (_, { textureBoundsE }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsE),
+      texCoordF: (_, { textureBoundsF }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsF)
     },
   });
 }
@@ -732,12 +746,12 @@ export function createCalcTileMultiAnalyze6Command(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVertices(textureBoundsC),
-      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVertices(textureBoundsD),
-      texCoordE: (_, { textureBoundsE }) => util.getTexCoordVertices(textureBoundsE),
-      texCoordF: (_, { textureBoundsF }) => util.getTexCoordVertices(textureBoundsF)
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
+      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
+      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsD),
+      texCoordE: (_, { textureBoundsE }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsE),
+      texCoordF: (_, { textureBoundsF }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsF)
     },
   });
 }
@@ -764,8 +778,8 @@ export function createCalcTileDiffCommand(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
     },
   });
 }
@@ -797,8 +811,8 @@ export function createDrawTileDiffCommand(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
     },
   });
 }
@@ -833,8 +847,8 @@ export function createDrawTileInterpolateValueCommand(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
     },
   });
 }
@@ -873,8 +887,8 @@ export function createDrawTileInterpolateColorCommand(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVertices(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVertices(textureBoundsB),
+      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
+      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
     },
   });
 }
@@ -911,7 +925,7 @@ export function createDrawTileInterpolateColorOnlyCommand(
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoord: (_, { textureBounds }) => util.getTexCoordVertices(textureBounds),
+      texCoord: (_, { textureBounds }) => util.getTexCoordVerticesTriangleStripQuad(textureBounds),
     },
   });
 }
@@ -925,7 +939,7 @@ export function createConvolutionSmoothCommand(
   commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
 ) {
   return regl<ConvolutionSmooth.Uniforms, ConvolutionSmooth.Attributes, ConvolutionSmooth.Props>({
-    vert: vertSmooth,
+    vert: vertSingleNotTransformed,
     frag: fragConvolutionSmooth,
     uniforms: {
       ...commonConfig.uniforms as DrawCommon.Uniforms,
@@ -940,5 +954,192 @@ export function createConvolutionSmoothCommand(
     depth: { enable: false },
     primitive: 'triangle strip',
     count: 4,
+  });
+}
+
+/**
+ * The resulting Regl DrawCommand is used to get the float values from the 3x3
+ * adjacent tiles. The float values can be scaled to adjust the hillshading.
+ * It will be saved to a framebuffer and is used as an input to advanced hillshading
+ */
+export function createHsAdvMergeAndScaleTiles(
+  regl: REGL.Regl,
+) {
+  return regl<HsAdvMergeAndScaleTiles.Uniforms, HsAdvMergeAndScaleTiles.Attributes, HsAdvMergeAndScaleTiles.Props>({
+    vert: vertSingleNotTransformed,
+    frag: fragHsAdvMergeAndScaleTiles,
+    uniforms: {
+      littleEndian: littleEndian,
+      nodataValue: regl.prop<HsAdvMergeAndScaleTiles.Props, 'nodataValue'>("nodataValue"),
+      texture: regl.prop<HsAdvMergeAndScaleTiles.Props, 'texture'>("texture"),
+      floatScale: regl.prop<HsAdvMergeAndScaleTiles.Props, 'floatScale'>("floatScale"),
+    },
+    attributes: {
+      // 18 triangles = 9 tiles
+      position: [
+        [-1, 1], [-1/3, 1], [-1, 1/3], [-1/3, 1/3], [-1/3, 1], [-1, 1/3],
+        [-1, 1/3], [-1/3, 1/3], [-1, -1/3], [-1/3, -1/3], [-1/3, 1/3], [-1, -1/3],
+        [-1, -1/3], [-1/3, -1/3], [-1, -1], [-1/3, -1], [-1/3, -1/3], [-1, -1],
+        [-1/3, 1], [1/3, 1], [-1/3, 1/3], [1/3, 1/3], [1/3, 1], [-1/3, 1/3],
+        [-1/3, 1/3], [1/3, 1/3], [-1/3, -1/3], [1/3, -1/3], [1/3, 1/3], [-1/3, -1/3],
+        [-1/3, -1/3], [1/3, -1/3], [-1/3, -1], [1/3, -1], [1/3, -1/3], [-1/3, -1],
+        [1/3, 1], [1, 1], [1/3, 1/3], [1, 1/3], [1, 1], [1/3, 1/3],
+        [1/3, 1/3], [1, 1/3], [1/3, -1/3], [1, -1/3], [1, 1/3], [1/3, -1/3],
+        [1/3, -1/3], [1, -1/3], [1/3, -1], [1, -1], [1, -1/3], [1/3, -1]
+      ],
+      texCoord: regl.prop<HsAdvMergeAndScaleTiles.Props, 'texCoord'>("texCoord"),
+    },
+    depth: { enable: false },
+    primitive: 'triangles',
+    count: 54,
+    viewport: (_, { canvasSize: [width, height] }) => ({ width, height }),
+    framebuffer: regl.prop<HsAdvMergeAndScaleTiles.Props, 'fbo'>("fbo"),
+  });
+}
+
+/**
+ * The resulting Regl DrawCommand is used to calculate the normals.
+ * It is used as an input to advanced hillshading
+ */
+export function createHsAdvCalcNormals(
+  regl: REGL.Regl,
+  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
+) {
+  return regl<HsAdvCalcNormals.Uniforms, HsAdvCalcNormals.Attributes, HsAdvCalcNormals.Props>({
+    ...commonConfig,
+    vert: vertSingleNotTransformed,
+    frag: fragHsAdvNormals,
+    uniforms: {
+      ...commonConfig.uniforms as DrawCommon.Uniforms,
+      tInput: regl.prop<HsAdvCalcNormals.Props, 'tInput'>("tInput"),
+      pixelScale: regl.prop<HsAdvCalcNormals.Props, 'pixelScale'>("pixelScale"),
+      onePixel: regl.prop<HsAdvCalcNormals.Props, 'onePixel'>("onePixel"),
+    },
+    attributes: {
+      position: [[-1, 1], [1, 1], [-1, -1], [1, -1]],
+      texCoord: [[0, 1], [1, 1], [0, 0], [1, 0]],
+    },
+    framebuffer: regl.prop<HsAdvCalcNormals.Props, 'fbo'>("fbo"),
+  });
+}
+
+/**
+ * The resulting Regl DrawCommand is used to show hillshading without shadows.
+ * Not currently used
+ */
+export function createHsAdvDirectLightning(
+  regl: REGL.Regl,
+  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
+) {
+  return regl<HsAdvDirectLightning.Uniforms, HsAdvDirectLightning.Attributes, HsAdvDirectLightning.Props>({
+    ...commonConfig,
+    vert: vertSingleNotTransformed,
+    frag: fragHsAdvDirectLight,
+    uniforms: {
+      ...commonConfig.uniforms as DrawCommon.Uniforms,
+      scaleLength: regl.prop<HsAdvDirectLightning.Props, 'scaleLength'>('scaleLength'),
+      sentinelLength: regl.prop<HsAdvDirectLightning.Props, 'sentinelLength'>('sentinelLength'),
+      scaleColormap: regl.prop<HsAdvDirectLightning.Props, 'scaleColormap'>('scaleColormap'),
+      sentinelColormap: regl.prop<HsAdvDirectLightning.Props, 'sentinelColormap'>('sentinelColormap'),
+      tInput: regl.prop<HsAdvDirectLightning.Props, 'tInput'>("tInput"),
+      tNormal: regl.prop<HsAdvDirectLightning.Props, 'tNormal'>("tNormal"),
+      floatScale: regl.prop<HsAdvDirectLightning.Props, 'floatScale'>("floatScale"),
+      sunDirection: regl.prop<HsAdvDirectLightning.Props, 'sunDirection'>("sunDirection"),
+    },
+    attributes: {
+      position: [[-1, 1], [1, 1], [-1, -1], [1, -1]],
+      texCoord: [[0, 1], [1, 1], [0, 0], [1, 0]],
+    },
+  });
+}
+
+/**
+ * The resulting Regl DrawCommand is used to calculate soft shadows.
+ */
+export function createHsAdvSoftShadows(
+  regl: REGL.Regl,
+  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
+) {
+  return regl<HsAdvSoftShadows.Uniforms, HsAdvSoftShadows.Attributes, HsAdvSoftShadows.Props>({
+    ...commonConfig,
+    vert: vertSingleNotTransformed,
+    frag: fragHsAdvSoftShadows,
+    uniforms: {
+      ...commonConfig.uniforms as DrawCommon.Uniforms,
+      tInput: regl.prop<HsAdvSoftShadows.Props, 'tInput'>("tInput"),
+      tNormal: regl.prop<HsAdvSoftShadows.Props, 'tNormal'>("tNormal"),
+      tSrc: regl.prop<HsAdvSoftShadows.Props, 'tSrc'>("tSrc"),
+      softIterations: regl.prop<HsAdvSoftShadows.Props, 'softIterations'>("softIterations"),
+      pixelScale: regl.prop<HsAdvSoftShadows.Props, 'pixelScale'>("pixelScale"),
+      resolution: regl.prop<HsAdvSoftShadows.Props, 'resolution'>("resolution"),
+      sunDirection: regl.prop<HsAdvSoftShadows.Props, 'sunDirection'>("sunDirection"),
+    },
+    attributes: {
+      position: [[-1, 1], [1, 1], [-1, -1], [1, -1]],
+      texCoord: [[1/3, 2/3], [2/3, 2/3], [1/3, 1/3], [2/3, 1/3]],
+    },
+    framebuffer: regl.prop<HsAdvSoftShadows.Props, 'fbo'>("fbo"),
+  });
+}
+
+/**
+ * The resulting Regl DrawCommand is used to calculate ambient lighting.
+ */
+export function createHsAdvAmbientShadows(
+  regl: REGL.Regl,
+  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
+) {
+  return regl<HsAdvAmbientShadows.Uniforms, HsAdvAmbientShadows.Attributes, HsAdvAmbientShadows.Props>({
+    ...commonConfig,
+    vert: vertSingleNotTransformed,
+    frag: fragHsAdvAmbientShadows,
+    uniforms: {
+      ...commonConfig.uniforms as DrawCommon.Uniforms,
+      tInput: regl.prop<HsAdvAmbientShadows.Props, 'tInput'>("tInput"),
+      tNormal: regl.prop<HsAdvAmbientShadows.Props, 'tNormal'>("tNormal"),
+      tSrc: regl.prop<HsAdvAmbientShadows.Props, 'tSrc'>("tSrc"),
+      ambientIterations: regl.prop<HsAdvAmbientShadows.Props, 'ambientIterations'>("ambientIterations"),
+      pixelScale: regl.prop<HsAdvAmbientShadows.Props, 'pixelScale'>("pixelScale"),
+      resolution: regl.prop<HsAdvAmbientShadows.Props, 'resolution'>("resolution"),
+      direction: regl.prop<HsAdvAmbientShadows.Props, 'direction'>("direction"),
+    },
+    attributes: {
+      position: [[-1, 1], [1, 1], [-1, -1], [1, -1]],
+      texCoord: [[1/3, 2/3], [2/3, 2/3], [1/3, 1/3], [2/3, 1/3]],
+    },
+    framebuffer: regl.prop<HsAdvAmbientShadows.Props, 'fbo'>("fbo"),
+  });
+}
+
+/**
+ * The resulting Regl DrawCommand is used to combine soft and ambient shading,
+ * use the colormap on the input floats and apply the hillshading.
+ */
+export function createHsAdvFinal(
+  regl: REGL.Regl,
+  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
+) {
+  return regl<HsAdvFinal.Uniforms, HsAdvFinal.Attributes, HsAdvFinal.Props>({
+    ...commonConfig,
+    vert: vertDouble,
+    frag: fragHsAdvFinal,
+    uniforms: {
+      ...commonConfig.uniforms as DrawCommon.Uniforms,
+      scaleLength: regl.prop<HsAdvFinal.Props, 'scaleLength'>('scaleLength'),
+      sentinelLength: regl.prop<HsAdvFinal.Props, 'sentinelLength'>('sentinelLength'),
+      scaleColormap: regl.prop<HsAdvFinal.Props, 'scaleColormap'>('scaleColormap'),
+      sentinelColormap: regl.prop<HsAdvFinal.Props, 'sentinelColormap'>('sentinelColormap'),
+      tInput: regl.prop<HsAdvFinal.Props, 'tInput'>("tInput"),
+      tSoftShadow: regl.prop<HsAdvFinal.Props, 'tSoftShadow'>("tSoftShadow"),
+      tAmbient: regl.prop<HsAdvFinal.Props, 'tAmbient'>("tAmbient"),
+      floatScale: regl.prop<HsAdvFinal.Props, 'floatScale'>("floatScale"),
+      finalSoftMultiplier: regl.prop<HsAdvFinal.Props, 'finalSoftMultiplier'>("finalSoftMultiplier"),
+      finalAmbientMultiplier: regl.prop<HsAdvFinal.Props, 'finalAmbientMultiplier'>("finalAmbientMultiplier"),
+    },
+    attributes: {
+      ...commonConfig.attributes as DrawCommon.Attributes,
+      texCoordA: [[1/3, 2/3], [2/3, 2/3], [1/3, 1/3], [2/3, 1/3]],
+      texCoordB: [[0, 1], [1, 1], [0, 0], [1, 0]],
+    },
   });
 }

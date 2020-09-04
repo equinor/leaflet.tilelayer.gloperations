@@ -24,15 +24,17 @@ export default class TextureManager {
 
   // map of tile coordinates to texture coordinates
   // (key is hash string of tile coordinates: 'x:y:z')
-  protected contents: Map<string, TextureCoordinates>;
+  contents: Map<string, TextureCoordinates>;
   // texture coordinates positions that are currently available
   protected available: TextureCoordinates[];
 
   constructor(
     regl: REGL.Regl,
-    tileSize: number,
+    tileSize = 256,
     maxTextureDimension: number,
-    flipY: boolean,
+    flipY = false,
+    textureFormat: REGL.TextureFormatType = 'rgba',
+    textureType: REGL.TextureDataType = 'uint8',
   ) {
     const tilesAcross = Math.floor(maxTextureDimension / tileSize);
     const pixelsAcross = tilesAcross * tileSize;
@@ -42,8 +44,8 @@ export default class TextureManager {
       width: pixelsAcross,
       height: pixelsAcross,
       flipY: flipY,
-      format: 'rgba',
-      type: 'uint8',
+      format: textureFormat,
+      type: textureType,
     });
 
     const contents = new Map<string, TextureCoordinates>();
@@ -143,8 +145,16 @@ export default class TextureManager {
     ];
   }
 
-  protected hashTileCoordinates({ x, y, z }: TileCoordinates): string {
+  hashTileCoordinates({ x, y, z }: TileCoordinates): string {
     return `${x}:${y}:${z}`;
+  }
+
+  getTextureCoordinates(
+    tileCoordinates: TileCoordinates,
+  ): [TextureCoordinates, TextureCoordinates] {
+    const hashKey = this.hashTileCoordinates(tileCoordinates);
+    const textureCoordinates = this.contents.get(hashKey) as TextureCoordinates;
+    return this.formatOutputTextureCoordinates(textureCoordinates);
   }
 
   protected allTextureCoordinates(tilesAcross: number, tileSize: number): TextureCoordinates[] {
