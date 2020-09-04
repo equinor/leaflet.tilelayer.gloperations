@@ -6,6 +6,7 @@ dependencies:
   d3-request: 1.0.6
   d3-scale: 3.2.2
   d3-selection: 2.0.0
+  gl-matrix: 3.3.0
   glsl-float-to-rgba: 1.0.0
   glsl-rgba-to-float: 1.0.0
   lodash-es: 4.17.15
@@ -23,6 +24,7 @@ devDependencies:
   '@types/d3-request': 1.0.5
   '@types/d3-scale': 2.2.0
   '@types/d3-selection': 1.4.2
+  '@types/gl-matrix': 3.2.0
   '@types/leaflet': 1.5.17
   '@types/lodash': 4.14.160
   '@types/lodash-es': 4.17.3
@@ -180,6 +182,13 @@ packages:
     dev: true
     resolution:
       integrity: sha512-wE2v81i4C4Ol09RtsWFAqg3BUitWbHSpSlIo+bNdsCJijO9sjme+zm+73ZMCa/qMC8UEERxzGbvmr1cffo2SiQ==
+  /@types/gl-matrix/3.2.0:
+    dependencies:
+      gl-matrix: 3.3.0
+    deprecated: 'This is a stub types definition. gl-matrix provides its own type definitions, so you do not need this installed.'
+    dev: true
+    resolution:
+      integrity: sha512-CY4JAtSOGQX7rVgqVuOk7ZfaLv8VeadDMPj3smMOy8Hp/YiHONa3Mr0mEUgbo0eEwV7+Owpf6BwspcA7hv4NXg==
   /@types/leaflet/1.5.17:
     dependencies:
       '@types/geojson': 7946.0.7
@@ -1006,6 +1015,9 @@ packages:
     dev: true
     resolution:
       integrity: sha512-kPCHWa1m9wGG/OwQpeweTwM/PYiQLrUIxXbt/P4Nic3LbGjCP0YwrALHW1uNLKZ0LIMg+RF+XRlj2ekT9ZlZAQ==
+  /gl-matrix/3.3.0:
+    resolution:
+      integrity: sha512-COb7LDz+SXaHtl/h4LeaFcNdJdAQSDeVqjiIihSXNrkWObZLhDI4hIkZC11Aeqp7bcE72clzB0BnDXr2SmslRA==
   /glob/7.1.6:
     dependencies:
       fs.realpath: 1.0.0
@@ -2586,6 +2598,7 @@ specifiers:
   '@types/d3-request': ^1.0.5
   '@types/d3-scale': ^2.2.0
   '@types/d3-selection': ^1.4.1
+  '@types/gl-matrix': ^3.2.0
   '@types/leaflet': ~1.5.17
   '@types/lodash': 4.14.160
   '@types/lodash-es': 4.17.3
@@ -2599,6 +2612,7 @@ specifiers:
   d3-request: ^1.0.6
   d3-scale: ^3.2.2
   d3-selection: ^2.0.0
+  gl-matrix: ^3.3.0
   glsl-float-to-rgba: ^1.0.0
   glsl-rgba-to-float: ^1.0.0
   glslify: ~7.1.0

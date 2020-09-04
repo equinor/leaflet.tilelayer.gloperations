@@ -1,6 +1,6 @@
 import REGL from 'regl';
-import { Contours, ContourMultiPolygon } from 'd3-contour';
-import { Point } from 'leaflet'
+import { ContourMultiPolygon } from 'd3-contour';
+import { vec3 } from "gl-matrix";
 
 export interface Color {
   color: string;
@@ -33,7 +33,8 @@ export interface TextureCoordinates {
 
 export interface HillshadeOptions {
   hillshadeType: string;
-  hsElevationScale?: number;
+  hsValueScale?: number|Dictionary<number>;
+  hsPixelScale?: number;
   hsSimpleZoomdelta?: number;
   hsSimpleSlopescale?: number;
   hsSimpleAzimuth?: number;
@@ -242,6 +243,197 @@ export namespace DrawTileHsPregen {
   export interface Attributes extends DrawCommon.Attributes {
     texCoordA: REGL.Vec2[];
     texCoordB: REGL.Vec2[];
+  }
+}
+
+export namespace HsAdvScaleFloats {
+  export interface Props extends DrawCommon.Props {
+    texture: REGL.Texture2D | REGL.Framebuffer2D;
+    // canvasSize: Pair<number>;
+    // fbo: REGL.Framebuffer2D;
+    // resolution: number;
+    // textureBounds: TextureBounds;
+    // pixelScale: number;
+    // onePixel: number;
+    // floatScale: number;
+  }
+  export interface Uniforms {
+    // textureBounds: REGL.Vec4;
+    texture: REGL.Texture2D | REGL.Framebuffer2D;
+    // pixelScale: number;
+    // resolution: number;
+    // onePixel: number;
+    // floatScale: number;
+  }
+  export interface Attributes {
+    texCoord: REGL.Vec2[];
+    position: number[] | number[][];
+  }
+}
+
+export namespace HsAdvMergeAndScaleTiles {
+  export interface Props {
+    canvasSize: Pair<number>;
+    texture: REGL.Texture2D;
+    fbo: REGL.Framebuffer2D;
+    floatScale: number;
+    nodataValue: number;
+    texCoord: number[][];
+  }
+  export interface Uniforms {
+    texture: REGL.Texture2D;
+    floatScale: number;
+    nodataValue: number;
+    littleEndian: boolean;
+  }
+  export interface Attributes {
+    texCoord: number[];
+    position: number[] | number[][];
+  }
+}
+
+export namespace HsAdvCalcNormals {
+  export interface Props extends DrawCommon.Props {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    fbo?: REGL.Framebuffer2D;
+    // resolution: number;
+    // textureBounds: TextureBounds;
+    pixelScale: number;
+    onePixel: number;
+    // elevationScale: number;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    // textureBounds: REGL.Vec4;
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    pixelScale: number;
+    // resolution: number;
+    onePixel: number;
+    // elevationScale: number;
+  }
+  export interface Attributes {
+    texCoord: REGL.Vec2[] | number[];
+    position: REGL.Vec2[] | number[];
+  }
+}
+
+export namespace HsAdvDirectLightning {
+  export interface Props extends DrawCommon.Props {
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    // fbo: REGL.Framebuffer2D;
+    // resolution: number;
+    textureBounds: TextureBounds;
+    floatScale: number;
+    // pixelScale: number;
+    sunDirection: number[] | Float32Array | vec3;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
+    // textureBounds: REGL.Vec4;
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    floatScale: number;
+    // pixelScale: number;
+    sunDirection: number[] | Float32Array | vec3;
+    // resolution: number;
+  }
+  export interface Attributes {
+    texCoord: REGL.Vec2[] | number[];
+    position: REGL.Vec2[] | number[];
+  }
+}
+
+export namespace HsAdvSoftShadows {
+  export interface Props extends DrawCommon.Props {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    tSrc: REGL.Framebuffer2D;
+    fbo: REGL.Framebuffer2D;
+    softIterations: number;
+    resolution:  number[] | REGL.Vec2;
+    textureBounds: TextureBounds;
+    pixelScale: number;
+    sunDirection: number[] | Float32Array | vec3;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    tSrc: REGL.Framebuffer2D;
+    softIterations: number;
+    pixelScale: number;
+    sunDirection: number[] | Float32Array | vec3;
+    resolution: number[] | REGL.Vec2;
+  }
+  export interface Attributes {
+    texCoord: REGL.Vec2[] | number[];
+    position: REGL.Vec2[] | number[];
+  }
+}
+
+export namespace HsAdvAmbientShadows {
+  export interface Props extends DrawCommon.Props {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    tSrc: REGL.Framebuffer2D;
+    fbo: REGL.Framebuffer2D;
+    ambientIterations: number;
+    resolution:  number[] | REGL.Vec2;
+    textureBounds: TextureBounds;
+    pixelScale: number;
+    direction: number[] | Float32Array | vec3;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    tSrc: REGL.Framebuffer2D;
+    ambientIterations: number;
+    pixelScale: number;
+    direction: number[] | Float32Array | vec3;
+    resolution: number[] | REGL.Vec2;
+  }
+  export interface Attributes {
+    texCoord: REGL.Vec2[] | number[];
+    position: REGL.Vec2[] | number[];
+  }
+}
+
+export namespace HsAdvFinal {
+  export interface Props extends DrawCommon.Props {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tSoftShadow: REGL.Texture2D | REGL.Framebuffer2D;
+    tAmbient: REGL.Texture2D | REGL.Framebuffer2D;
+    floatScale: number;
+    finalSoftMultiplier: number;
+    finalAmbientMultiplier: number;
+    textureBounds: TextureBounds;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tSoftShadow: REGL.Texture2D | REGL.Framebuffer2D;
+    tAmbient: REGL.Texture2D | REGL.Framebuffer2D;
+    floatScale: number;
+    finalSoftMultiplier: number;
+    finalAmbientMultiplier: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
+  }
+  export interface Attributes extends DrawCommon.Attributes {
+    texCoordA: REGL.Vec2[] | number[];
+    texCoordB: REGL.Vec2[] | number[];
+    // position: REGL.Vec2[] | number[];
   }
 }
 
