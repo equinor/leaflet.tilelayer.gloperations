@@ -25,19 +25,13 @@ import {
   DrawTileInterpolateColorOnly,
   DrawTileInterpolateValue,
   CalcTileMultiAnalyze1,
-  DrawTileMultiAnalyze1,
   CalcTileMultiAnalyze2,
-  DrawTileMultiAnalyze2,
   CalcTileMultiAnalyze3,
-  DrawTileMultiAnalyze3,
   CalcTileMultiAnalyze4,
-  DrawTileMultiAnalyze4,
   CalcTileMultiAnalyze5,
-  DrawTileMultiAnalyze5,
   CalcTileMultiAnalyze6,
-  DrawTileMultiAnalyze6,
-  DrawTileDiff,
   CalcTileDiff,
+  DrawTileResult,
   ConvolutionSmooth,
   Pair,
   calcResult,
@@ -90,19 +84,13 @@ export default class Renderer {
   drawTileInterpolateColorOnly: REGL.DrawCommand<REGL.DefaultContext, DrawTileInterpolateColorOnly.Props>;
   drawTileInterpolateValue: REGL.DrawCommand<REGL.DefaultContext, DrawTileInterpolateValue.Props>;
   calcTileDiff: REGL.DrawCommand<REGL.DefaultContext, CalcTileDiff.Props>;
-  drawTileDiff: REGL.DrawCommand<REGL.DefaultContext, DrawTileDiff.Props>;
+  drawTileResult: REGL.DrawCommand<REGL.DefaultContext, DrawTileResult.Props>;
   calcTileMultiAnalyze1: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze1.Props>;
-  drawTileMultiAnalyze1: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze1.Props>;
   calcTileMultiAnalyze2: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze2.Props>;
-  drawTileMultiAnalyze2: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze2.Props>;
   calcTileMultiAnalyze3: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze3.Props>;
-  drawTileMultiAnalyze3: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze3.Props>;
   calcTileMultiAnalyze4: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze4.Props>;
-  drawTileMultiAnalyze4: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze4.Props>;
   calcTileMultiAnalyze5: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze5.Props>;
-  drawTileMultiAnalyze5: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze5.Props>;
   calcTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze6.Props>;
-  drawTileMultiAnalyze6: REGL.DrawCommand<REGL.DefaultContext, DrawTileMultiAnalyze6.Props>;
   convolutionSmooth: REGL.DrawCommand<REGL.DefaultContext, ConvolutionSmooth.Props>;
   HsAdvMergeAndScaleTiles: REGL.DrawCommand<REGL.DefaultContext, HsAdvMergeAndScaleTiles.Props>;
   HsAdvCalcNormals: REGL.DrawCommand<REGL.DefaultContext, HsAdvCalcNormals.Props>;
@@ -177,18 +165,12 @@ export default class Renderer {
       drawTileInterpolateColorOnly: commands.createDrawTileInterpolateColorOnlyCommand(regl, commonDrawConfig, fragMacros),
       drawTileInterpolateValue: commands.createDrawTileInterpolateValueCommand(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze1: commands.createCalcTileMultiAnalyze1Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze1: commands.createDrawTileMultiAnalyze1Command(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze2: commands.createCalcTileMultiAnalyze2Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze2: commands.createDrawTileMultiAnalyze2Command(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze3: commands.createCalcTileMultiAnalyze3Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze3: commands.createDrawTileMultiAnalyze3Command(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze4: commands.createCalcTileMultiAnalyze4Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze4: commands.createDrawTileMultiAnalyze4Command(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze5: commands.createCalcTileMultiAnalyze5Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze5: commands.createDrawTileMultiAnalyze5Command(regl, commonDrawConfig, fragMacros),
       calcTileMultiAnalyze6: commands.createCalcTileMultiAnalyze6Command(regl, commonDrawConfig),
-      drawTileMultiAnalyze6: commands.createDrawTileMultiAnalyze6Command(regl, commonDrawConfig, fragMacros),
-      drawTileDiff: commands.createDrawTileDiffCommand(regl, commonDrawConfig, fragMacros),
+      drawTileResult: commands.createDrawResultCommand(regl, commonDrawConfig, fragMacros),
       calcTileDiff: commands.createCalcTileDiffCommand(regl, commonDrawConfig),
       convolutionSmooth: commands.createConvolutionSmoothCommand(regl, commonDrawConfig),
       HsAdvMergeAndScaleTiles: commands.createHsAdvMergeAndScaleTiles(regl),
@@ -382,35 +364,31 @@ export default class Renderer {
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
-    fboTile.use(() => {
-      this.calcTileDiff({
-        canvasSize: [tileSize, tileSize],
-        canvasCoordinates: [0, 0],
-        textureA: textureManagerA.texture,
-        textureB: textureManagerB.texture,
-        textureBoundsA: textureBoundsA,
-        textureBoundsB: textureBoundsB,
-      });
-
-      // Get encoded floatValues to use for mouseEvents
-      regl.read({data: resultEncodedPixels});
-    });
-
-    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
-
-    this.drawTileDiff({
-      scaleLength: this.scaleInput.length,
-      sentinelLength: this.sentinelInput.length,
-      scaleColormap: this.scaleColormap,
-      sentinelColormap: this.sentinelColormap,
+    this.calcTileDiff({
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
       textureB: textureManagerB.texture,
       textureBoundsA: textureBoundsA,
       textureBoundsB: textureBoundsB,
+      fbo:fboTile,
     });
 
+    this.drawTileResult({
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
+      canvasSize: [tileSize, tileSize],
+      canvasCoordinates: [0, 0],
+      texture: fboTile,
+    });
+
+    fboTile.use(() => {
+      // Get encoded floatValues to use for mouseEvents
+      regl.read({data: resultEncodedPixels});
+    });
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
     fboTile.destroy();
 
     // Since the tile will fill the whole canvas, the offset is simply [0, 0].
@@ -501,7 +479,7 @@ export default class Renderer {
 
     const pixelScale = _hillshadeOptions.hsPixelScale! / (tileSize * (2**zoom));
     let hsValueScale = 1.0;
-    if (typeof _hillshadeOptions.hsValueScale == "number") {
+    if (typeof _hillshadeOptions.hsValueScale === "number") {
       hsValueScale = _hillshadeOptions.hsValueScale;
     } else if (_hillshadeOptions.hsValueScale!.constructor === Object) {
       hsValueScale = _hillshadeOptions.hsValueScale![zoom];
@@ -625,29 +603,7 @@ export default class Renderer {
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
-    fboTile.use(() => {
-      this.calcTileMultiAnalyze1({
-        canvasSize: [tileSize, tileSize],
-        canvasCoordinates: [0, 0],
-        textureA: textureManagerA.texture,
-        textureBoundsA: textureBoundsA,
-        filterLowA: filterLowA,
-        filterHighA: filterHighA,
-        multiplierA: multiplierA,
-      });
-
-      // Get encoded floatValues to use for mouseEvents
-      regl.read({data: resultEncodedPixels});
-    });
-
-    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
-
-    // draw result.
-    this.drawTileMultiAnalyze1({
-      scaleLength: this.scaleInput.length,
-      sentinelLength: this.sentinelInput.length,
-      scaleColormap: this.scaleColormap,
-      sentinelColormap: this.sentinelColormap,
+    this.calcTileMultiAnalyze1({
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -655,8 +611,24 @@ export default class Renderer {
       filterLowA: filterLowA,
       filterHighA: filterHighA,
       multiplierA: multiplierA,
+      fbo:fboTile,
     });
 
+    this.drawTileResult({
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
+      canvasSize: [tileSize, tileSize],
+      canvasCoordinates: [0, 0],
+      texture: fboTile,
+    });
+
+    fboTile.use(() => {
+      // Get encoded floatValues to use for mouseEvents
+      regl.read({data: resultEncodedPixels});
+    });
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
     fboTile.destroy();
 
     // Since the tile will fill the whole canvas, the offset is simply [0, 0].
@@ -696,34 +668,7 @@ export default class Renderer {
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
-    fboTile.use(() => {
-      this.calcTileMultiAnalyze2({
-        canvasSize: [tileSize, tileSize],
-        canvasCoordinates: [0, 0],
-        textureA: textureManagerA.texture,
-        textureB: textureManagerB.texture,
-        textureBoundsA: textureBoundsA,
-        textureBoundsB: textureBoundsB,
-        filterLowA: filterLowA,
-        filterHighA: filterHighA,
-        filterLowB: filterLowB,
-        filterHighB: filterHighB,
-        multiplierA: multiplierA,
-        multiplierB: multiplierB,
-      });
-
-      // Get encoded floatValues to use for mouseEvents
-      regl.read({data: resultEncodedPixels});
-    });
-
-    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
-
-    // draw result.
-    this.drawTileMultiAnalyze2({
-      scaleLength: this.scaleInput.length,
-      sentinelLength: this.sentinelInput.length,
-      scaleColormap: this.scaleColormap,
-      sentinelColormap: this.sentinelColormap,
+    this.calcTileMultiAnalyze2({
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -736,8 +681,24 @@ export default class Renderer {
       filterHighB: filterHighB,
       multiplierA: multiplierA,
       multiplierB: multiplierB,
+      fbo:fboTile,
     });
 
+    this.drawTileResult({
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
+      canvasSize: [tileSize, tileSize],
+      canvasCoordinates: [0, 0],
+      texture: fboTile,
+    });
+
+    fboTile.use(() => {
+      // Get encoded floatValues to use for mouseEvents
+      regl.read({data: resultEncodedPixels});
+    });
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
     fboTile.destroy();
 
     // Since the tile will fill the whole canvas, the offset is simply [0, 0].
@@ -783,39 +744,7 @@ export default class Renderer {
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
-    fboTile.use(() => {
-      this.calcTileMultiAnalyze3({
-        canvasSize: [tileSize, tileSize],
-        canvasCoordinates: [0, 0],
-        textureA: textureManagerA.texture,
-        textureB: textureManagerB.texture,
-        textureC: textureManagerC.texture,
-        textureBoundsA: textureBoundsA,
-        textureBoundsB: textureBoundsB,
-        textureBoundsC: textureBoundsC,
-        filterLowA: filterLowA,
-        filterHighA: filterHighA,
-        filterLowB: filterLowB,
-        filterHighB: filterHighB,
-        filterLowC: filterLowC,
-        filterHighC: filterHighC,
-        multiplierA: multiplierA,
-        multiplierB: multiplierB,
-        multiplierC: multiplierC,
-      });
-
-      // Get encoded floatValues to use for mouseEvents
-      regl.read({data: resultEncodedPixels});
-    });
-
-    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
-
-    // draw result.
-    this.drawTileMultiAnalyze3({
-      scaleLength: this.scaleInput.length,
-      sentinelLength: this.sentinelInput.length,
-      scaleColormap: this.scaleColormap,
-      sentinelColormap: this.sentinelColormap,
+    this.calcTileMultiAnalyze3({
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -833,8 +762,24 @@ export default class Renderer {
       multiplierA: multiplierA,
       multiplierB: multiplierB,
       multiplierC: multiplierC,
+      fbo:fboTile,
     });
 
+    this.drawTileResult({
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
+      canvasSize: [tileSize, tileSize],
+      canvasCoordinates: [0, 0],
+      texture: fboTile,
+    });
+
+    fboTile.use(() => {
+      // Get encoded floatValues to use for mouseEvents
+      regl.read({data: resultEncodedPixels});
+    });
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
     fboTile.destroy();
 
     // Since the tile will fill the whole canvas, the offset is simply [0, 0].
@@ -885,44 +830,7 @@ export default class Renderer {
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
-    fboTile.use(() => {
-      this.calcTileMultiAnalyze4({
-        canvasSize: [tileSize, tileSize],
-        canvasCoordinates: [0, 0],
-        textureA: textureManagerA.texture,
-        textureB: textureManagerB.texture,
-        textureC: textureManagerC.texture,
-        textureD: textureManagerD.texture,
-        textureBoundsA: textureBoundsA,
-        textureBoundsB: textureBoundsB,
-        textureBoundsC: textureBoundsC,
-        textureBoundsD: textureBoundsD,
-        filterLowA: filterLowA,
-        filterHighA: filterHighA,
-        filterLowB: filterLowB,
-        filterHighB: filterHighB,
-        filterLowC: filterLowC,
-        filterHighC: filterHighC,
-        filterLowD: filterLowD,
-        filterHighD: filterHighD,
-        multiplierA: multiplierA,
-        multiplierB: multiplierB,
-        multiplierC: multiplierC,
-        multiplierD: multiplierD,
-      });
-
-      // Get encoded floatValues to use for mouseEvents
-      regl.read({data: resultEncodedPixels});
-    });
-
-    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
-
-    // draw result.
-    this.drawTileMultiAnalyze4({
-      scaleLength: this.scaleInput.length,
-      sentinelLength: this.sentinelInput.length,
-      scaleColormap: this.scaleColormap,
-      sentinelColormap: this.sentinelColormap,
+    this.calcTileMultiAnalyze4({
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -945,8 +853,24 @@ export default class Renderer {
       multiplierB: multiplierB,
       multiplierC: multiplierC,
       multiplierD: multiplierD,
+      fbo:fboTile,
     });
 
+    this.drawTileResult({
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
+      canvasSize: [tileSize, tileSize],
+      canvasCoordinates: [0, 0],
+      texture: fboTile,
+    });
+
+    fboTile.use(() => {
+      // Get encoded floatValues to use for mouseEvents
+      regl.read({data: resultEncodedPixels});
+    });
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
     fboTile.destroy();
 
     // Since the tile will fill the whole canvas, the offset is simply [0, 0].
@@ -1004,48 +928,7 @@ export default class Renderer {
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
-    fboTile.use(() => {
-      this.calcTileMultiAnalyze5({
-        canvasSize: [tileSize, tileSize],
-        canvasCoordinates: [0, 0],
-        textureA: textureManagerA.texture,
-        textureB: textureManagerB.texture,
-        textureC: textureManagerC.texture,
-        textureD: textureManagerD.texture,
-        textureE: textureManagerE.texture,
-        textureBoundsA: textureBoundsA,
-        textureBoundsB: textureBoundsB,
-        textureBoundsC: textureBoundsC,
-        textureBoundsD: textureBoundsD,
-        textureBoundsE: textureBoundsE,
-        filterLowA: filterLowA,
-        filterHighA: filterHighA,
-        filterLowB: filterLowB,
-        filterHighB: filterHighB,
-        filterLowC: filterLowC,
-        filterHighC: filterHighC,
-        filterLowD: filterLowD,
-        filterHighD: filterHighD,
-        filterLowE: filterLowE,
-        filterHighE: filterHighE,
-        multiplierA: multiplierA,
-        multiplierB: multiplierB,
-        multiplierC: multiplierC,
-        multiplierD: multiplierD,
-        multiplierE: multiplierE,
-      });
-
-      // Get encoded floatValues to use for mouseEvents
-      regl.read({data: resultEncodedPixels});
-    });
-
-    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
-
-    this.drawTileMultiAnalyze5({
-      scaleLength: this.scaleInput.length,
-      sentinelLength: this.sentinelInput.length,
-      scaleColormap: this.scaleColormap,
-      sentinelColormap: this.sentinelColormap,
+    this.calcTileMultiAnalyze5({
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -1073,8 +956,24 @@ export default class Renderer {
       multiplierC: multiplierC,
       multiplierD: multiplierD,
       multiplierE: multiplierE,
+      fbo:fboTile,
     });
 
+    this.drawTileResult({
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
+      canvasSize: [tileSize, tileSize],
+      canvasCoordinates: [0, 0],
+      texture: fboTile,
+    });
+
+    fboTile.use(() => {
+      // Get encoded floatValues to use for mouseEvents
+      regl.read({data: resultEncodedPixels});
+    });
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
     fboTile.destroy();
 
     // Since the tile will fill the whole canvas, the offset is simply [0, 0].
@@ -1138,53 +1037,7 @@ export default class Renderer {
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
 
-    fboTile.use(() => {
-      this.calcTileMultiAnalyze6({
-        canvasSize: [tileSize, tileSize],
-        canvasCoordinates: [0, 0],
-        textureA: textureManagerA.texture,
-        textureB: textureManagerB.texture,
-        textureC: textureManagerC.texture,
-        textureD: textureManagerD.texture,
-        textureE: textureManagerE.texture,
-        textureF: textureManagerF.texture,
-        textureBoundsA: textureBoundsA,
-        textureBoundsB: textureBoundsB,
-        textureBoundsC: textureBoundsC,
-        textureBoundsD: textureBoundsD,
-        textureBoundsE: textureBoundsE,
-        textureBoundsF: textureBoundsF,
-        filterLowA: filterLowA,
-        filterHighA: filterHighA,
-        filterLowB: filterLowB,
-        filterHighB: filterHighB,
-        filterLowC: filterLowC,
-        filterHighC: filterHighC,
-        filterLowD: filterLowD,
-        filterHighD: filterHighD,
-        filterLowE: filterLowE,
-        filterHighE: filterHighE,
-        filterLowF: filterLowF,
-        filterHighF: filterHighF,
-        multiplierA: multiplierA,
-        multiplierB: multiplierB,
-        multiplierC: multiplierC,
-        multiplierD: multiplierD,
-        multiplierE: multiplierE,
-        multiplierF: multiplierF,
-      });
-
-      // Get encoded floatValues to use for mouseEvents
-      regl.read({data: resultEncodedPixels});
-    });
-
-    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
-
-    this.drawTileMultiAnalyze6({
-      scaleLength: this.scaleInput.length,
-      sentinelLength: this.sentinelInput.length,
-      scaleColormap: this.scaleColormap,
-      sentinelColormap: this.sentinelColormap,
+    this.calcTileMultiAnalyze6({
       canvasSize: [tileSize, tileSize],
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
@@ -1217,8 +1070,24 @@ export default class Renderer {
       multiplierD: multiplierD,
       multiplierE: multiplierE,
       multiplierF: multiplierF,
+      fbo:fboTile,
     });
 
+    this.drawTileResult({
+      scaleLength: this.scaleInput.length,
+      sentinelLength: this.sentinelInput.length,
+      scaleColormap: this.scaleColormap,
+      sentinelColormap: this.sentinelColormap,
+      canvasSize: [tileSize, tileSize],
+      canvasCoordinates: [0, 0],
+      texture: fboTile,
+    });
+
+    fboTile.use(() => {
+      // Get encoded floatValues to use for mouseEvents
+      regl.read({data: resultEncodedPixels});
+    });
+    resultEncodedPixels = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixels);
     fboTile.destroy();
 
     // Since the tile will fill the whole canvas, the offset is simply [0, 0].
@@ -1444,7 +1313,7 @@ export default class Renderer {
     const nodataTile = util.createNoDataTile(nodataValue, tileSize);
     const pixelScale = _hillshadeOptions.hsPixelScale! / (tileSize * (2**zoom));
     let hsValueScale = 1.0;
-    if (typeof _hillshadeOptions.hsValueScale == "number"){
+    if (typeof _hillshadeOptions.hsValueScale === "number") {
       hsValueScale = _hillshadeOptions.hsValueScale;
     } else if (_hillshadeOptions.hsValueScale!.constructor === Object) {
       hsValueScale = _hillshadeOptions.hsValueScale![zoom];
@@ -1618,7 +1487,6 @@ export default class Renderer {
       })
     );
 
-    // let resultEncodedPixels: Float32Array[] = [];
     const resultEncodedPixels: Uint8Array[] = [];
 
     const renderFrame = () => {
@@ -1652,35 +1520,34 @@ export default class Renderer {
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
-          fboTile.use(() => {
-            this.calcTileDiff({
-              canvasSize: [tileSize, tileSize],
-              canvasCoordinates: [0, 0],
-              textureA: textureManagerA.texture,
-              textureB: textureManagerB.texture,
-              textureBoundsA: tilesABounds[index],
-              textureBoundsB: tilesBBounds[index],
-            });
-            regl.read({data: resultEncodedPixelsTile});
+          this.calcTileDiff({
+            canvasSize: [tileSize, tileSize],
+            canvasCoordinates: [0, 0],
+            textureA: textureManagerA.texture,
+            textureB: textureManagerB.texture,
+            textureBoundsA: tilesABounds[index],
+            textureBoundsB: tilesBBounds[index],
+            fbo:fboTile,
           });
 
-          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
-          // Add tile result to array
-          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
-          tileIndex += 1;
-
-          this.drawTileDiff({
+          this.drawTileResult({
             scaleLength: this.scaleInput.length,
             sentinelLength: this.sentinelInput.length,
             scaleColormap: this.scaleColormap,
             sentinelColormap: this.sentinelColormap,
             canvasSize,
             canvasCoordinates: canvasCoords,
-            textureA: textureManagerA.texture,
-            textureB: textureManagerB.texture,
-            textureBoundsA: tilesABounds[index],
-            textureBoundsB: tilesBBounds[index],
+            texture: fboTile,
           });
+
+          fboTile.use(() => {
+            // Get encoded floatValues to use for mouseEvents
+            regl.read({data: resultEncodedPixelsTile});
+          });
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
+          // Add tile result to array
+          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
+          tileIndex += 1;
 
           fboTile.destroy();
         });
@@ -1769,40 +1636,35 @@ export default class Renderer {
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
-          fboTile.use(() => {
-            this.calcTileMultiAnalyze1({
-              canvasSize: [tileSize, tileSize],
-              canvasCoordinates: [0, 0],
-              textureA: textureManagerA.texture,
-              textureBoundsA: tilesABounds[index],
-              filterLowA: filterLowA,
-              filterHighA: filterHighA,
-              multiplierA: multiplierA,
-            });
-
-            // Get encoded floatValues to use for mouseEvents
-            regl.read({data: resultEncodedPixelsTile});
+          this.calcTileMultiAnalyze1({
+            canvasSize: [tileSize, tileSize],
+            canvasCoordinates: [0, 0],
+            textureA: textureManagerA.texture,
+            textureBoundsA: tilesABounds[index],
+            filterLowA: filterLowA,
+            filterHighA: filterHighA,
+            multiplierA: multiplierA,
+            fbo:fboTile,
           });
 
-          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
-          // Add tile result to array
-          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
-          tileIndex += 1;
-
-          this.drawTileMultiAnalyze1({
+          this.drawTileResult({
             scaleLength: this.scaleInput.length,
             sentinelLength: this.sentinelInput.length,
             scaleColormap: this.scaleColormap,
             sentinelColormap: this.sentinelColormap,
             canvasSize,
             canvasCoordinates: canvasCoords,
-            textureA: textureManagerA.texture,
-            textureBoundsA: tilesABounds[index],
-            filterLowA: filterLowA,
-            filterHighA: filterHighA,
-            multiplierA: multiplierA,
+            texture: fboTile,
           });
 
+          fboTile.use(() => {
+            // Get encoded floatValues to use for mouseEvents
+            regl.read({data: resultEncodedPixelsTile});
+          });
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
+          // Add tile result to array
+          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
+          tileIndex += 1;
           fboTile.destroy();
         });
       }
@@ -1899,38 +1761,9 @@ export default class Renderer {
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
-          fboTile.use(() => {
-            this.calcTileMultiAnalyze2({
-              canvasSize: [tileSize, tileSize],
-              canvasCoordinates: [0, 0],
-              textureA: textureManagerA.texture,
-              textureB: textureManagerB.texture,
-              textureBoundsA: tilesABounds[index],
-              textureBoundsB: tilesBBounds[index],
-              filterLowA: filterLowA,
-              filterHighA: filterHighA,
-              filterLowB: filterLowB,
-              filterHighB: filterHighB,
-              multiplierA: multiplierA,
-              multiplierB: multiplierB,
-            });
-
-            // Get encoded floatValues to use for mouseEvents
-            regl.read({data: resultEncodedPixelsTile});
-          });
-
-          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
-          // Add tile result to array
-          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
-          tileIndex += 1;
-
-          this.drawTileMultiAnalyze2({
-            scaleLength: this.scaleInput.length,
-            sentinelLength: this.sentinelInput.length,
-            scaleColormap: this.scaleColormap,
-            sentinelColormap: this.sentinelColormap,
-            canvasSize,
-            canvasCoordinates: canvasCoords,
+          this.calcTileMultiAnalyze2({
+            canvasSize: [tileSize, tileSize],
+            canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
             textureB: textureManagerB.texture,
             textureBoundsA: tilesABounds[index],
@@ -1941,8 +1774,27 @@ export default class Renderer {
             filterHighB: filterHighB,
             multiplierA: multiplierA,
             multiplierB: multiplierB,
+            fbo:fboTile,
           });
 
+          this.drawTileResult({
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
+            canvasSize,
+            canvasCoordinates: canvasCoords,
+            texture: fboTile,
+          });
+
+          fboTile.use(() => {
+            // Get encoded floatValues to use for mouseEvents
+            regl.read({data: resultEncodedPixelsTile});
+          });
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
+          // Add tile result to array
+          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
+          tileIndex += 1;
           fboTile.destroy();
         });
       }
@@ -2052,44 +1904,9 @@ export default class Renderer {
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
-          fboTile.use(() => {
-            this.calcTileMultiAnalyze3({
-              canvasSize: [tileSize, tileSize],
-              canvasCoordinates: [0, 0],
-              textureA: textureManagerA.texture,
-              textureB: textureManagerB.texture,
-              textureC: textureManagerC.texture,
-              textureBoundsA: tilesABounds[index],
-              textureBoundsB: tilesBBounds[index],
-              textureBoundsC: tilesCBounds[index],
-              filterLowA: filterLowA,
-              filterHighA: filterHighA,
-              filterLowB: filterLowB,
-              filterHighB: filterHighB,
-              filterLowC: filterLowC,
-              filterHighC: filterHighC,
-              multiplierA: multiplierA,
-              multiplierB: multiplierB,
-              multiplierC: multiplierC,
-            });
-
-            // Get encoded floatValues to use for mouseEvents
-            regl.read({data: resultEncodedPixelsTile});
-          });
-
-
-          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
-          // Add tile result to array
-          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
-          tileIndex += 1;
-
-          this.drawTileMultiAnalyze3({
-            scaleLength: this.scaleInput.length,
-            sentinelLength: this.sentinelInput.length,
-            scaleColormap: this.scaleColormap,
-            sentinelColormap: this.sentinelColormap,
-            canvasSize,
-            canvasCoordinates: canvasCoords,
+          this.calcTileMultiAnalyze3({
+            canvasSize: [tileSize, tileSize],
+            canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
             textureB: textureManagerB.texture,
             textureC: textureManagerC.texture,
@@ -2105,8 +1922,27 @@ export default class Renderer {
             multiplierA: multiplierA,
             multiplierB: multiplierB,
             multiplierC: multiplierC,
+            fbo:fboTile,
           });
 
+          this.drawTileResult({
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
+            canvasSize,
+            canvasCoordinates: canvasCoords,
+            texture: fboTile,
+          });
+
+          fboTile.use(() => {
+            // Get encoded floatValues to use for mouseEvents
+            regl.read({data: resultEncodedPixelsTile});
+          });
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
+          // Add tile result to array
+          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
+          tileIndex += 1;
           fboTile.destroy();
         });
       }
@@ -2229,48 +2065,9 @@ export default class Renderer {
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
-          fboTile.use(() => {
-            this.calcTileMultiAnalyze4({
-              canvasSize: [tileSize, tileSize],
-              canvasCoordinates: [0, 0],
-              textureA: textureManagerA.texture,
-              textureB: textureManagerB.texture,
-              textureC: textureManagerC.texture,
-              textureD: textureManagerD.texture,
-              textureBoundsA: tilesABounds[index],
-              textureBoundsB: tilesBBounds[index],
-              textureBoundsC: tilesCBounds[index],
-              textureBoundsD: tilesDBounds[index],
-              filterLowA: filterLowA,
-              filterHighA: filterHighA,
-              filterLowB: filterLowB,
-              filterHighB: filterHighB,
-              filterLowC: filterLowC,
-              filterHighC: filterHighC,
-              filterLowD: filterLowD,
-              filterHighD: filterHighD,
-              multiplierA: multiplierA,
-              multiplierB: multiplierB,
-              multiplierC: multiplierC,
-              multiplierD: multiplierD,
-            });
-
-            // Get encoded floatValues to use for mouseEvents
-            regl.read({data: resultEncodedPixelsTile});
-          });
-
-          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
-          // Add tile result to array
-          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
-          tileIndex += 1;
-
-          this.drawTileMultiAnalyze4({
-            scaleLength: this.scaleInput.length,
-            sentinelLength: this.sentinelInput.length,
-            scaleColormap: this.scaleColormap,
-            sentinelColormap: this.sentinelColormap,
-            canvasSize,
-            canvasCoordinates: canvasCoords,
+          this.calcTileMultiAnalyze4({
+            canvasSize: [tileSize, tileSize],
+            canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
             textureB: textureManagerB.texture,
             textureC: textureManagerC.texture,
@@ -2291,8 +2088,27 @@ export default class Renderer {
             multiplierB: multiplierB,
             multiplierC: multiplierC,
             multiplierD: multiplierD,
+            fbo:fboTile,
           });
 
+          this.drawTileResult({
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
+            canvasSize,
+            canvasCoordinates: canvasCoords,
+            texture: fboTile,
+          });
+
+          fboTile.use(() => {
+            // Get encoded floatValues to use for mouseEvents
+            regl.read({data: resultEncodedPixelsTile});
+          });
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
+          // Add tile result to array
+          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
+          tileIndex += 1;
           fboTile.destroy();
         });
       }
@@ -2428,53 +2244,9 @@ export default class Renderer {
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
-          fboTile.use(() => {
-            this.calcTileMultiAnalyze5({
-              canvasSize: [tileSize, tileSize],
-              canvasCoordinates: [0, 0],
-              textureA: textureManagerA.texture,
-              textureB: textureManagerB.texture,
-              textureC: textureManagerC.texture,
-              textureD: textureManagerD.texture,
-              textureE: textureManagerE.texture,
-              textureBoundsA: tilesABounds[index],
-              textureBoundsB: tilesBBounds[index],
-              textureBoundsC: tilesCBounds[index],
-              textureBoundsD: tilesDBounds[index],
-              textureBoundsE: tilesEBounds[index],
-              filterLowA: filterLowA,
-              filterHighA: filterHighA,
-              filterLowB: filterLowB,
-              filterHighB: filterHighB,
-              filterLowC: filterLowC,
-              filterHighC: filterHighC,
-              filterLowD: filterLowD,
-              filterHighD: filterHighD,
-              filterLowE: filterLowE,
-              filterHighE: filterHighE,
-              multiplierA: multiplierA,
-              multiplierB: multiplierB,
-              multiplierC: multiplierC,
-              multiplierD: multiplierD,
-              multiplierE: multiplierE,
-            });
-
-            // Get encoded floatValues to use for mouseEvents
-            regl.read({data: resultEncodedPixelsTile});
-          });
-
-          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
-          // Add tile result to array
-          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
-          tileIndex += 1;
-
-          this.drawTileMultiAnalyze5({
-            scaleLength: this.scaleInput.length,
-            sentinelLength: this.sentinelInput.length,
-            scaleColormap: this.scaleColormap,
-            sentinelColormap: this.sentinelColormap,
-            canvasSize,
-            canvasCoordinates: canvasCoords,
+          this.calcTileMultiAnalyze5({
+            canvasSize: [tileSize, tileSize],
+            canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
             textureB: textureManagerB.texture,
             textureC: textureManagerC.texture,
@@ -2500,8 +2272,27 @@ export default class Renderer {
             multiplierC: multiplierC,
             multiplierD: multiplierD,
             multiplierE: multiplierE,
+            fbo:fboTile,
           });
 
+          this.drawTileResult({
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
+            canvasSize,
+            canvasCoordinates: canvasCoords,
+            texture: fboTile,
+          });
+
+          fboTile.use(() => {
+            // Get encoded floatValues to use for mouseEvents
+            regl.read({data: resultEncodedPixelsTile});
+          });
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
+          // Add tile result to array
+          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
+          tileIndex += 1;
           fboTile.destroy();
         });
       }
@@ -2650,58 +2441,9 @@ export default class Renderer {
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
 
-          fboTile.use(() => {
-            this.calcTileMultiAnalyze6({
-              canvasSize: [tileSize, tileSize],
-              canvasCoordinates: [0, 0],
-              textureA: textureManagerA.texture,
-              textureB: textureManagerB.texture,
-              textureC: textureManagerC.texture,
-              textureD: textureManagerD.texture,
-              textureE: textureManagerE.texture,
-              textureF: textureManagerF.texture,
-              textureBoundsA: tilesABounds[index],
-              textureBoundsB: tilesBBounds[index],
-              textureBoundsC: tilesCBounds[index],
-              textureBoundsD: tilesDBounds[index],
-              textureBoundsE: tilesEBounds[index],
-              textureBoundsF: tilesFBounds[index],
-              filterLowA: filterLowA,
-              filterHighA: filterHighA,
-              filterLowB: filterLowB,
-              filterHighB: filterHighB,
-              filterLowC: filterLowC,
-              filterHighC: filterHighC,
-              filterLowD: filterLowD,
-              filterHighD: filterHighD,
-              filterLowE: filterLowE,
-              filterHighE: filterHighE,
-              filterLowF: filterLowF,
-              filterHighF: filterHighF,
-              multiplierA: multiplierA,
-              multiplierB: multiplierB,
-              multiplierC: multiplierC,
-              multiplierD: multiplierD,
-              multiplierE: multiplierE,
-              multiplierF: multiplierF,
-            });
-
-            // Get encoded floatValues to use for mouseEvents
-            regl.read({data: resultEncodedPixelsTile});
-          });
-
-          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
-          // Add tile result to array
-          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
-          tileIndex += 1;
-
-          this.drawTileMultiAnalyze6({
-            scaleLength: this.scaleInput.length,
-            sentinelLength: this.sentinelInput.length,
-            scaleColormap: this.scaleColormap,
-            sentinelColormap: this.sentinelColormap,
-            canvasSize,
-            canvasCoordinates: canvasCoords,
+          this.calcTileMultiAnalyze6({
+            canvasSize: [tileSize, tileSize],
+            canvasCoordinates: [0, 0],
             textureA: textureManagerA.texture,
             textureB: textureManagerB.texture,
             textureC: textureManagerC.texture,
@@ -2732,8 +2474,27 @@ export default class Renderer {
             multiplierD: multiplierD,
             multiplierE: multiplierE,
             multiplierF: multiplierF,
+            fbo:fboTile,
           });
 
+          this.drawTileResult({
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
+            canvasSize,
+            canvasCoordinates: canvasCoords,
+            texture: fboTile,
+          });
+
+          fboTile.use(() => {
+            // Get encoded floatValues to use for mouseEvents
+            regl.read({data: resultEncodedPixelsTile});
+          });
+          resultEncodedPixelsTile = this.flipReadPixelsUint(tileSize, tileSize, resultEncodedPixelsTile);
+          // Add tile result to array
+          resultEncodedPixels[tileIndex] = resultEncodedPixelsTile;
+          tileIndex += 1;
           fboTile.destroy();
         });
       }
