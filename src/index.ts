@@ -7,12 +7,11 @@ import {
   values,
   zipWith,
 } from 'lodash-es';
-import { ContourMultiPolygon } from 'd3-contour';
+import { ContourMultiPolygon, contours } from 'd3-contour';
 import * as util from './util';
 import { select, selectAll } from "d3-selection";
 import { scaleLinear } from "d3-scale";
 import { geoPath } from "d3-geo";
-import { contours } from "d3-contour";
 import { json } from "d3-request";
 import { min, max, scan, range } from "d3-array";
 import { interpolateHcl } from "d3-interpolate";
@@ -338,27 +337,34 @@ export default class GLOperations extends L.GridLayer {
 
     // generate vec3 directions for advanced hillshading with default iterations
     this._renderer.generateAmbientDirections(this.options.hsAdvAmbientIterations);
-    this._renderer.generateSunDirections(this.options.hsAdvSoftIterations, this.options.hsAdvSunRadiusMultiplier);
+    this._renderer.generateSunDirections(
+      this.options.hsAdvSoftIterations,
+      this.options.hsAdvSunRadiusMultiplier
+    );
 
     // Listen for 'tileunload' event to remove the tile from the texture.
-    this.on('tileunload', this._onTileRemove.bind(this));
+    this.on("tileunload", this._onTileRemove.bind(this));
 
     // Listen for all visible tiles loaded. If using contours then run update
-    this.on('load', _ => setTimeout(() => {
-      if (this.options.debug) console.log("all tiles loaded. Updating contours if enabled.");
-      this._maybeUpdateMergedArrayAndDrawContours();
-      // delay due to: https://github.com/Leaflet/Leaflet/blob/master/src/map/Map.js#L1696
-    }, 300));
+    this.on("load", (_) =>
+      setTimeout(() => {
+        if (this.options.debug) console.log("all tiles loaded. Updating contours if enabled.");
+        this._maybeUpdateMergedArrayAndDrawContours();
+        // delay due to: https://github.com/Leaflet/Leaflet/blob/master/src/map/Map.js#L1696
+      }, 300)
+    );
 
     // Listen for zoom changes. Necessary when using fractional zoom levels.
     setTimeout(() => {
-      this._map.on('zoomend', _ => setTimeout(async () => {
-        if (this.options.contourType !== 'none') {
-          if (this.options.debug) console.log("zoom changed. Moving contour canvas.");
-          const activeTilesBounds: ActiveTilesBounds = await this._getActivetilesBounds();
-          this._moveContourCanvas(activeTilesBounds);
-        }
-      }, 50));
+      this._map.on("zoomend", _ =>
+        setTimeout(async () => {
+          if (this.options.contourType !== "none") {
+            if (this.options.debug) console.log("zoom changed. Moving contour canvas.");
+            const activeTilesBounds: ActiveTilesBounds = await this._getActivetilesBounds();
+            this._moveContourCanvas(activeTilesBounds);
+          }
+        }, 50)
+      );
     }, 300);
   }
 
@@ -452,7 +458,7 @@ export default class GLOperations extends L.GridLayer {
       );
 
       this._renderer.regl.destroy();
-      //@ts-ignore
+      // @ts-ignore
       delete this._renderer;
 
       Object.assign(this, {
@@ -594,7 +600,7 @@ export default class GLOperations extends L.GridLayer {
         )
       ) {
         setTimeout(async () => {
-          await this._smoothContourInput();
+          this._smoothContourInput();
           this._calculateAndDrawContours();
         }, 50);
       } else if (
@@ -754,7 +760,7 @@ export default class GLOperations extends L.GridLayer {
     });
 
     if (this.options.glOperation === 'none') {
-      //Download an extra layer if required
+      // Download an extra layer if required
       if (extraPixelLayers === 1) {
         this._fetchTileData(coords, operationUrlA).then((pixelDataA) => {
           if (this.options.debug) console.log("createTile - extraPixelLayers === 1");
@@ -775,7 +781,6 @@ export default class GLOperations extends L.GridLayer {
           const [sourceX, sourceY] = this._renderer.renderTileHsPregen(
             { coords: coords, pixelData: pixelData },
             { coords: coords, pixelData: pixelDataHs },
-            this.options._hillshadeOptions,
           );
 
           // Copy pixel data to a property on tile canvas element (for later retrieval).
@@ -953,7 +958,7 @@ export default class GLOperations extends L.GridLayer {
         );
 
         // Copy pixel data to a property on tile canvas element (for later retrieval).
-        tileCanvas.pixelData = <Uint8Array>resultEncodedPixels;
+        tileCanvas.pixelData = resultEncodedPixels as Uint8Array;
         tileCanvas.pixelDataA = pixelDataA;
         tileCanvas.pixelDataB = pixelDataB;
         tileCanvas.pixelDataC = pixelDataC;
@@ -1194,7 +1199,6 @@ export default class GLOperations extends L.GridLayer {
       canvasCoordinates = this._renderer.renderTilesHsPregen(
         tilesData,
         tilesDataHs,
-        this.options._hillshadeOptions,
       );
     } else if (this.options._hillshadeOptions.hillshadeType === 'advanced') {
       // canvasCoordinates = this._renderer.renderTilesHsAdvanced(
@@ -1251,7 +1255,6 @@ export default class GLOperations extends L.GridLayer {
       const canvasCoordinates = this._renderer.renderTilesHsPregen(
         tilesData,
         tilesDataHs,
-        this.options._hillshadeOptions,
       );
 
       canvasCoordinates.forEach(([sourceX, sourceY], index) => {
@@ -2734,7 +2737,7 @@ export default class GLOperations extends L.GridLayer {
   /**
    * Merge tiles, calculate new contours and draw on seperate canvas
    */
-  protected async _maybeUpdateMergedArrayAndDrawContours() {
+  protected async _maybeUpdateMergedArrayAndDrawContours(): Promise<void> {
     if (this.options.contourType === 'none') return;
 
     this._map.fire('contourDrawing', {status: true});
@@ -2748,7 +2751,7 @@ export default class GLOperations extends L.GridLayer {
 
       await this._mergePixelData(activeTilesBounds, tileSize);
       if (this.options.contourSmoothInput) {
-        await this._smoothContourInput();
+        this._smoothContourInput();
       }
       await this._calculateAndDrawContours();
       await this._moveContourCanvas(activeTilesBounds);
@@ -2758,11 +2761,11 @@ export default class GLOperations extends L.GridLayer {
   /**
    * Calculate new contours and draw on seperate canvas
    */
-  protected async _smoothContourInput() {
+  protected _smoothContourInput(): void {
     if (this.options.debug) console.log("_smoothContourInput()");
     const valuesNan = <number[]>this._contourData.mergedTileArray;
     const valuesNoNan = valuesNan.map(function(item) {
-      //TODO: fix for other noDataValues
+      // TODO: fix for other noDataValues
       if(isNaN(item)) {
         item = this.options.nodataValue;
       }
@@ -2777,8 +2780,8 @@ export default class GLOperations extends L.GridLayer {
       this.options.contourSmoothInputKernel
     );
 
-    //TODO fix for nodataValue other than default
-    //Replace nodata with NaN
+    // TODO fix for nodataValue other than default
+    // Replace nodata with NaN
     const newArr = [];
     for(let x = 0; x < resultEncodedPixels.length; x += 1) {
       let value = resultEncodedPixels[x];
@@ -2793,13 +2796,13 @@ export default class GLOperations extends L.GridLayer {
   /**
    * Calculate new contours and draw on seperate canvas
    */
-  protected async _calculateAndDrawContours() {
+  protected async _calculateAndDrawContours(): Promise<void> {
     if (this.options.contourType === 'none') return;
 
     this._map.fire('contourDrawing', {status: true});
     if (this.options.debug) console.log("_calculateAndDrawContours()");
     await this._clearContours();
-    await this._calculateContours();
+    this._calculateContours();
     setTimeout(() => {
       this._drawContours();
     }, 50);
@@ -2813,7 +2816,7 @@ export default class GLOperations extends L.GridLayer {
       label: ContourLabel,
       labelColor: string,
       labelFont: string
-    ) {
+    ): void {
     context.save();
     context.translate(label.xy[0], label.xy[1]);
     context.rotate(label.angle + (Math.cos(label.angle) < 0 ? Math.PI : 0));
@@ -2827,7 +2830,7 @@ export default class GLOperations extends L.GridLayer {
   /**
    * Calculate contours
    */
-  protected async _calculateContours() {
+  protected _calculateContours(): void {
     if (this.options.debug) console.log("_calculateContours()");
 
     let values;
@@ -2960,14 +2963,14 @@ export default class GLOperations extends L.GridLayer {
     contourCtx.clearRect(0, 0, width, height);
     contourCtx.save();
 
-    if (this.options.contourType == 'lines') {
+    if (this.options.contourType === 'lines') {
       contourCtx.lineWidth = this.options.contourLineWeight;
       contourCtx.strokeStyle = this.options.contourLineColor;
 
       if (!this.options.contourHypso && !this.options.contourBathy) {
         contourCtx.beginPath();
         contoursGeoData.forEach(function (c) {
-          if (contourIndexInterval == 0 || c.value % contourIndexInterval != 0) path(c);
+          if (contourIndexInterval === 0 || c.value % contourIndexInterval !== 0) path(c);
         });
         contourCtx.stroke();
       } else {
@@ -2989,12 +2992,12 @@ export default class GLOperations extends L.GridLayer {
       }
 
       // draw thicker index lines, if specified
-      if (this.options.contourIndexInterval != 0) {
+      if (this.options.contourIndexInterval !== 0) {
         if (!this.options.contourIndexLabels) {
           contourCtx.lineWidth = this.options.contourLineIndexWeight;
           contourCtx.beginPath();
           contoursGeoData.forEach(function (c) {
-            if (c.value % contourIndexInterval == 0) path(c);
+            if (c.value % contourIndexInterval === 0) path(c);
           });
           contourCtx.stroke();
         } else {
@@ -3003,25 +3006,23 @@ export default class GLOperations extends L.GridLayer {
           for (const c of contoursGeoData) {
             const threshold = c.value;
 
-            if (c.value % this.options.contourIndexInterval == 0) {
+            if (c.value % this.options.contourIndexInterval === 0) {
               // TODO: New TS errors occuring. Figure out why
               // Property 'coordinates' does not exist on type 'ContourMultiPolygon'.
-              //@ts-ignore
+              // @ts-ignore
               c.coordinates.forEach(polygon =>
-                //@ts-ignore
+                // @ts-ignore
                 polygon.forEach((ring, j) => {
-                  const p = ring.slice(1, Infinity),
-                    // best number of steps to divide ring.length
-                    possibilities = d3.range(this.options.contourLabelDistance, this.options.contourLabelDistance * 1.4),
-                    scores = possibilities.map(d => -((p.length - 1) % d)),
-                    n = possibilities[<number>d3.scan(scores)],
-                    // best starting point: bottom for first rings, top for holes
-                    start =
-                      //@ts-ignore
-                      1 + (<number>d3.scan(p.map(xy => (j === 0 ? -1 : 1) * xy[1])) % n),
-                    margin = 10;
+                  const p = ring.slice(1, Infinity);
+                  // best number of steps to divide ring.length
+                  const possibilities = d3.range(this.options.contourLabelDistance, this.options.contourLabelDistance * 1.4);
+                  const scores = possibilities.map(d => -((p.length - 1) % d));
+                  const n = possibilities[<number>d3.scan(scores)];
+                  // best starting point: bottom for first rings, top for holes
+                  const start = 1 + (<number>d3.scan(p.map(xy => (j === 0 ? -1 : 1) * xy[1])) % n);
+                  const margin = 10;
 
-                  //@ts-ignore
+                  // @ts-ignore
                   p.forEach((xy, i) => {
                     if (
                       i % n === start &&
@@ -3030,15 +3031,15 @@ export default class GLOperations extends L.GridLayer {
                       xy[1] > margin &&
                       xy[1] < height - margin
                     ) {
-                      const a = (i - 2 + p.length) % p.length,
-                        b = (i + 2) % p.length,
-                        dx = p[b][0] - p[a][0],
-                        dy = p[b][1] - p[a][1];
+                      const a = (i - 2 + p.length) % p.length;
+                      const b = (i + 2) % p.length;
+                      const dx = p[b][0] - p[a][0];
+                      const dy = p[b][1] - p[a][1];
                       if (dx === 0 && dy === 0) return;
 
                       labels.push({
                         threshold,
-                        //@ts-ignore
+                        // @ts-ignore
                         xy: xy.map(d => 1.0 * d),
                         angle: Math.atan2(dy, dx),
                         text: `${c.value}`
@@ -3053,16 +3054,16 @@ export default class GLOperations extends L.GridLayer {
             // the full rectangle minus a ring around each label
             contourCtx.save();
             contourCtx.beginPath();
-            contourCtx.moveTo(0, 0),
-            contourCtx.lineTo(width, 0),
-            contourCtx.lineTo(width, height),
-            contourCtx.lineTo(0, height),
+            contourCtx.moveTo(0, 0);
+            contourCtx.lineTo(width, 0);
+            contourCtx.lineTo(width, height);
+            contourCtx.lineTo(0, height);
             contourCtx.lineTo(0, 0);
             for (const label of labels) {
               for (let i = 0; i < 2 * Math.PI; i += 0.2) {
-                const pos = [Math.cos(i) * 20, -Math.sin(i) * 10],
-                  c = Math.cos(label.angle),
-                  s = Math.sin(label.angle);
+                const pos = [Math.cos(i) * 20, -Math.sin(i) * 10];
+                const c = Math.cos(label.angle);
+                const s = Math.sin(label.angle);
                   contourCtx[i === 0 ? "moveTo" : "lineTo"](
                   label.xy[0] + pos[0] * c - pos[1] * s,
                   label.xy[1] + pos[1] * c + pos[0] * s
@@ -3074,11 +3075,11 @@ export default class GLOperations extends L.GridLayer {
 
             // draw index contour for this threshold
             if (c.value % this.options.contourIndexInterval === 0 ) {
-              contourCtx.beginPath(),
-                (contourCtx.strokeStyle = this.options.contourLineColor),
-                (contourCtx.lineWidth = this.options.contourLineIndexWeight),
-                path(c),
-                contourCtx.stroke();
+              contourCtx.beginPath();
+              contourCtx.strokeStyle = this.options.contourLineColor;
+              contourCtx.lineWidth = this.options.contourLineIndexWeight;
+              path(c);
+              contourCtx.stroke();
             }
 
             // draw labels for this threshold
@@ -3094,7 +3095,7 @@ export default class GLOperations extends L.GridLayer {
           }
         }
       }
-    } else if (this.options.contourType == 'illuminated') {
+    } else if (this.options.contourType === 'illuminated') {
       contourCtx.lineWidth = this.options.contourIlluminatedShadowSize + 1;
       contourCtx.shadowBlur = this.options.contourIlluminatedShadowSize;
       contourCtx.shadowOffsetX = this.options.contourIlluminatedShadowSize;
@@ -3136,11 +3137,11 @@ export default class GLOperations extends L.GridLayer {
       const containingTile: GridLayerTile | undefined = this._getTileContainingPoint(pixelCoords);
       // Find position within tile.
       const coordsInTile: L.Point | undefined = containingTile && this._getCoordsInTile(containingTile, pixelCoords);
-      //get byteindex for coordsInTile
+      // get byteindex for coordsInTile
 
-      let byteIndex: number | undefined = undefined;
+      let byteIndex: number | undefined;
       if (coordsInTile !== undefined) {
-        byteIndex = (coordsInTile!.y * this._tileSizeAsNumber() + coordsInTile!.x) * BYTES_PER_WORD;
+        byteIndex = (coordsInTile.y * this._tileSizeAsNumber() + coordsInTile.x) * BYTES_PER_WORD;
       }
 
       const pixelValues: PixelValues = {};

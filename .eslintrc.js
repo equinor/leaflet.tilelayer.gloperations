@@ -88,7 +88,7 @@ module.exports = {
         "@typescript-eslint/restrict-template-expressions": "off",
         "@typescript-eslint/quotes": "off",
         "@typescript-eslint/no-floating-promises": "off",
-        "@typescript-eslint/no-unused-vars": ["warning", {
+        "@typescript-eslint/no-unused-vars": ["warn", {
             "argsIgnorePattern": "^_",
             "varsIgnorePattern": "^_",
         }],

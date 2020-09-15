@@ -57,7 +57,7 @@ export async function fetchPNGData(url: string, nodataValue: number, tileDimensi
     xhr.send(null);
   }).then((data: ArrayBuffer) => {
     return new Uint8Array(decode(data).data);
-  }).catch(() => createNoDataTile(nodataValue, tileDimension));
+  }).catch(() => <Uint8Array>createNoDataTile(nodataValue, tileDimension));
 }
 
 /**
@@ -183,7 +183,7 @@ export function staticCast<T>(val: any): T {
  * Add one or more macro definitions to a GLSL source string.
  */
 export function defineMacros(src: string, macros: { [key: string]: any }): string {
-  const defs = Object.keys(macros).map((key) => `#define ${key} ${macros[key]}\n`).join('');
+  const defs = Object.keys(macros).map((key) => `#define ${key} ${<string>macros[key]}\n`).join('');
   return `${defs}\n${src}`;
 }
 
