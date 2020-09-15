@@ -161,6 +161,7 @@ module.exports = {
             "error",
             "never"
         ],
+        "semi": [2, "always"],
         "prefer-arrow/prefer-arrow-functions": "off",
         "prefer-const": "error",
         "radix": "error",
