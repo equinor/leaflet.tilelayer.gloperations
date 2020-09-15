@@ -6,11 +6,18 @@ import {
 } from 'lodash-es';
 import REGL, { Framebuffer2D } from 'regl';
 
-import { CLEAR_COLOR, MAX_TEXTURE_DIMENSION } from './constants';
+import {
+  CLEAR_COLOR,
+  MAX_TEXTURE_DIMENSION,
+  EARTH_SUN_DISTANCE,
+  SUN_RADIUS,
+} from './constants';
 
 import * as commands from './regl-commands';
 import TextureManager from './TextureManager';
 import {
+  Color,
+  SentinelValue,
   DrawTile,
   DrawTileHsSimple,
   DrawTileHsPregen,
@@ -46,16 +53,6 @@ import {
 } from './types';
 
 import * as util from './util';
-
-import {
-  EARTH_SUN_DISTANCE,
-  SUN_RADIUS,
-} from './constants';
-
-import {
-  Color,
-  SentinelValue,
-} from './types';
 
 import { vec3 } from "gl-matrix";
 
@@ -121,9 +118,9 @@ export default class Renderer {
     scaleInput: Color[],
     sentinelInput: SentinelValue[],
     colorscaleMaxLength: number,
-    sentinelMaxLength: number,
+    sentinelMaxLength: number
   ) {
-    const canvas = L.DomUtil.create('canvas') as HTMLCanvasElement;
+    const canvas = L.DomUtil.create("canvas") as HTMLCanvasElement;
     let maxTextureDimension = MAX_TEXTURE_DIMENSION;
 
     const regl = REGL({
@@ -131,7 +128,7 @@ export default class Renderer {
       // profile: true,
       // extension only used for advanced hillshading
       // TODO: add fallback to rgba if writing to float fails
-      optionalExtensions: ['OES_texture_float', 'WEBGL_color_buffer_float'],
+      optionalExtensions: ["OES_texture_float", "WEBGL_color_buffer_float"],
       onDone: function (err: Error, regl: REGL.Regl) {
         if (err) {
           console.log(err);
@@ -141,7 +138,8 @@ export default class Renderer {
         }
         // TODO: Improve software rendering detection
         if (regl.limits.maxFragmentUniforms === 261) {
-          console.warn("Software rendering detected. Many features of this plugin will fail. If you have a GPU, check if drivers are installed ok?");
+          console.warn("Software rendering detected. Many features of this plugin will fail.\
+          If you have a GPU, check if drivers are installed ok?");
         }
       }
     });
@@ -204,9 +202,7 @@ export default class Renderer {
 
   findMaxTextureDimension() {
     // TODO: fix maxTextureSize logic
-    const {
-      regl,
-    } = this;
+    const { regl } = this;
 
     const maxTextureDimension = regl.limits.maxTextureSize;
 
@@ -262,7 +258,7 @@ export default class Renderer {
     const offset_pixels = Math.max(0.5, 2 ** (zoom + zoomdelta) / 2048);
     const offset_texcoords = offset_pixels / textureManager.texture.width;
 
-    if (_hillshadeOptions.hillshadeType === 'none') {
+    if (_hillshadeOptions.hillshadeType === "none") {
       this.drawTile({
         canvasSize: [tileSize, tileSize],
         canvasCoordinates: [0, 0],
@@ -274,7 +270,7 @@ export default class Renderer {
         sentinelColormap: this.sentinelColormap,
         enableSimpleHillshade: false,
       });
-    } else if (_hillshadeOptions.hillshadeType === 'simple') {
+    } else if (_hillshadeOptions.hillshadeType === "simple") {
       this.drawTileHsSimple({
         scaleLength: this.scaleInput.length,
         sentinelLength: this.sentinelInput.length,
@@ -302,7 +298,6 @@ export default class Renderer {
   renderTileHsPregen(
     tileDatum: TileDatum,
     tileDatumHs: TileDatum,
-    _hillshadeOptions: HillshadeOptions,
   ): Pair<number> {
     const {
       regl,
@@ -337,7 +332,7 @@ export default class Renderer {
   // TODO: Render to a fbo using a texture with flipY and this should not be necessary?
   /**
    * WebGL uses [0,0] coordinate at top, not bottom. Use this function to flip readPixel results.
-  */
+   */
   flipReadPixelsUint(
     width: number,
     height: number,
@@ -381,8 +376,8 @@ export default class Renderer {
       width: tileSize,
       height: tileSize,
       depth: false,
-      colorFormat: 'rgba',
-      colorType: 'uint8',
+      colorFormat: "rgba",
+      colorType: "uint8",
     });
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
@@ -428,9 +423,7 @@ export default class Renderer {
     height: number,
     kernelSize: number,
   ): Float32Array {
-    const {
-      regl,
-    } = this;
+    const { regl } = this;
     this.setCanvasSize(width, height);
 
     const texture = regl.texture({
@@ -444,8 +437,8 @@ export default class Renderer {
       width: width,
       height: height,
       depth: false,
-      colorFormat: 'rgba',
-      colorType: 'uint8'
+      colorFormat: "rgba",
+      colorType: "uint8"
     });
 
     let resultEncodedPixels: Uint8Array | Float32Array = new Uint8Array(width * height * 4);
@@ -453,7 +446,7 @@ export default class Renderer {
     fboSmoothed.use(() => {
       this.convolutionSmooth({
         texture: texture,
-        //TODO: case with width != height?
+        // TODO: case with width != height?
         textureSize: width,
         kernelSize: kernelSize,
       });
@@ -497,20 +490,20 @@ export default class Renderer {
     const fboSoftShadowPP = util.PingPong(regl, {
       width: tileSize,
       height: tileSize,
-      colorType: "float"
+      colorType: "float",
     });
 
     const fboAmbientShadowPP = util.PingPong(regl, {
       width: tileSize,
       height: tileSize,
-      colorType: "float"
+      colorType: "float",
     });
 
     const pixelScale = _hillshadeOptions.hsPixelScale! / (tileSize * (2**zoom));
     let hsValueScale = 1.0;
-    if (typeof _hillshadeOptions.hsValueScale == 'number'){
+    if (typeof _hillshadeOptions.hsValueScale == "number") {
       hsValueScale = _hillshadeOptions.hsValueScale;
-    } else if (_hillshadeOptions.hsValueScale!.constructor == Object) {
+    } else if (_hillshadeOptions.hsValueScale!.constructor === Object) {
       hsValueScale = _hillshadeOptions.hsValueScale![zoom];
     }
 
@@ -559,7 +552,7 @@ export default class Renderer {
         pixelScale: pixelScale,
         sunDirection: this.sunDirections[i],
         // fbo: i === _hillshadeOptions.hsAdvSoftIterations! - 1 ? undefined : fboSoftShadowPP.pong() // to show shadows
-        fbo: fboSoftShadowPP.pong()
+        fbo: fboSoftShadowPP.pong(),
       });
       fboSoftShadowPP.swap();
     }
@@ -576,7 +569,7 @@ export default class Renderer {
         resolution: [tileSize, tileSize],
         pixelScale: pixelScale,
         // fbo: i === _hillshadeOptions.hsAdvAmbientIterations! - 1 ? undefined : fboAmbientShadowPP.pong() // to show shadows
-        fbo: fboAmbientShadowPP.pong()
+        fbo: fboAmbientShadowPP.pong(),
       });
       fboAmbientShadowPP.swap();
     }
@@ -626,8 +619,8 @@ export default class Renderer {
       width: tileSize,
       height: tileSize,
       depth: false,
-      colorFormat: 'rgba',
-      colorType: 'uint8'
+      colorFormat: "rgba",
+      colorType: "uint8",
     });
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
@@ -638,8 +631,8 @@ export default class Renderer {
         canvasCoordinates: [0, 0],
         textureA: textureManagerA.texture,
         textureBoundsA: textureBoundsA,
-        filterLowA : filterLowA,
-        filterHighA : filterHighA,
+        filterLowA: filterLowA,
+        filterHighA: filterHighA,
         multiplierA: multiplierA,
       });
 
@@ -659,8 +652,8 @@ export default class Renderer {
       canvasCoordinates: [0, 0],
       textureA: textureManagerA.texture,
       textureBoundsA: textureBoundsA,
-      filterLowA : filterLowA,
-      filterHighA : filterHighA,
+      filterLowA: filterLowA,
+      filterHighA: filterHighA,
       multiplierA: multiplierA,
     });
 
@@ -697,8 +690,8 @@ export default class Renderer {
       width: tileSize,
       height: tileSize,
       depth: false,
-      colorFormat: 'rgba',
-      colorType: 'uint8'
+      colorFormat: "rgba",
+      colorType: "uint8",
     });
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
@@ -711,10 +704,10 @@ export default class Renderer {
         textureB: textureManagerB.texture,
         textureBoundsA: textureBoundsA,
         textureBoundsB: textureBoundsB,
-        filterLowA : filterLowA,
-        filterHighA : filterHighA,
-        filterLowB : filterLowB,
-        filterHighB : filterHighB,
+        filterLowA: filterLowA,
+        filterHighA: filterHighA,
+        filterLowB: filterLowB,
+        filterHighB: filterHighB,
         multiplierA: multiplierA,
         multiplierB: multiplierB,
       });
@@ -737,10 +730,10 @@ export default class Renderer {
       textureB: textureManagerB.texture,
       textureBoundsA: textureBoundsA,
       textureBoundsB: textureBoundsB,
-      filterLowA : filterLowA,
-      filterHighA : filterHighA,
-      filterLowB : filterLowB,
-      filterHighB : filterHighB,
+      filterLowA: filterLowA,
+      filterHighA: filterHighA,
+      filterLowB: filterLowB,
+      filterHighB: filterHighB,
       multiplierA: multiplierA,
       multiplierB: multiplierB,
     });
@@ -784,8 +777,8 @@ export default class Renderer {
       width: tileSize,
       height: tileSize,
       depth: false,
-      colorFormat: 'rgba',
-      colorType: 'uint8'
+      colorFormat: "rgba",
+      colorType: "uint8",
     });
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
@@ -800,12 +793,12 @@ export default class Renderer {
         textureBoundsA: textureBoundsA,
         textureBoundsB: textureBoundsB,
         textureBoundsC: textureBoundsC,
-        filterLowA : filterLowA,
-        filterHighA : filterHighA,
-        filterLowB : filterLowB,
-        filterHighB : filterHighB,
-        filterLowC : filterLowC,
-        filterHighC : filterHighC,
+        filterLowA: filterLowA,
+        filterHighA: filterHighA,
+        filterLowB: filterLowB,
+        filterHighB: filterHighB,
+        filterLowC: filterLowC,
+        filterHighC: filterHighC,
         multiplierA: multiplierA,
         multiplierB: multiplierB,
         multiplierC: multiplierC,
@@ -831,12 +824,12 @@ export default class Renderer {
       textureBoundsA: textureBoundsA,
       textureBoundsB: textureBoundsB,
       textureBoundsC: textureBoundsC,
-      filterLowA : filterLowA,
-      filterHighA : filterHighA,
-      filterLowB : filterLowB,
-      filterHighB : filterHighB,
-      filterLowC : filterLowC,
-      filterHighC : filterHighC,
+      filterLowA: filterLowA,
+      filterHighA: filterHighA,
+      filterLowB: filterLowB,
+      filterHighB: filterHighB,
+      filterLowC: filterLowC,
+      filterHighC: filterHighC,
       multiplierA: multiplierA,
       multiplierB: multiplierB,
       multiplierC: multiplierC,
@@ -886,8 +879,8 @@ export default class Renderer {
       width: tileSize,
       height: tileSize,
       depth: false,
-      colorFormat: 'rgba',
-      colorType: 'uint8'
+      colorFormat: "rgba",
+      colorType: "uint8",
     });
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
@@ -904,14 +897,14 @@ export default class Renderer {
         textureBoundsB: textureBoundsB,
         textureBoundsC: textureBoundsC,
         textureBoundsD: textureBoundsD,
-        filterLowA : filterLowA,
-        filterHighA : filterHighA,
-        filterLowB : filterLowB,
-        filterHighB : filterHighB,
-        filterLowC : filterLowC,
-        filterHighC : filterHighC,
-        filterLowD : filterLowD,
-        filterHighD : filterHighD,
+        filterLowA: filterLowA,
+        filterHighA: filterHighA,
+        filterLowB: filterLowB,
+        filterHighB: filterHighB,
+        filterLowC: filterLowC,
+        filterHighC: filterHighC,
+        filterLowD: filterLowD,
+        filterHighD: filterHighD,
         multiplierA: multiplierA,
         multiplierB: multiplierB,
         multiplierC: multiplierC,
@@ -940,14 +933,14 @@ export default class Renderer {
       textureBoundsB: textureBoundsB,
       textureBoundsC: textureBoundsC,
       textureBoundsD: textureBoundsD,
-      filterLowA : filterLowA,
-      filterHighA : filterHighA,
-      filterLowB : filterLowB,
-      filterHighB : filterHighB,
-      filterLowC : filterLowC,
-      filterHighC : filterHighC,
-      filterLowD : filterLowD,
-      filterHighD : filterHighD,
+      filterLowA: filterLowA,
+      filterHighA: filterHighA,
+      filterLowB: filterLowB,
+      filterHighB: filterHighB,
+      filterLowC: filterLowC,
+      filterHighC: filterHighC,
+      filterLowD: filterLowD,
+      filterHighD: filterHighD,
       multiplierA: multiplierA,
       multiplierB: multiplierB,
       multiplierC: multiplierC,
@@ -1005,8 +998,8 @@ export default class Renderer {
       width: tileSize,
       height: tileSize,
       depth: false,
-      colorFormat: 'rgba',
-      colorType: 'uint8'
+      colorFormat: "rgba",
+      colorType: "uint8",
     });
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
@@ -1139,8 +1132,8 @@ export default class Renderer {
       width: tileSize,
       height: tileSize,
       depth: false,
-      colorFormat: 'rgba',
-      colorType: 'uint8'
+      colorFormat: "rgba",
+      colorType: "uint8",
     });
 
     let resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
@@ -1232,7 +1225,6 @@ export default class Renderer {
     return [0, 0, resultEncodedPixels];
   }
 
-
   renderTiles(
     tiles: TileDatum[],
     _hillshadeOptions: HillshadeOptions,
@@ -1260,7 +1252,7 @@ export default class Renderer {
       (tile: TileDatum, canvasCoords: Pair<number>) => ({
         ...tile,
         canvasCoords,
-      }),
+      })
     );
 
     const canvasSize = [canvasWidth, canvasHeight] as Pair<number>;
@@ -1286,36 +1278,40 @@ export default class Renderer {
       const offset_pixels = Math.max(0.5, 2 ** (zoom + zoomdelta) / 2048);
       const offset_texcoords = offset_pixels / textureManager.texture.width;
 
-      if (_hillshadeOptions.hillshadeType === 'none') {
-        this.drawTile(chunk.map(({ canvasCoords }, index) => ({
-          canvasSize,
-          canvasCoordinates: canvasCoords,
-          textureBounds: textureBounds[index],
-          texture: textureManager.texture,
-          scaleLength: this.scaleInput.length,
-          sentinelLength: this.sentinelInput.length,
-          scaleColormap: this.scaleColormap,
-          sentinelColormap: this.sentinelColormap,
-          enableSimpleHillshade: false,
-        })));
-      } else if (_hillshadeOptions.hillshadeType === 'simple') {
-        this.drawTileHsSimple(chunk.map(({ canvasCoords }, index) => ({
-          scaleLength: this.scaleInput.length,
-          sentinelLength: this.sentinelInput.length,
-          scaleColormap: this.scaleColormap,
-          sentinelColormap: this.sentinelColormap,
-          canvasSize,
-          canvasCoordinates: canvasCoords,
-          textureBounds: textureBounds[index],
-          textureSize: textureManager.texture.width,
-          texture: textureManager.texture,
-          tileSize: tileSize,
-          offset: offset_texcoords,
-          enableSimpleHillshade: true,
-          azimuth: _hillshadeOptions.hsSimpleAzimuth,
-          altitude: _hillshadeOptions.hsSimpleAltitude,
-          slopescale: _hillshadeOptions.hsSimpleSlopescale,
-        })));
+      if (_hillshadeOptions.hillshadeType === "none") {
+        this.drawTile(
+          chunk.map(({ canvasCoords }, index) => ({
+            canvasSize,
+            canvasCoordinates: canvasCoords,
+            textureBounds: textureBounds[index],
+            texture: textureManager.texture,
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
+            enableSimpleHillshade: false,
+          }))
+        );
+      } else if (_hillshadeOptions.hillshadeType === "simple") {
+        this.drawTileHsSimple(
+          chunk.map(({ canvasCoords }, index) => ({
+            scaleLength: this.scaleInput.length,
+            sentinelLength: this.sentinelInput.length,
+            scaleColormap: this.scaleColormap,
+            sentinelColormap: this.sentinelColormap,
+            canvasSize,
+            canvasCoordinates: canvasCoords,
+            textureBounds: textureBounds[index],
+            textureSize: textureManager.texture.width,
+            texture: textureManager.texture,
+            tileSize: tileSize,
+            offset: offset_texcoords,
+            enableSimpleHillshade: true,
+            azimuth: _hillshadeOptions.hsSimpleAzimuth,
+            altitude: _hillshadeOptions.hsSimpleAltitude,
+            slopescale: _hillshadeOptions.hsSimpleSlopescale,
+          }))
+        );
       }
     }
 
@@ -1325,7 +1321,6 @@ export default class Renderer {
   renderTilesHsPregen(
     tiles: TileDatum[],
     tilesHs: TileDatum[],
-    _hillshadeOptions: HillshadeOptions,
   ): Array<Pair<number>> {
     const {
       regl,
@@ -1383,18 +1378,20 @@ export default class Renderer {
         ({ coords, tilesHsPixelData }) => textureManagerHillshade.addTile(coords, tilesHsPixelData),
       );
 
-      this.drawTileHsPregen(chunk.map(({ canvasCoords }, index) => ({
-        scaleLength: this.scaleInput.length,
-        sentinelLength: this.sentinelInput.length,
-        scaleColormap: this.scaleColormap,
-        sentinelColormap: this.sentinelColormap,
-        canvasSize,
-        canvasCoordinates: canvasCoords,
-        textureBounds: textureBounds[index],
-        textureBoundsHs: textureBoundsHs[index],
-        texture: textureManager.texture,
-        hillshadePregenTexture: textureManagerHillshade.texture,
-      })));
+      this.drawTileHsPregen(
+        chunk.map(({ canvasCoords }, index) => ({
+          scaleLength: this.scaleInput.length,
+          sentinelLength: this.sentinelInput.length,
+          scaleColormap: this.scaleColormap,
+          sentinelColormap: this.sentinelColormap,
+          canvasSize,
+          canvasCoordinates: canvasCoords,
+          textureBounds: textureBounds[index],
+          textureBoundsHs: textureBoundsHs[index],
+          texture: textureManager.texture,
+          hillshadePregenTexture: textureManagerHillshade.texture,
+        }))
+      );
     }
 
     return canvasCoordinates;
@@ -1429,7 +1426,7 @@ export default class Renderer {
       (tile: TileDatum, canvasCoords: Pair<number>) => ({
         ...tile,
         canvasCoords,
-      }),
+      })
     );
 
     const canvasSize = [canvasWidth, canvasHeight] as Pair<number>;
@@ -1447,9 +1444,9 @@ export default class Renderer {
     const nodataTile = util.createNoDataTile(nodataValue, tileSize);
     const pixelScale = _hillshadeOptions.hsPixelScale! / (tileSize * (2**zoom));
     let hsValueScale = 1.0;
-    if (typeof _hillshadeOptions.hsValueScale == 'number'){
+    if (typeof _hillshadeOptions.hsValueScale == "number"){
       hsValueScale = _hillshadeOptions.hsValueScale;
-    } else if (_hillshadeOptions.hsValueScale!.constructor == Object) {
+    } else if (_hillshadeOptions.hsValueScale!.constructor === Object) {
       hsValueScale = _hillshadeOptions.hsValueScale![zoom];
     }
 
@@ -1493,13 +1490,13 @@ export default class Renderer {
             const fboSoftShadowPP = util.PingPong(regl, {
               width: tileSize,
               height: tileSize,
-              colorType: "float"
+              colorType: "float",
             });
 
             const fboAmbientShadowPP = util.PingPong(regl, {
               width: tileSize,
               height: tileSize,
-              colorType: "float"
+              colorType: "float",
             });
 
             this.HsAdvMergeAndScaleTiles({
@@ -1533,7 +1530,7 @@ export default class Renderer {
                 pixelScale: pixelScale,
                 sunDirection: this.sunDirections[i],
                 // fbo: i === _hillshadeOptions.hsAdvSoftIterations! - 1 ? undefined : fboSoftShadowPP.pong() // to show shadows
-                fbo: fboSoftShadowPP.pong()
+                fbo: fboSoftShadowPP.pong(),
               });
               fboSoftShadowPP.swap();
             }
@@ -1550,7 +1547,7 @@ export default class Renderer {
                 resolution: [tileSize, tileSize],
                 pixelScale: pixelScale,
                 // fbo: i === _hillshadeOptions.hsAdvAmbientIterations! - 1 ? undefined : fboAmbientShadowPP.pong() // to show shadows
-                fbo: fboAmbientShadowPP.pong()
+                fbo: fboAmbientShadowPP.pong(),
               });
               fboAmbientShadowPP.swap();
             }
@@ -1618,7 +1615,7 @@ export default class Renderer {
         tilesAPixelData: tilesA.pixelData,
         tilesBPixelData: tilesB.pixelData,
         canvasCoords,
-      }),
+      })
     );
 
     // let resultEncodedPixels: Float32Array[] = [];
@@ -1649,8 +1646,8 @@ export default class Renderer {
             width: tileSize,
             height: tileSize,
             depth: false,
-            colorFormat: 'rgba',
-            colorType: 'uint8',
+            colorFormat: "rgba",
+            colorType: "uint8",
           });
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
@@ -1695,7 +1692,7 @@ export default class Renderer {
 
     renderFrame();
 
-    //clean up TextureManagers
+    // clean up TextureManagers
     this.textureManagerA.destroy();
     this.textureManagerB.destroy();
     this.textureManagerA = new TextureManager(regl, tileSize, MAX_TEXTURE_DIMENSION, false);
@@ -1739,7 +1736,7 @@ export default class Renderer {
         coords: tilesA.coords,
         tilesAPixelData: tilesA.pixelData,
         canvasCoords,
-      }),
+      })
     );
 
     const resultEncodedPixels: Uint8Array[] = [];
@@ -1766,8 +1763,8 @@ export default class Renderer {
             width: tileSize,
             height: tileSize,
             depth: false,
-            colorFormat: 'rgba',
-            colorType: 'uint8'
+            colorFormat: "rgba",
+            colorType: "uint8",
           });
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
@@ -1801,8 +1798,8 @@ export default class Renderer {
             canvasCoordinates: canvasCoords,
             textureA: textureManagerA.texture,
             textureBoundsA: tilesABounds[index],
-            filterLowA : filterLowA,
-            filterHighA : filterHighA,
+            filterLowA: filterLowA,
+            filterHighA: filterHighA,
             multiplierA: multiplierA,
           });
 
@@ -1816,7 +1813,7 @@ export default class Renderer {
 
     renderFrame();
 
-    //clean up TextureManagers
+    // clean up TextureManagers
     this.textureManagerA.destroy();
     this.textureManagerA = new TextureManager(regl, tileSize, MAX_TEXTURE_DIMENSION, false);
 
@@ -1826,10 +1823,10 @@ export default class Renderer {
   renderTilesWithMultiAnalyze2(
     tilesA: TileDatum[],
     tilesB: TileDatum[],
-    filterLowA : number,
-    filterHighA : number,
-    filterLowB : number,
-    filterHighB : number,
+    filterLowA: number,
+    filterHighA: number,
+    filterLowB: number,
+    filterHighB: number,
     multiplierA: number,
     multiplierB: number,
     onFrameRendered: (canvasCoordinates: Array<Pair<number>>) => void,
@@ -1866,7 +1863,7 @@ export default class Renderer {
         tilesAPixelData: tilesA.pixelData,
         tilesBPixelData: tilesB.pixelData,
         canvasCoords,
-      }),
+      })
     );
 
     const resultEncodedPixels: Uint8Array[] = [];
@@ -1896,8 +1893,8 @@ export default class Renderer {
             width: tileSize,
             height: tileSize,
             depth: false,
-            colorFormat: 'rgba',
-            colorType: 'uint8'
+            colorFormat: "rgba",
+            colorType: "uint8",
           });
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
@@ -1938,10 +1935,10 @@ export default class Renderer {
             textureB: textureManagerB.texture,
             textureBoundsA: tilesABounds[index],
             textureBoundsB: tilesBBounds[index],
-            filterLowA : filterLowA,
-            filterHighA : filterHighA,
-            filterLowB : filterLowB,
-            filterHighB : filterHighB,
+            filterLowA: filterLowA,
+            filterHighA: filterHighA,
+            filterLowB: filterLowB,
+            filterHighB: filterHighB,
             multiplierA: multiplierA,
             multiplierB: multiplierB,
           });
@@ -1956,7 +1953,7 @@ export default class Renderer {
 
     renderFrame();
 
-    //clean up TextureManagers
+    // clean up TextureManagers
     this.textureManagerA.destroy();
     this.textureManagerB.destroy();
     this.textureManagerA = new TextureManager(regl, tileSize, MAX_TEXTURE_DIMENSION, false);
@@ -1965,17 +1962,16 @@ export default class Renderer {
     return resultEncodedPixels;
   }
 
-
   renderTilesWithMultiAnalyze3(
     tilesA: TileDatum[],
     tilesB: TileDatum[],
     tilesC: TileDatum[],
-    filterLowA : number,
-    filterHighA : number,
-    filterLowB : number,
-    filterHighB : number,
-    filterLowC : number,
-    filterHighC : number,
+    filterLowA: number,
+    filterHighA: number,
+    filterLowB: number,
+    filterHighB: number,
+    filterLowC: number,
+    filterHighC: number,
     multiplierA: number,
     multiplierB: number,
     multiplierC: number,
@@ -2017,7 +2013,7 @@ export default class Renderer {
         tilesBPixelData: tilesB.pixelData,
         tilesCPixelData: tilesC.pixelData,
         canvasCoords,
-      }),
+      })
     );
 
     const resultEncodedPixels: Uint8Array[] = [];
@@ -2050,8 +2046,8 @@ export default class Renderer {
             width: tileSize,
             height: tileSize,
             depth: false,
-            colorFormat: 'rgba',
-            colorType: 'uint8'
+            colorFormat: "rgba",
+            colorType: "uint8",
           });
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
@@ -2100,12 +2096,12 @@ export default class Renderer {
             textureBoundsA: tilesABounds[index],
             textureBoundsB: tilesBBounds[index],
             textureBoundsC: tilesCBounds[index],
-            filterLowA : filterLowA,
-            filterHighA : filterHighA,
-            filterLowB : filterLowB,
-            filterHighB : filterHighB,
-            filterLowC : filterLowC,
-            filterHighC : filterHighC,
+            filterLowA: filterLowA,
+            filterHighA: filterHighA,
+            filterLowB: filterLowB,
+            filterHighB: filterHighB,
+            filterLowC: filterLowC,
+            filterHighC: filterHighC,
             multiplierA: multiplierA,
             multiplierB: multiplierB,
             multiplierC: multiplierC,
@@ -2121,7 +2117,7 @@ export default class Renderer {
 
     renderFrame();
 
-    //clean up TextureManagers
+    // clean up TextureManagers
     this.textureManagerA.destroy();
     this.textureManagerB.destroy();
     this.textureManagerC.destroy();
@@ -2132,20 +2128,19 @@ export default class Renderer {
     return resultEncodedPixels;
   }
 
-
   renderTilesWithMultiAnalyze4(
     tilesA: TileDatum[],
     tilesB: TileDatum[],
     tilesC: TileDatum[],
     tilesD: TileDatum[],
-    filterLowA : number,
-    filterHighA : number,
-    filterLowB : number,
-    filterHighB : number,
-    filterLowC : number,
-    filterHighC : number,
-    filterLowD : number,
-    filterHighD : number,
+    filterLowA: number,
+    filterHighA: number,
+    filterLowB: number,
+    filterHighB: number,
+    filterLowC: number,
+    filterHighC: number,
+    filterLowD: number,
+    filterHighD: number,
     multiplierA: number,
     multiplierB: number,
     multiplierC: number,
@@ -2192,7 +2187,7 @@ export default class Renderer {
         tilesCPixelData: tilesC.pixelData,
         tilesDPixelData: tilesD.pixelData,
         canvasCoords,
-      }),
+      })
     );
 
     const resultEncodedPixels: Uint8Array[] = [];
@@ -2228,8 +2223,8 @@ export default class Renderer {
             width: tileSize,
             height: tileSize,
             depth: false,
-            colorFormat: 'rgba',
-            colorType: 'uint8'
+            colorFormat: "rgba",
+            colorType: "uint8",
           });
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
@@ -2284,14 +2279,14 @@ export default class Renderer {
             textureBoundsB: tilesBBounds[index],
             textureBoundsC: tilesCBounds[index],
             textureBoundsD: tilesDBounds[index],
-            filterLowA : filterLowA,
-            filterHighA : filterHighA,
-            filterLowB : filterLowB,
-            filterHighB : filterHighB,
-            filterLowC : filterLowC,
-            filterHighC : filterHighC,
-            filterLowD : filterLowD,
-            filterHighD : filterHighD,
+            filterLowA: filterLowA,
+            filterHighA: filterHighA,
+            filterLowB: filterLowB,
+            filterHighB: filterHighB,
+            filterLowC: filterLowC,
+            filterHighC: filterHighC,
+            filterLowD: filterLowD,
+            filterHighD: filterHighD,
             multiplierA: multiplierA,
             multiplierB: multiplierB,
             multiplierC: multiplierC,
@@ -2308,7 +2303,7 @@ export default class Renderer {
 
     renderFrame();
 
-    //clean up TextureManagers
+    // clean up TextureManagers
     this.textureManagerA.destroy();
     this.textureManagerB.destroy();
     this.textureManagerC.destroy();
@@ -2327,16 +2322,16 @@ export default class Renderer {
     tilesC: TileDatum[],
     tilesD: TileDatum[],
     tilesE: TileDatum[],
-    filterLowA : number,
-    filterHighA : number,
-    filterLowB : number,
-    filterHighB : number,
-    filterLowC : number,
-    filterHighC : number,
-    filterLowD : number,
-    filterHighD : number,
-    filterLowE : number,
-    filterHighE : number,
+    filterLowA: number,
+    filterHighA: number,
+    filterLowB: number,
+    filterHighB: number,
+    filterLowC: number,
+    filterHighC: number,
+    filterLowD: number,
+    filterHighD: number,
+    filterLowE: number,
+    filterHighE: number,
     multiplierA: number,
     multiplierB: number,
     multiplierC: number,
@@ -2388,7 +2383,7 @@ export default class Renderer {
         tilesDPixelData: tilesD.pixelData,
         tilesEPixelData: tilesE.pixelData,
         canvasCoords,
-      }),
+      })
     );
 
     const resultEncodedPixels: Uint8Array[] = [];
@@ -2427,8 +2422,8 @@ export default class Renderer {
             width: tileSize,
             height: tileSize,
             depth: false,
-            colorFormat: 'rgba',
-            colorType: 'uint8'
+            colorFormat: "rgba",
+            colorType: "uint8",
           });
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
@@ -2490,16 +2485,16 @@ export default class Renderer {
             textureBoundsC: tilesCBounds[index],
             textureBoundsD: tilesDBounds[index],
             textureBoundsE: tilesEBounds[index],
-            filterLowA : filterLowA,
-            filterHighA : filterHighA,
-            filterLowB : filterLowB,
-            filterHighB : filterHighB,
-            filterLowC : filterLowC,
-            filterHighC : filterHighC,
-            filterLowD : filterLowD,
-            filterHighD : filterHighD,
-            filterLowE : filterLowE,
-            filterHighE : filterHighE,
+            filterLowA: filterLowA,
+            filterHighA: filterHighA,
+            filterLowB: filterLowB,
+            filterHighB: filterHighB,
+            filterLowC: filterLowC,
+            filterHighC: filterHighC,
+            filterLowD: filterLowD,
+            filterHighD: filterHighD,
+            filterLowE: filterLowE,
+            filterHighE: filterHighE,
             multiplierA: multiplierA,
             multiplierB: multiplierB,
             multiplierC: multiplierC,
@@ -2517,7 +2512,7 @@ export default class Renderer {
 
     renderFrame();
 
-    //clean up TextureManagers
+    // clean up TextureManagers
     this.textureManagerA.destroy();
     this.textureManagerB.destroy();
     this.textureManagerC.destroy();
@@ -2539,14 +2534,14 @@ export default class Renderer {
     tilesD: TileDatum[],
     tilesE: TileDatum[],
     tilesF: TileDatum[],
-    filterLowA : number,
-    filterHighA : number,
-    filterLowB : number,
-    filterHighB : number,
-    filterLowC : number,
-    filterHighC : number,
-    filterLowD : number,
-    filterHighD : number,
+    filterLowA: number,
+    filterHighA: number,
+    filterLowB: number,
+    filterHighB: number,
+    filterLowC: number,
+    filterHighC: number,
+    filterLowD: number,
+    filterHighD: number,
     filterLowE: number,
     filterHighE: number,
     filterLowF: number,
@@ -2649,8 +2644,8 @@ export default class Renderer {
             width: tileSize,
             height: tileSize,
             depth: false,
-            colorFormat: 'rgba',
-            colorType: 'uint8'
+            colorFormat: "rgba",
+            colorType: "uint8",
           });
 
           let resultEncodedPixelsTile = new Uint8Array(tileSize * tileSize * 4);
@@ -2749,7 +2744,7 @@ export default class Renderer {
 
     renderFrame();
 
-    //clean up TextureManagers
+    // clean up TextureManagers
     this.textureManagerA.destroy();
     this.textureManagerB.destroy();
     this.textureManagerC.destroy();
@@ -2804,7 +2799,7 @@ export default class Renderer {
         oldPixelData: oldTile.pixelData,
         newPixelData: newTile.pixelData,
         canvasCoords,
-      }),
+      })
     );
 
     // Create a new TextureManager to hold the new data. After the transition, this will replace the
@@ -2936,23 +2931,25 @@ export default class Renderer {
         );
 
         // Render each tile.
-        this.drawTileInterpolateColor(chunk.map(({ canvasCoords }, index) => ({
-          scaleLengthA: this.scaleInputPrevious.length,
-          sentinelLengthA: this.sentinelInputPrevious.length,
-          scaleColormapA: this.scaleColormapPrevious,
-          sentinelColormapA: this.sentinelColormapPrevious,
-          scaleLengthB: this.scaleInput.length,
-          sentinelLengthB: this.sentinelInput.length,
-          scaleColormapB: this.scaleColormap,
-          sentinelColormapB: this.sentinelColormap,
-          canvasSize,
-          canvasCoordinates: canvasCoords,
-          textureA: textureManager.texture,
-          textureB: newTextureManager.texture,
-          textureBoundsA: oldTextureBounds[index],
-          textureBoundsB: newTextureBounds[index],
-          interpolationFraction,
-        })));
+        this.drawTileInterpolateColor(
+          chunk.map(({ canvasCoords }, index) => ({
+            scaleLengthA: this.scaleInputPrevious.length,
+            sentinelLengthA: this.sentinelInputPrevious.length,
+            scaleColormapA: this.scaleColormapPrevious,
+            sentinelColormapA: this.sentinelColormapPrevious,
+            scaleLengthB: this.scaleInput.length,
+            sentinelLengthB: this.sentinelInput.length,
+            scaleColormapB: this.scaleColormap,
+            sentinelColormapB: this.sentinelColormap,
+            canvasSize,
+            canvasCoordinates: canvasCoords,
+            textureA: textureManager.texture,
+            textureB: newTextureManager.texture,
+            textureBoundsA: oldTextureBounds[index],
+            textureBoundsB: newTextureBounds[index],
+            interpolationFraction,
+          }))
+        );
       }
 
       // Invoke the callback with the canvas coordinates of the rendered tiles.
@@ -3005,7 +3002,7 @@ export default class Renderer {
       (tile: TileDatum, canvasCoords: Pair<number>) => ({
         ...tile,
         canvasCoords,
-      }),
+      })
     );
 
     // Create a new TextureManager to hold the new data. After the transition, this will replace the
@@ -3031,21 +3028,23 @@ export default class Renderer {
         );
 
         // Render each tile.
-        this.drawTileInterpolateColorOnly(chunk.map(({ canvasCoords }, index) => ({
-          scaleLengthA: this.scaleInputPrevious.length,
-          sentinelLengthA: this.sentinelInputPrevious.length,
-          scaleColormapA: this.scaleColormapPrevious,
-          sentinelColormapA: this.sentinelColormapPrevious,
-          scaleLengthB: this.scaleInput.length,
-          sentinelLengthB: this.sentinelInput.length,
-          scaleColormapB: this.scaleColormap,
-          sentinelColormapB: this.sentinelColormap,
-          canvasSize,
-          canvasCoordinates: canvasCoords,
-          texture: textureManager.texture,
-          textureBounds: textureBounds[index],
-          interpolationFraction,
-        })));
+        this.drawTileInterpolateColorOnly(
+          chunk.map(({ canvasCoords }, index) => ({
+            scaleLengthA: this.scaleInputPrevious.length,
+            sentinelLengthA: this.sentinelInputPrevious.length,
+            scaleColormapA: this.scaleColormapPrevious,
+            sentinelColormapA: this.sentinelColormapPrevious,
+            scaleLengthB: this.scaleInput.length,
+            sentinelLengthB: this.sentinelInput.length,
+            scaleColormapB: this.scaleColormap,
+            sentinelColormapB: this.sentinelColormap,
+            canvasSize,
+            canvasCoordinates: canvasCoords,
+            texture: textureManager.texture,
+            textureBounds: textureBounds[index],
+            interpolationFraction,
+          }))
+        );
       }
 
       // Invoke the callback with the canvas coordinates of the rendered tiles.
@@ -3072,9 +3071,15 @@ export default class Renderer {
   generateSunDirections(iterations: number, sunRadiusMultiplier: number): void {
     const sunDirections = [];
     for (let i = 0; i < iterations; i++) {
-      const direction = vec3.normalize(vec3.create(),
-        vec3.add(vec3.create(),
-          vec3.scale(vec3.create(), vec3.normalize(vec3.create(), [1, 1, 1]), EARTH_SUN_DISTANCE),
+      const direction = vec3.normalize(
+        vec3.create(),
+        vec3.add(
+          vec3.create(),
+          vec3.scale(
+            vec3.create(),
+            vec3.normalize(vec3.create(), [1, 1, 1]),
+            EARTH_SUN_DISTANCE
+          ),
           vec3.random(vec3.create(), SUN_RADIUS * sunRadiusMultiplier)
         )
       );
