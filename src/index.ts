@@ -364,7 +364,7 @@ export default class GLOperations extends L.GridLayer {
             const activeTilesBounds: ActiveTilesBounds = await this._getActivetilesBounds();
             this._moveContourCanvas(activeTilesBounds);
           }
-        })
+        });
       });
     }, 300);
   }
@@ -604,7 +604,7 @@ export default class GLOperations extends L.GridLayer {
         promise.then(async () => {
           this._smoothContourInput();
           this._calculateAndDrawContours();
-        })
+        });
       } else if (
         this.options.contourInterval !== prevContourInterval ||
         this.options.contourIndexInterval !== prevContourIndexInterval ||
@@ -2758,7 +2758,7 @@ export default class GLOperations extends L.GridLayer {
       }
       await this._calculateAndDrawContours();
       await this._moveContourCanvas(activeTilesBounds);
-    })
+    });
   }
 
   /**

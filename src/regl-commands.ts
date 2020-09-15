@@ -14,19 +14,13 @@ import fragInterpolateValue from './shaders/interpolateValue.fs';
 import fragSingle from './shaders/single.fs';
 import fragHsPregen from './shaders/hillshading/hsPregen.fs';
 import fragMulti1Calc from './shaders/multiAnalyze1Calc.fs';
-import fragMulti1Draw from './shaders/multiAnalyze1Draw.fs';
 import fragMulti2Calc from './shaders/multiAnalyze2Calc.fs';
-import fragMulti2Draw from './shaders/multiAnalyze2Draw.fs';
 import fragMulti3Calc from './shaders/multiAnalyze3Calc.fs';
-import fragMulti3Draw from './shaders/multiAnalyze3Draw.fs';
 import fragMulti4Calc from './shaders/multiAnalyze4Calc.fs';
-import fragMulti4Draw from './shaders/multiAnalyze4Draw.fs';
 import fragMulti5Calc from './shaders/multiAnalyze5Calc.fs';
-import fragMulti5Draw from './shaders/multiAnalyze5Draw.fs';
 import fragMulti6Calc from './shaders/multiAnalyze6Calc.fs';
-import fragMulti6Draw from './shaders/multiAnalyze6Draw.fs';
 import fragDiffCalc from './shaders/diffCalc.fs';
-import fragDiffDraw from './shaders/diffDraw.fs';
+import fragDrawResult from './shaders/drawResult.fs';
 import fragConvolutionSmooth from './shaders/convolutionSmooth.fs';
 import fragHsAdvMergeAndScaleTiles from './shaders/hillshading/hsAdvMergeAndScaleTiles.fs';
 import fragHsAdvNormals from './shaders/hillshading/hsAdvNormals.fs';
@@ -45,19 +39,13 @@ import {
   DrawTileInterpolateColorOnly,
   DrawTileInterpolateValue,
   CalcTileMultiAnalyze1,
-  DrawTileMultiAnalyze1,
   CalcTileMultiAnalyze2,
-  DrawTileMultiAnalyze2,
   CalcTileMultiAnalyze3,
-  DrawTileMultiAnalyze3,
   CalcTileMultiAnalyze4,
-  DrawTileMultiAnalyze4,
   CalcTileMultiAnalyze5,
-  DrawTileMultiAnalyze5,
   CalcTileMultiAnalyze6,
-  DrawTileMultiAnalyze6,
+  DrawTileResult,
   CalcTileDiff,
-  DrawTileDiff,
   ConvolutionSmooth,
   HsAdvMergeAndScaleTiles,
   HsAdvCalcNormals,
@@ -228,40 +216,6 @@ export function createDrawTileHsPregenCommand(
   });
 }
 
-export function createDrawTileMultiAnalyze1Command(
-  regl: REGL.Regl,
-  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
-  fragMacros: Dictionary<any>,
-) {
-  return regl<
-    DrawTileMultiAnalyze1.Uniforms,
-    DrawTileMultiAnalyze1.Attributes,
-    DrawTileMultiAnalyze1.Props
-  >({
-    ...commonConfig,
-    vert: vertSingle,
-    frag: util.defineMacros(fragMulti1Draw, fragMacros),
-    depth:  {
-      enable: false
-    },
-    uniforms: {
-      ...commonConfig.uniforms as DrawCommon.Uniforms,
-      scaleLength: regl.prop<DrawTileMultiAnalyze1.Props, 'scaleLength'>('scaleLength'),
-      sentinelLength: regl.prop<DrawTileMultiAnalyze1.Props, 'sentinelLength'>('sentinelLength'),
-      scaleColormap: regl.prop<DrawTileMultiAnalyze1.Props, 'scaleColormap'>('scaleColormap'),
-      sentinelColormap: regl.prop<DrawTileMultiAnalyze1.Props, 'sentinelColormap'>('sentinelColormap'),
-      filterLowA: (_, { filterLowA }) => filterLowA,
-      filterHighA: (_, { filterHighA }) => filterHighA,
-      multiplierA: (_, { multiplierA }) => multiplierA,
-      textureA: (_, { textureA }) => textureA,
-    },
-    attributes: {
-      ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoord: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
-    },
-  });
-}
-
 export function createCalcTileMultiAnalyze1Command(
   regl: REGL.Regl,
   commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
@@ -288,45 +242,7 @@ export function createCalcTileMultiAnalyze1Command(
       ...commonConfig.attributes as DrawCommon.Attributes,
       texCoord: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
     },
-  });
-}
-
-export function createDrawTileMultiAnalyze2Command(
-  regl: REGL.Regl,
-  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
-  fragMacros: Dictionary<any>,
-) {
-  return regl<
-    DrawTileMultiAnalyze2.Uniforms,
-    DrawTileMultiAnalyze2.Attributes,
-    DrawTileMultiAnalyze2.Props
-  >({
-    ...commonConfig,
-    vert: vertDouble,
-    frag: util.defineMacros(fragMulti2Draw, fragMacros),
-    depth:  {
-      enable: false
-    },
-    uniforms: {
-      ...commonConfig.uniforms as DrawCommon.Uniforms,
-      scaleLength: regl.prop<DrawTileMultiAnalyze2.Props, 'scaleLength'>('scaleLength'),
-      sentinelLength: regl.prop<DrawTileMultiAnalyze2.Props, 'sentinelLength'>('sentinelLength'),
-      scaleColormap: regl.prop<DrawTileMultiAnalyze2.Props, 'scaleColormap'>('scaleColormap'),
-      sentinelColormap: regl.prop<DrawTileMultiAnalyze2.Props, 'sentinelColormap'>('sentinelColormap'),
-      filterLowA: (_, { filterLowA }) => filterLowA,
-      filterHighA: (_, { filterHighA }) => filterHighA,
-      filterLowB: (_, { filterLowB }) => filterLowB,
-      filterHighB: (_, { filterHighB }) => filterHighB,
-      multiplierA: (_, { multiplierA }) => multiplierA,
-      multiplierB: (_, { multiplierB }) => multiplierB,
-      textureA: (_, { textureA }) => textureA,
-      textureB: (_, { textureB }) => textureB,
-    },
-    attributes: {
-      ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
-    },
+    framebuffer: regl.prop<CalcTileMultiAnalyze1.Props, 'fbo'>("fbo"),
   });
 }
 
@@ -361,50 +277,7 @@ export function createCalcTileMultiAnalyze2Command(
       texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
       texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
     },
-  });
-}
-
-export function createDrawTileMultiAnalyze3Command(
-  regl: REGL.Regl,
-  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
-  fragMacros: Dictionary<any>,
-) {
-  return regl<
-    DrawTileMultiAnalyze3.Uniforms,
-    DrawTileMultiAnalyze3.Attributes,
-    DrawTileMultiAnalyze3.Props
-  >({
-    ...commonConfig,
-    vert: vertMulti3,
-    frag: util.defineMacros(fragMulti3Draw, fragMacros),
-    depth:  {
-      enable: false
-    },
-    uniforms: {
-      ...commonConfig.uniforms as DrawCommon.Uniforms,
-      scaleLength: regl.prop<DrawTileMultiAnalyze3.Props, 'scaleLength'>('scaleLength'),
-      sentinelLength: regl.prop<DrawTileMultiAnalyze3.Props, 'sentinelLength'>('sentinelLength'),
-      scaleColormap: regl.prop<DrawTileMultiAnalyze3.Props, 'scaleColormap'>('scaleColormap'),
-      sentinelColormap: regl.prop<DrawTileMultiAnalyze3.Props, 'sentinelColormap'>('sentinelColormap'),
-      filterLowA: (_, { filterLowA }) => filterLowA,
-      filterHighA: (_, { filterHighA }) => filterHighA,
-      filterLowB: (_, { filterLowB }) => filterLowB,
-      filterHighB: (_, { filterHighB }) => filterHighB,
-      filterLowC: (_, { filterLowC }) => filterLowC,
-      filterHighC: (_, { filterHighC }) => filterHighC,
-      multiplierA: (_, { multiplierA }) => multiplierA,
-      multiplierB: (_, { multiplierB }) => multiplierB,
-      multiplierC: (_, { multiplierC }) => multiplierC,
-      textureA: (_, { textureA }) => textureA,
-      textureB: (_, { textureB }) => textureB,
-      textureC: (_, { textureC }) => textureC,
-    },
-    attributes: {
-      ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
-    },
+    framebuffer: regl.prop<CalcTileMultiAnalyze2.Props, 'fbo'>("fbo"),
   });
 }
 
@@ -444,55 +317,7 @@ export function createCalcTileMultiAnalyze3Command(
       texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
       texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
     },
-  });
-}
-
-export function createDrawTileMultiAnalyze4Command(
-  regl: REGL.Regl,
-  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
-  fragMacros: Dictionary<any>,
-) {
-  return regl<
-    DrawTileMultiAnalyze4.Uniforms,
-    DrawTileMultiAnalyze4.Attributes,
-    DrawTileMultiAnalyze4.Props
-  >({
-    ...commonConfig,
-    vert: vertMulti4,
-    frag: util.defineMacros(fragMulti4Draw, fragMacros),
-    depth:  {
-      enable: false
-    },
-    uniforms: {
-      ...commonConfig.uniforms as DrawCommon.Uniforms,
-      scaleLength: regl.prop<DrawTileMultiAnalyze4.Props, 'scaleLength'>('scaleLength'),
-      sentinelLength: regl.prop<DrawTileMultiAnalyze4.Props, 'sentinelLength'>('sentinelLength'),
-      scaleColormap: regl.prop<DrawTileMultiAnalyze4.Props, 'scaleColormap'>('scaleColormap'),
-      sentinelColormap: regl.prop<DrawTileMultiAnalyze4.Props, 'sentinelColormap'>('sentinelColormap'),
-      filterLowA: (_, { filterLowA }) => filterLowA,
-      filterHighA: (_, { filterHighA }) => filterHighA,
-      filterLowB: (_, { filterLowB }) => filterLowB,
-      filterHighB: (_, { filterHighB }) => filterHighB,
-      filterLowC: (_, { filterLowC }) => filterLowC,
-      filterHighC: (_, { filterHighC }) => filterHighC,
-      filterLowD: (_, { filterLowD }) => filterLowD,
-      filterHighD: (_, { filterHighD }) => filterHighD,
-      multiplierA: (_, { multiplierA }) => multiplierA,
-      multiplierB: (_, { multiplierB }) => multiplierB,
-      multiplierC: (_, { multiplierC }) => multiplierC,
-      multiplierD: (_, { multiplierD }) => multiplierD,
-      textureA: (_, { textureA }) => textureA,
-      textureB: (_, { textureB }) => textureB,
-      textureC: (_, { textureC }) => textureC,
-      textureD: (_, { textureD }) => textureD,
-    },
-    attributes: {
-      ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
-      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsD),
-    },
+    framebuffer: regl.prop<CalcTileMultiAnalyze3.Props, 'fbo'>("fbo"),
   });
 }
 
@@ -537,60 +362,7 @@ export function createCalcTileMultiAnalyze4Command(
       texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
       texCoordD: (_, { textureBoundsD }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsD),
     },
-  });
-}
-
-export function createDrawTileMultiAnalyze5Command(
-  regl: REGL.Regl,
-  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
-  fragMacros: Dictionary<any>,
-) {
-  return regl<
-    DrawTileMultiAnalyze5.Uniforms,
-    DrawTileMultiAnalyze5.Attributes,
-    DrawTileMultiAnalyze5.Props
-  >({
-    ...commonConfig,
-    vert: vertMulti5,
-    frag: util.defineMacros(fragMulti5Draw, fragMacros),
-    depth: {
-      enable: false
-    },
-    uniforms: {
-      ...commonConfig.uniforms as DrawCommon.Uniforms,
-      scaleLength: regl.prop<DrawTileMultiAnalyze5.Props, 'scaleLength'>('scaleLength'),
-      sentinelLength: regl.prop<DrawTileMultiAnalyze5.Props, 'sentinelLength'>('sentinelLength'),
-      scaleColormap: regl.prop<DrawTileMultiAnalyze5.Props, 'scaleColormap'>('scaleColormap'),
-      sentinelColormap: regl.prop<DrawTileMultiAnalyze5.Props, 'sentinelColormap'>('sentinelColormap'),
-      filterLowA: (_, { filterLowA }) => filterLowA,
-      filterHighA: (_, { filterHighA }) => filterHighA,
-      filterLowB: (_, { filterLowB }) => filterLowB,
-      filterHighB: (_, { filterHighB }) => filterHighB,
-      filterLowC: (_, { filterLowC }) => filterLowC,
-      filterHighC: (_, { filterHighC }) => filterHighC,
-      filterLowD: (_, { filterLowD }) => filterLowD,
-      filterHighD: (_, { filterHighD }) => filterHighD,
-      filterLowE: (_, { filterLowE }) => filterLowE,
-      filterHighE: (_, { filterHighE }) => filterHighE,
-      multiplierA: (_, { multiplierA }) => multiplierA,
-      multiplierB: (_, { multiplierB }) => multiplierB,
-      multiplierC: (_, { multiplierC }) => multiplierC,
-      multiplierD: (_, { multiplierD }) => multiplierD,
-      multiplierE: (_, { multiplierE }) => multiplierE,
-      textureA: (_, { textureA }) => textureA,
-      textureB: (_, { textureB }) => textureB,
-      textureC: (_, { textureC }) => textureC,
-      textureD: (_, { textureD }) => textureD,
-      textureE: (_, { textureE }) => textureE,
-    },
-    attributes: {
-      ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
-      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsD),
-      texCoordE: (_, { textureBoundsE }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsE),
-    },
+    framebuffer: regl.prop<CalcTileMultiAnalyze1.Props, 'fbo'>("fbo"),
   });
 }
 
@@ -640,65 +412,7 @@ export function createCalcTileMultiAnalyze5Command(
       texCoordD: (_, { textureBoundsD }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsD),
       texCoordE: (_, { textureBoundsE }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsE),
     },
-  });
-}
-
-export function createDrawTileMultiAnalyze6Command(
-  regl: REGL.Regl,
-  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
-  fragMacros: Dictionary<any>,
-) {
-  return regl<
-    DrawTileMultiAnalyze6.Uniforms,
-    DrawTileMultiAnalyze6.Attributes,
-    DrawTileMultiAnalyze6.Props
-  >({
-    ...commonConfig,
-    vert: vertMulti6,
-    frag: util.defineMacros(fragMulti6Draw, fragMacros),
-    depth: {
-      enable: false
-    },
-    uniforms: {
-      ...commonConfig.uniforms as DrawCommon.Uniforms,
-      scaleLength: regl.prop<DrawTileMultiAnalyze6.Props, 'scaleLength'>('scaleLength'),
-      sentinelLength: regl.prop<DrawTileMultiAnalyze6.Props, 'sentinelLength'>('sentinelLength'),
-      scaleColormap: regl.prop<DrawTileMultiAnalyze6.Props, 'scaleColormap'>('scaleColormap'),
-      sentinelColormap: regl.prop<DrawTileMultiAnalyze6.Props, 'sentinelColormap'>('sentinelColormap'),
-      filterLowA: (_, { filterLowA }) => filterLowA,
-      filterHighA: (_, { filterHighA }) => filterHighA,
-      filterLowB: (_, { filterLowB }) => filterLowB,
-      filterHighB: (_, { filterHighB }) => filterHighB,
-      filterLowC: (_, { filterLowC }) => filterLowC,
-      filterHighC: (_, { filterHighC }) => filterHighC,
-      filterLowD: (_, { filterLowD }) => filterLowD,
-      filterHighD: (_, { filterHighD }) => filterHighD,
-      filterLowE: (_, { filterLowE }) => filterLowE,
-      filterHighE: (_, { filterHighE }) => filterHighE,
-      filterLowF: (_, { filterLowF }) => filterLowF,
-      filterHighF: (_, { filterHighF }) => filterHighF,
-      multiplierA: (_, { multiplierA }) => multiplierA,
-      multiplierB: (_, { multiplierB }) => multiplierB,
-      multiplierC: (_, { multiplierC }) => multiplierC,
-      multiplierD: (_, { multiplierD }) => multiplierD,
-      multiplierE: (_, { multiplierE }) => multiplierE,
-      multiplierF: (_, { multiplierF }) => multiplierF,
-      textureA: (_, { textureA }) => textureA,
-      textureB: (_, { textureB }) => textureB,
-      textureC: (_, { textureC }) => textureC,
-      textureD: (_, { textureD }) => textureD,
-      textureE: (_, { textureE }) => textureE,
-      textureF: (_, { textureF }) => textureF,
-    },
-    attributes: {
-      ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
-      texCoordC: (_, { textureBoundsC }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsC),
-      texCoordD: (_, { textureBoundsD }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsD),
-      texCoordE: (_, { textureBoundsE }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsE),
-      texCoordF: (_, { textureBoundsF }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsF)
-    },
+    framebuffer: regl.prop<CalcTileMultiAnalyze5.Props, 'fbo'>("fbo"),
   });
 }
 
@@ -753,6 +467,7 @@ export function createCalcTileMultiAnalyze6Command(
       texCoordE: (_, { textureBoundsE }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsE),
       texCoordF: (_, { textureBoundsF }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsF)
     },
+    framebuffer: regl.prop<CalcTileMultiAnalyze6.Props, 'fbo'>("fbo"),
   });
 }
 
@@ -781,38 +496,37 @@ export function createCalcTileDiffCommand(
       texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
       texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
     },
+    framebuffer: regl.prop<CalcTileDiff.Props, 'fbo'>("fbo"),
   });
 }
 
-export function createDrawTileDiffCommand(
+export function createDrawResultCommand(
   regl: REGL.Regl,
   commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
   fragMacros: Dictionary<any>,
 ) {
   return regl<
-    DrawTileDiff.Uniforms,
-    DrawTileDiff.Attributes,
-    DrawTileDiff.Props
+    DrawTileResult.Uniforms,
+    DrawTileResult.Attributes,
+    DrawTileResult.Props
   >({
     ...commonConfig,
-    vert: vertDouble,
-    frag: util.defineMacros(fragDiffDraw, fragMacros),
+    vert: vertSingle,
+    frag: util.defineMacros(fragDrawResult, fragMacros),
     depth:  {
       enable: false
     },
     uniforms: {
       ...commonConfig.uniforms as DrawCommon.Uniforms,
-      scaleLength: regl.prop<DrawTileDiff.Props, 'scaleLength'>('scaleLength'),
-      sentinelLength: regl.prop<DrawTileDiff.Props, 'sentinelLength'>('sentinelLength'),
-      scaleColormap: regl.prop<DrawTileDiff.Props, 'scaleColormap'>('scaleColormap'),
-      sentinelColormap: regl.prop<DrawTileDiff.Props, 'sentinelColormap'>('sentinelColormap'),
-      textureA: regl.prop<DrawTileDiff.Props, 'textureA'>("textureA"),
-      textureB: regl.prop<DrawTileDiff.Props, 'textureB'>("textureB"),
+      scaleLength: regl.prop<DrawTileResult.Props, 'scaleLength'>('scaleLength'),
+      sentinelLength: regl.prop<DrawTileResult.Props, 'sentinelLength'>('sentinelLength'),
+      scaleColormap: regl.prop<DrawTileResult.Props, 'scaleColormap'>('scaleColormap'),
+      sentinelColormap: regl.prop<DrawTileResult.Props, 'sentinelColormap'>('sentinelColormap'),
+      texture: regl.prop<DrawTileResult.Props, 'texture'>("texture"),
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
-      texCoordA: (_, { textureBoundsA }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsA),
-      texCoordB: (_, { textureBoundsB }) => util.getTexCoordVerticesTriangleStripQuad(textureBoundsB),
+      texCoord: [[0, 1], [1, 1], [0, 0], [1, 0]],
     },
   });
 }
