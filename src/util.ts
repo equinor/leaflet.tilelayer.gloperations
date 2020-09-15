@@ -344,3 +344,9 @@ export async function getAdjacentTilesTexCoords(
     }
     return textureCoords;
 }
+
+export function delay(ms: number) {
+  return new Promise(function(resolve) {
+      setTimeout(resolve, ms);
+  });
+}

@@ -356,15 +356,16 @@ export default class GLOperations extends L.GridLayer {
 
     // Listen for zoom changes. Necessary when using fractional zoom levels.
     setTimeout(() => {
-      this._map.on("zoomend", _ =>
-        setTimeout(async () => {
+      this._map.on("zoomend", _ => {
+        const promise = util.delay(50);
+        promise.then(async () => {
           if (this.options.contourType !== "none") {
             if (this.options.debug) console.log("zoom changed. Moving contour canvas.");
             const activeTilesBounds: ActiveTilesBounds = await this._getActivetilesBounds();
             this._moveContourCanvas(activeTilesBounds);
           }
-        }, 50)
-      );
+        })
+      });
     }, 300);
   }
 
@@ -599,10 +600,11 @@ export default class GLOperations extends L.GridLayer {
           this.options.contourSmoothInputKernel !== prevContourSmoothInputKernel
         )
       ) {
-        setTimeout(async () => {
+        const promise = util.delay(50);
+        promise.then(async () => {
           this._smoothContourInput();
           this._calculateAndDrawContours();
-        }, 50);
+        })
       } else if (
         this.options.contourInterval !== prevContourInterval ||
         this.options.contourIndexInterval !== prevContourIndexInterval ||
@@ -2745,7 +2747,8 @@ export default class GLOperations extends L.GridLayer {
 
     await this._clearContours();
 
-    setTimeout(async () => {
+    const promise = util.delay(50);
+    promise.then(async () => {
       const activeTilesBounds: ActiveTilesBounds = await this._getActivetilesBounds();
       const tileSize = this._tileSizeAsNumber();
 
@@ -2755,7 +2758,7 @@ export default class GLOperations extends L.GridLayer {
       }
       await this._calculateAndDrawContours();
       await this._moveContourCanvas(activeTilesBounds);
-    }, 50);
+    })
   }
 
   /**
