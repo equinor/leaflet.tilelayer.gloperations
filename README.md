@@ -4,6 +4,10 @@
 [![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/equinor/leaflet.tilelayer.gloperations.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/equinor/leaflet.tilelayer.gloperations/context:javascript)
 [![Known Vulnerabilities](https://snyk.io/test/github/equinor/leaflet.tilelayer.gloperations/badge.svg?targetFile=package.json)](https://snyk.io/test/github/equinor/leaflet.tilelayer.gloperations?targetFile=package.json)
 
+<p align="center">
+  <img width="645px" src="https://raw.githubusercontent.com/wiki/equinor/leaflet.tilelayer.gloperations/images/gloperations_logo.png">
+<p>
+
 # Leaflet.TileLayer.GLOperations
 
 Custom Leaflet TileLayer using WebGL to do operations on and colorize floating-point pixels
