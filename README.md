@@ -15,6 +15,7 @@ Custom Leaflet TileLayer using WebGL to do operations on and colorize floating-p
 ## Resources
 * [Demo](https://equinor.github.io/leaflet.tilelayer.gloperations/) (currently not working on mobile devices)
 * [Wiki](https://github.com/equinor/leaflet.tilelayer.gloperations/wiki)
+* [Changelog](https://github.com/equinor/leaflet.tilelayer.gloperations/blob/master/CHANGELOG.md)
 
 ## Features
 
