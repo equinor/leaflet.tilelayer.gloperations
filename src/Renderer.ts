@@ -31,6 +31,7 @@ import {
   CalcTileMultiAnalyze5,
   CalcTileMultiAnalyze6,
   CalcTileDiff,
+  ConvertDem,
   DrawTileResult,
   ConvolutionSmooth,
   Pair,
@@ -84,6 +85,7 @@ export default class Renderer {
   drawTileInterpolateColorOnly: REGL.DrawCommand<REGL.DefaultContext, DrawTileInterpolateColorOnly.Props>;
   drawTileInterpolateValue: REGL.DrawCommand<REGL.DefaultContext, DrawTileInterpolateValue.Props>;
   calcTileDiff: REGL.DrawCommand<REGL.DefaultContext, CalcTileDiff.Props>;
+  convertDem: REGL.DrawCommand<REGL.DefaultContext, ConvertDem.Props>;
   drawTileResult: REGL.DrawCommand<REGL.DefaultContext, DrawTileResult.Props>;
   calcTileMultiAnalyze1: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze1.Props>;
   calcTileMultiAnalyze2: REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze2.Props>;
@@ -172,6 +174,7 @@ export default class Renderer {
       calcTileMultiAnalyze6: commands.createCalcTileMultiAnalyze6Command(regl, commonDrawConfig),
       drawTileResult: commands.createDrawResultCommand(regl, commonDrawConfig, fragMacros),
       calcTileDiff: commands.createCalcTileDiffCommand(regl, commonDrawConfig),
+      convertDem: commands.createConvertDemCommand(regl, commonDrawConfig),
       convolutionSmooth: commands.createConvolutionSmoothCommand(regl, commonDrawConfig),
       HsAdvMergeAndScaleTiles: commands.createHsAdvMergeAndScaleTiles(regl),
       HsAdvCalcNormals: commands.createHsAdvCalcNormals(regl, commonDrawConfig),
@@ -393,6 +396,50 @@ export default class Renderer {
 
     // Since the tile will fill the whole canvas, the offset is simply [0, 0].
     return [0, 0, resultEncodedPixels];
+  }
+
+  renderConvertDem(
+    pixelData: Uint8Array
+  ): Uint8Array {
+    const {
+      regl,
+      tileSize,
+    } = this;
+
+    const tDem = regl.texture({
+      width: tileSize,
+      height: tileSize,
+      data: pixelData,
+      format: "rgba",
+      type: "uint8",
+      flipY: false,
+    });
+
+    const fboTile: Framebuffer2D = regl.framebuffer({
+      width: tileSize,
+      height: tileSize,
+      depth: false,
+      colorFormat: "rgba",
+      colorType: "uint8",
+    });
+
+    const resultEncodedPixels = new Uint8Array(tileSize * tileSize * 4);
+
+    this.convertDem({
+      canvasSize: [tileSize, tileSize],
+      canvasCoordinates: [0, 0],
+      texture: tDem,
+      fbo:fboTile,
+    });
+
+    fboTile.use(() => {
+      // Get encoded floats in rgba format
+      regl.read({data: resultEncodedPixels});
+    });
+    tDem.destroy();
+    fboTile.destroy();
+
+    return resultEncodedPixels;
   }
 
   renderConvolutionSmooth(

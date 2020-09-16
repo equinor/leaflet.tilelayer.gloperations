@@ -752,6 +752,19 @@ export namespace CalcTileDiff {
   }
 }
 
+export namespace ConvertDem {
+  export interface Props extends DrawCommon.Props {
+    texture: REGL.Texture2D;
+    fbo: REGL.Framebuffer2D;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    texture: REGL.Texture2D;
+  }
+  export interface Attributes extends DrawCommon.Attributes {
+    texCoord: REGL.Vec2[];
+  }
+}
+
 export namespace DrawTileResult {
   export interface Props extends DrawCommon.Props {
     scaleColormap: REGL.Texture2D;

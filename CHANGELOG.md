@@ -5,6 +5,7 @@
 ### Added
 
 - Added advanced hillshading option. See [Wiki](https://github.com/equinor/leaflet.tilelayer.gloperations/wiki/Hillshading) for available options.
+- Support for loading [DEM tile format](https://en.wikipedia.org/wiki/Digital_elevation_model)
 - Can specify color as hex values (`#FF0000`) in addition to existing rgb format (`rgb(255,0,0)`).
 
 ### Changed

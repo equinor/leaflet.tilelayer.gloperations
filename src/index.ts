@@ -83,6 +83,7 @@ interface EventsObject {
 
 export interface Options extends L.GridLayerOptions {
   url: string;
+  tileFormat: string;
   nodataValue: number;
   colorScale?: Color[];
   sentinelValues?: SentinelValue[];
@@ -192,6 +193,7 @@ export interface Options extends L.GridLayerOptions {
 }
 
 const defaultOptions = {
+  tileFormat: 'float32',
   colorScale: [],
   sentinelValues: [],
   transitions: false,
@@ -2578,8 +2580,20 @@ export default class GLOperations extends L.GridLayer {
   /**
    * Fetch pixel data for an individual tile from the given URL.
    */
-  protected _fetchTileData(coords: TileCoordinates, url: string): Promise<Uint8Array> {
-    return util.fetchPNGData(this.getTileUrl(coords, url), this.options.nodataValue, this._tileSizeAsNumber());
+  protected async _fetchTileData(coords: TileCoordinates, url: string): Promise<Uint8Array> {
+    if (this.options.tileFormat === 'float32') {
+      return util.fetchPNGData(this.getTileUrl(coords, url), this.options.nodataValue, this._tileSizeAsNumber());
+    } else if (this.options.tileFormat === 'dem') {
+      const nodataTile = util.createNoDataTile(this.options.nodataValue, this._tileSizeAsNumber());
+      const imageData = await util.fetchPNGData(this.getTileUrl(coords, url), this.options.nodataValue, this._tileSizeAsNumber());
+      if (util.typedArraysAreEqual(imageData, nodataTile)) {
+        return imageData;
+      } else {
+        const rgbaData = this._renderer.renderConvertDem(imageData);
+        return rgbaData;
+      }
+    }
+    return util.createNoDataTile(this.options.nodataValue, this._tileSizeAsNumber());
   }
 
   /**
