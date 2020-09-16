@@ -20,6 +20,7 @@ import fragMulti4Calc from './shaders/multiAnalyze4Calc.fs';
 import fragMulti5Calc from './shaders/multiAnalyze5Calc.fs';
 import fragMulti6Calc from './shaders/multiAnalyze6Calc.fs';
 import fragDiffCalc from './shaders/diffCalc.fs';
+import fragConvertDem from './shaders/convertDem.fs';
 import fragDrawResult from './shaders/drawResult.fs';
 import fragConvolutionSmooth from './shaders/convolutionSmooth.fs';
 import fragHsAdvMergeAndScaleTiles from './shaders/hillshading/hsAdvMergeAndScaleTiles.fs';
@@ -46,6 +47,7 @@ import {
   CalcTileMultiAnalyze6,
   DrawTileResult,
   CalcTileDiff,
+  ConvertDem,
   ConvolutionSmooth,
   HsAdvMergeAndScaleTiles,
   HsAdvCalcNormals,
@@ -528,6 +530,37 @@ export function createDrawResultCommand(
       ...commonConfig.attributes as DrawCommon.Attributes,
       texCoord: [[0, 1], [1, 1], [0, 0], [1, 0]],
     },
+  });
+}
+
+/**
+ * The command output by this function converts a tile in DEM format
+ * to float32 packed as rgba.
+ */
+export function createConvertDemCommand(
+  regl: REGL.Regl,
+  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
+) {
+  return regl<
+    ConvertDem.Uniforms,
+    ConvertDem.Attributes,
+    ConvertDem.Props
+  >({
+    ...commonConfig,
+    vert: vertSingle,
+    frag: fragConvertDem,
+    depth:  {
+      enable: false
+    },
+    uniforms: {
+      ...commonConfig.uniforms as DrawCommon.Uniforms,
+      texture: (_, { texture }) => texture,
+    },
+    attributes: {
+      ...commonConfig.attributes as DrawCommon.Attributes,
+      texCoord: [[0, 1], [1, 1], [0, 0], [1, 0]],
+    },
+    framebuffer: regl.prop<ConvertDem.Props, 'fbo'>("fbo"),
   });
 }
 

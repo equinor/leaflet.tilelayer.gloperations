@@ -1,6 +1,6 @@
 import { memoize } from 'lodash-es';
 import REGL from 'regl';
-import { decode } from 'upng-js';
+import { decode, toRGBA8 } from 'upng-js';
 
 import {
   Color,
@@ -56,7 +56,9 @@ export async function fetchPNGData(url: string, nodataValue: number, tileDimensi
     xhr.addEventListener('error', reject);
     xhr.send(null);
   }).then((data: ArrayBuffer) => {
-    return new Uint8Array(decode(data).data);
+    const img = decode(data);
+    const rgba = toRGBA8(img)[0];
+    return new Uint8Array(rgba);
   }).catch(() => <Uint8Array>createNoDataTile(nodataValue, tileDimension));
 }
 
