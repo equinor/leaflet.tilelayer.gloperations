@@ -527,6 +527,12 @@ export default class GLOperations extends L.GridLayer {
       this._renderer.textureManager.clearTiles();
     }
 
+    if (this.options.hsAdvBaselayerUrl !== prevHsAdvBaselayerUrl) {
+      // need to clear tiles so they are not reused
+      // TODO: Check why necessary
+      this._renderer.textureManagerHillshade.clearTiles();
+    }
+
     if (this.options.glOperation === 'none') {
       if (this.options.transitions) {
         if (this.options.url !== prevUrl) {
