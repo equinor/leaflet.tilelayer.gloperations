@@ -418,6 +418,8 @@ export default class GLOperations extends L.GridLayer {
       hsValueScale: prevHsValueScale,
       hsPixelScale: prevHsPixelScale,
       hsSimpleSlopescale: prevHsSimpleSlopescale,
+      hsSimpleAzimuth: prevHsSimpleAzimuth,
+      hsSimpleAltitude: prevHsSimpleAltitude,
       hsAdvSoftIterations: prevHsAdvSoftIterations,
       hsAdvAmbientIterations: prevHsAdvAmbientIterations,
       hsAdvSunRadiusMultiplier: prevHsAdvSunRadiusMultiplier,
@@ -540,6 +542,8 @@ export default class GLOperations extends L.GridLayer {
             this.options.hillshadeType !== prevHillshadeType ||
             this.options.hsPregenUrl !== prevHsPregenUrl ||
             this.options.hsSimpleSlopescale !== prevHsSimpleSlopescale ||
+            this.options.hsSimpleAzimuth !== prevHsSimpleAzimuth ||
+            this.options.hsSimpleAltitude !== prevHsSimpleAltitude ||
             this.options.hsAdvSunRadiusMultiplier !== prevHsAdvSunRadiusMultiplier ||
             this.options.hsAdvFinalSoftMultiplier !== prevHsAdvFinalSoftMultiplier ||
             this.options.hsAdvFinalAmbientMultiplier !== prevHsAdvFinalAmbientMultiplier ||
