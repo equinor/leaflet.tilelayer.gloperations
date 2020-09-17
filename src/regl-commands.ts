@@ -28,7 +28,8 @@ import fragHsAdvNormals from './shaders/hillshading/hsAdvNormals.fs';
 import fragHsAdvDirectLight from './shaders/hillshading/hsAdvDirect.fs';
 import fragHsAdvSoftShadows from './shaders/hillshading/hsAdvSoftShadows.fs';
 import fragHsAdvAmbientShadows from './shaders/hillshading/hsAdvAmbientShadows.fs';
-import fragHsAdvFinal from './shaders/hillshading/hsAdvFinal.fs';
+import fragHsAdvFinalColorscale from './shaders/hillshading/hsAdvFinalColorscale.fs';
+import fragHsAdvFinalBaselayer from './shaders/hillshading/hsAdvFinalBaselayer.fs';
 
 import {
   Dictionary,
@@ -54,7 +55,8 @@ import {
   HsAdvDirectLightning,
   HsAdvSoftShadows,
   HsAdvAmbientShadows,
-  HsAdvFinal,
+  HsAdvFinalColorscale,
+  HsAdvFinalBaselayer,
 } from './types';
 
 import {
@@ -862,26 +864,26 @@ export function createHsAdvAmbientShadows(
  * The resulting Regl DrawCommand is used to combine soft and ambient shading,
  * use the colormap on the input floats and apply the hillshading.
  */
-export function createHsAdvFinal(
+export function createHsAdvFinalColorscale(
   regl: REGL.Regl,
   commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
 ) {
-  return regl<HsAdvFinal.Uniforms, HsAdvFinal.Attributes, HsAdvFinal.Props>({
+  return regl<HsAdvFinalColorscale.Uniforms, HsAdvFinalColorscale.Attributes, HsAdvFinalColorscale.Props>({
     ...commonConfig,
     vert: vertDouble,
-    frag: fragHsAdvFinal,
+    frag: fragHsAdvFinalColorscale,
     uniforms: {
       ...commonConfig.uniforms as DrawCommon.Uniforms,
-      scaleLength: regl.prop<HsAdvFinal.Props, 'scaleLength'>('scaleLength'),
-      sentinelLength: regl.prop<HsAdvFinal.Props, 'sentinelLength'>('sentinelLength'),
-      scaleColormap: regl.prop<HsAdvFinal.Props, 'scaleColormap'>('scaleColormap'),
-      sentinelColormap: regl.prop<HsAdvFinal.Props, 'sentinelColormap'>('sentinelColormap'),
-      tInput: regl.prop<HsAdvFinal.Props, 'tInput'>("tInput"),
-      tSoftShadow: regl.prop<HsAdvFinal.Props, 'tSoftShadow'>("tSoftShadow"),
-      tAmbient: regl.prop<HsAdvFinal.Props, 'tAmbient'>("tAmbient"),
-      floatScale: regl.prop<HsAdvFinal.Props, 'floatScale'>("floatScale"),
-      finalSoftMultiplier: regl.prop<HsAdvFinal.Props, 'finalSoftMultiplier'>("finalSoftMultiplier"),
-      finalAmbientMultiplier: regl.prop<HsAdvFinal.Props, 'finalAmbientMultiplier'>("finalAmbientMultiplier"),
+      scaleLength: regl.prop<HsAdvFinalColorscale.Props, 'scaleLength'>('scaleLength'),
+      sentinelLength: regl.prop<HsAdvFinalColorscale.Props, 'sentinelLength'>('sentinelLength'),
+      scaleColormap: regl.prop<HsAdvFinalColorscale.Props, 'scaleColormap'>('scaleColormap'),
+      sentinelColormap: regl.prop<HsAdvFinalColorscale.Props, 'sentinelColormap'>('sentinelColormap'),
+      tInput: regl.prop<HsAdvFinalColorscale.Props, 'tInput'>("tInput"),
+      tSoftShadow: regl.prop<HsAdvFinalColorscale.Props, 'tSoftShadow'>("tSoftShadow"),
+      tAmbient: regl.prop<HsAdvFinalColorscale.Props, 'tAmbient'>("tAmbient"),
+      floatScale: regl.prop<HsAdvFinalColorscale.Props, 'floatScale'>("floatScale"),
+      finalSoftMultiplier: regl.prop<HsAdvFinalColorscale.Props, 'finalSoftMultiplier'>("finalSoftMultiplier"),
+      finalAmbientMultiplier: regl.prop<HsAdvFinalColorscale.Props, 'finalAmbientMultiplier'>("finalAmbientMultiplier"),
     },
     attributes: {
       ...commonConfig.attributes as DrawCommon.Attributes,
@@ -890,3 +892,32 @@ export function createHsAdvFinal(
     },
   });
 }
+
+/**
+ * The resulting Regl DrawCommand is used to combine soft and ambient shading,
+ * use the baselayer tile and apply the hillshading.
+ */
+export function createHsAdvFinalBaselayer(
+  regl: REGL.Regl,
+  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
+) {
+  return regl<HsAdvFinalBaselayer.Uniforms, HsAdvFinalBaselayer.Attributes, HsAdvFinalBaselayer.Props>({
+    ...commonConfig,
+    vert: vertDouble,
+    frag: fragHsAdvFinalBaselayer,
+    uniforms: {
+      ...commonConfig.uniforms as DrawCommon.Uniforms,
+      tBase: regl.prop<HsAdvFinalBaselayer.Props, 'tBase'>("tBase"),
+      tSoftShadow: regl.prop<HsAdvFinalBaselayer.Props, 'tSoftShadow'>("tSoftShadow"),
+      tAmbient: regl.prop<HsAdvFinalBaselayer.Props, 'tAmbient'>("tAmbient"),
+      finalSoftMultiplier: regl.prop<HsAdvFinalBaselayer.Props, 'finalSoftMultiplier'>("finalSoftMultiplier"),
+      finalAmbientMultiplier: regl.prop<HsAdvFinalBaselayer.Props, 'finalAmbientMultiplier'>("finalAmbientMultiplier"),
+    },
+    attributes: {
+      ...commonConfig.attributes as DrawCommon.Attributes,
+      texCoordA: regl.prop<HsAdvFinalBaselayer.Props, 'baseTexCoords'>("baseTexCoords"),
+      texCoordB: [[0, 1], [1, 1], [0, 0], [1, 0]],
+    },
+  });
+}
+

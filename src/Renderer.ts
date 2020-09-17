@@ -44,7 +44,8 @@ import {
   HsAdvDirectLightning,
   HsAdvSoftShadows,
   HsAdvAmbientShadows,
-  HsAdvFinal,
+  HsAdvFinalColorscale,
+  HsAdvFinalBaselayer,
 } from './types';
 
 import * as util from './util';
@@ -99,7 +100,8 @@ export default class Renderer {
   HsAdvDirectLightning: REGL.DrawCommand<REGL.DefaultContext, HsAdvDirectLightning.Props>;
   HsAdvSoftShadows: REGL.DrawCommand<REGL.DefaultContext, HsAdvSoftShadows.Props>;
   HsAdvAmbientShadows: REGL.DrawCommand<REGL.DefaultContext, HsAdvAmbientShadows.Props>;
-  HsAdvFinal: REGL.DrawCommand<REGL.DefaultContext, HsAdvFinal.Props>;
+  HsAdvFinalColorscale: REGL.DrawCommand<REGL.DefaultContext, HsAdvFinalColorscale.Props>;
+  HsAdvFinalBaselayer: REGL.DrawCommand<REGL.DefaultContext, HsAdvFinalBaselayer.Props>;
 
   constructor(
     gloperations: any,
@@ -181,7 +183,8 @@ export default class Renderer {
       HsAdvDirectLightning: commands.createHsAdvDirectLightning(regl, commonDrawConfig),
       HsAdvSoftShadows: commands.createHsAdvSoftShadows(regl, commonDrawConfig),
       HsAdvAmbientShadows: commands.createHsAdvAmbientShadows(regl, commonDrawConfig),
-      HsAdvFinal: commands.createHsAdvFinal(regl, commonDrawConfig),
+      HsAdvFinalColorscale: commands.createHsAdvFinalColorscale(regl, commonDrawConfig),
+      HsAdvFinalBaselayer: commands.createHsAdvFinalBaselayer(regl, commonDrawConfig),
     });
   }
 
@@ -490,6 +493,7 @@ export default class Renderer {
     zoom: number,
     textureCoords: number[][],
     pixelScale: number,
+    baselayerTexCoords: number[][],
   ): Pair<number> {
     const {
       regl,
@@ -599,20 +603,35 @@ export default class Renderer {
       fboAmbientShadowPP.swap();
     }
 
-    this.HsAdvFinal({
-      scaleLength: this.scaleInput.length,
-      sentinelLength: this.sentinelInput.length,
-      scaleColormap: this.scaleColormap,
-      sentinelColormap: this.sentinelColormap,
-      canvasSize: [tileSize, tileSize],
-      canvasCoordinates: [0, 0],
-      tInput: fboFloats,
-      tSoftShadow: fboSoftShadowPP.ping(),
-      tAmbient: fboAmbientShadowPP.ping(),
-      floatScale: hsValueScale,
-      finalSoftMultiplier: _hillshadeOptions.hsAdvFinalSoftMultiplier,
-      finalAmbientMultiplier: _hillshadeOptions.hsAdvFinalAmbientMultiplier,
-    });
+    if (_hillshadeOptions.hsAdvBaselayerUrl) {
+      // if url to baselayer is used, merge hs with this tile
+      this.HsAdvFinalBaselayer({
+        canvasSize: [tileSize, tileSize],
+        canvasCoordinates: [0, 0],
+        tBase: this.textureManagerHillshade.texture,
+        baseTexCoords: baselayerTexCoords,
+        tSoftShadow: fboSoftShadowPP.ping(),
+        tAmbient: fboAmbientShadowPP.ping(),
+        finalSoftMultiplier: _hillshadeOptions.hsAdvFinalSoftMultiplier,
+        finalAmbientMultiplier: _hillshadeOptions.hsAdvFinalAmbientMultiplier,
+      });
+    } else {
+      // if no url to baselayer, use colorscale to calculate colors to merge with hs.
+      this.HsAdvFinalColorscale({
+        scaleLength: this.scaleInput.length,
+        sentinelLength: this.sentinelInput.length,
+        scaleColormap: this.scaleColormap,
+        sentinelColormap: this.sentinelColormap,
+        canvasSize: [tileSize, tileSize],
+        canvasCoordinates: [0, 0],
+        tInput: fboFloats,
+        tSoftShadow: fboSoftShadowPP.ping(),
+        tAmbient: fboAmbientShadowPP.ping(),
+        floatScale: hsValueScale,
+        finalSoftMultiplier: _hillshadeOptions.hsAdvFinalSoftMultiplier,
+        finalAmbientMultiplier: _hillshadeOptions.hsAdvFinalAmbientMultiplier,
+      });
+    }
 
     fboFloats.destroy();
     fboNormals.destroy();
@@ -1469,7 +1488,7 @@ export default class Renderer {
               fboAmbientShadowPP.swap();
             }
 
-            this.HsAdvFinal({
+            this.HsAdvFinalColorscale({
               scaleLength: this.scaleInput.length,
               sentinelLength: this.sentinelInput.length,
               scaleColormap: this.scaleColormap,

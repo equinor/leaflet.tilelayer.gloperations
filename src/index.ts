@@ -136,6 +136,7 @@ export interface Options extends L.GridLayerOptions {
   hsAdvSunRadiusMultiplier?: number;
   hsAdvFinalSoftMultiplier?: number;
   hsAdvFinalAmbientMultiplier?: number;
+  hsAdvBaselayerUrl?: string;
   hsPregenUrl?: string;
   _hillshadeOptions?: HillshadeOptions;
 
@@ -257,6 +258,7 @@ const defaultOptions = {
   hsAdvSunRadiusMultiplier: 100,
   hsAdvFinalSoftMultiplier: 1.0,
   hsAdvFinalAmbientMultiplier: 0.25,
+  hsAdvBaselayerUrl: '',
   hsPregenUrl: '',
   _hillshadeOptions: { hillshadeType: 'none' },
 
@@ -421,6 +423,7 @@ export default class GLOperations extends L.GridLayer {
       hsAdvSunRadiusMultiplier: prevHsAdvSunRadiusMultiplier,
       hsAdvFinalSoftMultiplier: prevHsAdvFinalSoftMultiplier,
       hsAdvFinalAmbientMultiplier: prevHsAdvFinalAmbientMultiplier,
+      hsAdvBaselayerUrl: prevHsAdvBaselayerUrl,
       contourInterval: prevContourInterval,
       contourIndexInterval: prevContourIndexInterval,
       contourLineColor: prevContourLineColor,
@@ -500,6 +503,7 @@ export default class GLOperations extends L.GridLayer {
       hsAdvSunRadiusMultiplier: this.options.hsAdvSunRadiusMultiplier,
       hsAdvFinalSoftMultiplier: this.options.hsAdvFinalSoftMultiplier,
       hsAdvFinalAmbientMultiplier: this.options.hsAdvFinalAmbientMultiplier,
+      hsAdvBaselayerUrl: this.options.hsAdvBaselayerUrl,
       hsPregenUrl: this.options.hsPregenUrl,
     };
 
@@ -542,7 +546,8 @@ export default class GLOperations extends L.GridLayer {
             this.options.hsAdvSoftIterations !== prevHsAdvSoftIterations ||
             this.options.hsAdvAmbientIterations !== prevHsAdvAmbientIterations ||
             this.options.hsValueScale !== prevHsValueScale ||
-            this.options.hsPixelScale !== prevHsPixelScale
+            this.options.hsPixelScale !== prevHsPixelScale ||
+            this.options.hsAdvBaselayerUrl !== prevHsAdvBaselayerUrl
           ) {
             this._updateTiles();
             if (this.options.debug) console.log("Running GLOperations with new url, no transition and no operation");
@@ -827,12 +832,25 @@ export default class GLOperations extends L.GridLayer {
                 url
               );
 
+              let baselayerTexCoords: number[][] = [];
+              // download baselayer tile if url specified
+              if (this.options.hsAdvBaselayerUrl) {
+                const basePixelData = await this._fetchTileData(
+                  coords,
+                  this.options.hsAdvBaselayerUrl,
+                  "image",
+                );
+                const textureBounds = this._renderer.textureManagerHillshade.addTile(coords, basePixelData);
+                baselayerTexCoords = util.getTexCoordVerticesTriangleStripQuad(textureBounds);
+              }
+
               // Adjacent tiles as now available in TextureManager. Start rendering
               const [sourceX, sourceY] = this._renderer.renderTileHsAdvanced(
                 this.options._hillshadeOptions,
                 this._getZoomForUrl(),
                 textureCoords,
                 this._getPixelScale(),
+                baselayerTexCoords,
               );
 
               // Copy pixel data to a property on tile canvas element (for later retrieval).
@@ -2584,10 +2602,14 @@ export default class GLOperations extends L.GridLayer {
   /**
    * Fetch pixel data for an individual tile from the given URL.
    */
-  protected async _fetchTileData(coords: TileCoordinates, url: string): Promise<Uint8Array> {
-    if (this.options.tileFormat === 'float32') {
+  protected async _fetchTileData(
+    coords: TileCoordinates,
+    url: string,
+    tileFormat: string = this.options.tileFormat,
+  ): Promise<Uint8Array> {
+    if (tileFormat === 'float32' || tileFormat === 'image') {
       return util.fetchPNGData(this.getTileUrl(coords, url), this.options.nodataValue, this._tileSizeAsNumber());
-    } else if (this.options.tileFormat === 'dem') {
+    } else if (tileFormat === 'dem') {
       const nodataTile = util.createNoDataTile(this.options.nodataValue, this._tileSizeAsNumber());
       const imageData = await util.fetchPNGData(this.getTileUrl(coords, url), this.options.nodataValue, this._tileSizeAsNumber());
       if (util.typedArraysAreEqual(imageData, nodataTile)) {

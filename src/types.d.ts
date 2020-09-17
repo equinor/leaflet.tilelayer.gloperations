@@ -44,6 +44,7 @@ export interface HillshadeOptions {
   hsAdvSunRadiusMultiplier?: number;
   hsAdvFinalSoftMultiplier?: number;
   hsAdvFinalAmbientMultiplier?: number;
+  hsAdvBaselayerUrl?: string;
   hsPregenUrl?: string;
 }
 
@@ -404,7 +405,7 @@ export namespace HsAdvAmbientShadows {
   }
 }
 
-export namespace HsAdvFinal {
+export namespace HsAdvFinalColorscale {
   export interface Props extends DrawCommon.Props {
     tInput: REGL.Texture2D | REGL.Framebuffer2D;
     tSoftShadow: REGL.Texture2D | REGL.Framebuffer2D;
@@ -433,7 +434,28 @@ export namespace HsAdvFinal {
   export interface Attributes extends DrawCommon.Attributes {
     texCoordA: REGL.Vec2[] | number[];
     texCoordB: REGL.Vec2[] | number[];
-    // position: REGL.Vec2[] | number[];
+  }
+}
+
+export namespace HsAdvFinalBaselayer {
+  export interface Props extends DrawCommon.Props {
+    tBase: REGL.Texture2D | REGL.Framebuffer2D;
+    tSoftShadow: REGL.Texture2D | REGL.Framebuffer2D;
+    tAmbient: REGL.Texture2D | REGL.Framebuffer2D;
+    finalSoftMultiplier: number;
+    finalAmbientMultiplier: number;
+    baseTexCoords: REGL.Vec2[] | number[] | number[][];
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    tBase: REGL.Texture2D | REGL.Framebuffer2D;
+    tSoftShadow: REGL.Texture2D | REGL.Framebuffer2D;
+    tAmbient: REGL.Texture2D | REGL.Framebuffer2D;
+    finalSoftMultiplier: number;
+    finalAmbientMultiplier: number;
+  }
+  export interface Attributes extends DrawCommon.Attributes {
+    texCoordA: REGL.Vec2[] | number[] | number[][];
+    texCoordB: REGL.Vec2[] | number[];
   }
 }
 
