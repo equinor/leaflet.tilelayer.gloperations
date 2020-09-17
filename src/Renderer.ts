@@ -489,6 +489,7 @@ export default class Renderer {
     _hillshadeOptions: HillshadeOptions,
     zoom: number,
     textureCoords: number[][],
+    pixelScale: number,
   ): Pair<number> {
     const {
       regl,
@@ -524,7 +525,6 @@ export default class Renderer {
       colorType: "float",
     });
 
-    const pixelScale = _hillshadeOptions.hsPixelScale! / (tileSize * (2**zoom));
     let hsValueScale = 1.0;
     if (typeof _hillshadeOptions.hsValueScale === "number") {
       hsValueScale = _hillshadeOptions.hsValueScale;
@@ -1318,6 +1318,7 @@ export default class Renderer {
     _hillshadeOptions: HillshadeOptions,
     url: string,
     zoom: number,
+    pixelScale: number,
   ): Array<Pair<number>> {
     const {
       regl,
@@ -1358,7 +1359,7 @@ export default class Renderer {
     const chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
 
     const nodataTile = util.createNoDataTile(nodataValue, tileSize);
-    const pixelScale = _hillshadeOptions.hsPixelScale! / (tileSize * (2**zoom));
+    // const pixelScale = _hillshadeOptions.hsPixelScale! / (tileSize * (2**zoom));
     let hsValueScale = 1.0;
     if (typeof _hillshadeOptions.hsValueScale === "number") {
       hsValueScale = _hillshadeOptions.hsValueScale;
