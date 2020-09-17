@@ -51,6 +51,8 @@ import {
   Dictionary,
 } from './types';
 
+import { EARTH_CIRCUMFERENCE } from './constants';
+
 /**
  * Augment Leaflet GridLayer definition to include some helpful "private" properties.
  *
@@ -123,8 +125,8 @@ export interface Options extends L.GridLayerOptions {
 
   // Hillshading
   hillshadeType: string;
-  hsValueScale?: number|Dictionary<number>;
-  hsPixelScale?: number;
+  hsValueScale?: number | Dictionary<number>;
+  hsPixelScale?: number | string;
   hsSimpleZoomdelta?: number;
   hsSimpleSlopescale?: number;
   hsSimpleAzimuth?: number;
@@ -245,7 +247,7 @@ const defaultOptions = {
   // Hillshading default options
   hillshadeType: 'none', // none, simple or pregen
   hsValueScale: 1.0,
-  hsPixelScale: 100,
+  hsPixelScale: 'auto',
   hsSimpleZoomdelta: 0,
   hsSimpleSlopescale: 3.0,
   hsSimpleAzimuth: 315,
@@ -830,6 +832,7 @@ export default class GLOperations extends L.GridLayer {
                 this.options._hillshadeOptions,
                 this._getZoomForUrl(),
                 textureCoords,
+                this._getPixelScale(),
               );
 
               // Copy pixel data to a property on tile canvas element (for later retrieval).
@@ -1210,6 +1213,7 @@ export default class GLOperations extends L.GridLayer {
       //   this.options._hillshadeOptions,
       //   this.options.url,
       //   this._getZoomForUrl(),
+        // this._getPixelScale(),
       // );
       // TODO: make this work without redraw?
       if (this.options.debug) console.log("_updateTiles() with advanced hs");
@@ -3269,5 +3273,22 @@ export default class GLOperations extends L.GridLayer {
     const sentinel = sentinelValues && sentinelValues.find(({ offset }) => offset === pixelValue);
     // If pixelValue matches no sentinel, just return pixelValue.
     return sentinel || pixelValue;
+  }
+
+  /**
+   * Calculate how many map units one pixel represents. Used for hillshading.
+   */
+  protected _getPixelScale(): number {
+    let pixelScale = 1;
+    const zoom = this._getZoomForUrl();
+    if (this.options.hsPixelScale === 'auto') {
+      pixelScale = EARTH_CIRCUMFERENCE * Math.abs(
+          Math.cos(this._map.getCenter().lat / 180 * Math.PI
+        )) / Math.pow(2, zoom + 8);
+    } else if (typeof this.options.hsPixelScale === 'number') {
+      pixelScale = this.options.hsPixelScale as unknown as number
+                    / (this._tileSizeAsNumber() * (2**zoom));
+    }
+    return pixelScale;
   }
 }

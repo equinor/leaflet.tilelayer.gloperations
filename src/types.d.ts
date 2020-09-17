@@ -33,8 +33,8 @@ export interface TextureCoordinates {
 
 export interface HillshadeOptions {
   hillshadeType: string;
-  hsValueScale?: number|Dictionary<number>;
-  hsPixelScale?: number;
+  hsValueScale?: number | Dictionary<number>;
+  hsPixelScale?: number | string;
   hsSimpleZoomdelta?: number;
   hsSimpleSlopescale?: number;
   hsSimpleAzimuth?: number;
