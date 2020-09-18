@@ -418,6 +418,8 @@ export default class GLOperations extends L.GridLayer {
       hsValueScale: prevHsValueScale,
       hsPixelScale: prevHsPixelScale,
       hsSimpleSlopescale: prevHsSimpleSlopescale,
+      hsSimpleAzimuth: prevHsSimpleAzimuth,
+      hsSimpleAltitude: prevHsSimpleAltitude,
       hsAdvSoftIterations: prevHsAdvSoftIterations,
       hsAdvAmbientIterations: prevHsAdvAmbientIterations,
       hsAdvSunRadiusMultiplier: prevHsAdvSunRadiusMultiplier,
@@ -525,6 +527,12 @@ export default class GLOperations extends L.GridLayer {
       this._renderer.textureManager.clearTiles();
     }
 
+    if (this.options.hsAdvBaselayerUrl !== prevHsAdvBaselayerUrl) {
+      // need to clear tiles so they are not reused
+      // TODO: Check why necessary
+      this._renderer.textureManagerHillshade.clearTiles();
+    }
+
     if (this.options.glOperation === 'none') {
       if (this.options.transitions) {
         if (this.options.url !== prevUrl) {
@@ -540,6 +548,8 @@ export default class GLOperations extends L.GridLayer {
             this.options.hillshadeType !== prevHillshadeType ||
             this.options.hsPregenUrl !== prevHsPregenUrl ||
             this.options.hsSimpleSlopescale !== prevHsSimpleSlopescale ||
+            this.options.hsSimpleAzimuth !== prevHsSimpleAzimuth ||
+            this.options.hsSimpleAltitude !== prevHsSimpleAltitude ||
             this.options.hsAdvSunRadiusMultiplier !== prevHsAdvSunRadiusMultiplier ||
             this.options.hsAdvFinalSoftMultiplier !== prevHsAdvFinalSoftMultiplier ||
             this.options.hsAdvFinalAmbientMultiplier !== prevHsAdvFinalAmbientMultiplier ||
