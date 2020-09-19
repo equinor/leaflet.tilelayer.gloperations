@@ -14,7 +14,7 @@ function Map(props) {
   //initial setup of map
   const mapRef = useRef(null);
     useEffect(() => {
-    setMap(createMap(mapRef.current));
+    setMap(createMap(mapRef.current, props.mapType));
   }, []);
 
   const valueDisplayRef = useRef(null);
@@ -25,6 +25,7 @@ function Map(props) {
       valueDisplayRef.current = addValueDisplay(map);
 
       const tilelayer = addGLOperations(
+        props.mapType,
         map,
         map.options.maxBounds,
         contourPane,
@@ -62,7 +63,7 @@ function Map(props) {
                                           + '<br>Permeability: ' + mouseEvent.pixelValues.pixelValueD.toFixed(VALUE_DISPLAY_PRECISION);
     }
     valueDisplayRef.current.update(text);
-  } 
+  }
 
     return (
       <div id="map" ref={mapRef}></div>

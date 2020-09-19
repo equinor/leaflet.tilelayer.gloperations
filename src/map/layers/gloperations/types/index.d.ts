@@ -18,6 +18,7 @@ export interface MouseEvent extends L.LeafletMouseEvent {
 }
 export interface Options extends L.GridLayerOptions {
     url: string;
+    tileFormat: string;
     nodataValue: number;
     colorScale?: Color[];
     sentinelValues?: SentinelValue[];
@@ -55,7 +56,8 @@ export interface Options extends L.GridLayerOptions {
     transitionTimeMs?: number;
     debug: boolean;
     hillshadeType: string;
-    hsElevationScale?: number;
+    hsValueScale?: number | Dictionary<number>;
+    hsPixelScale?: number | string;
     hsSimpleZoomdelta?: number;
     hsSimpleSlopescale?: number;
     hsSimpleAzimuth?: number;
@@ -65,6 +67,7 @@ export interface Options extends L.GridLayerOptions {
     hsAdvSunRadiusMultiplier?: number;
     hsAdvFinalSoftMultiplier?: number;
     hsAdvFinalAmbientMultiplier?: number;
+    hsAdvBaselayerUrl?: string;
     hsPregenUrl?: string;
     _hillshadeOptions?: HillshadeOptions;
     contourPane?: HTMLElement;
@@ -117,6 +120,7 @@ export interface Options extends L.GridLayerOptions {
     crossOrigin?: boolean;
 }
 declare const defaultOptions: {
+    tileFormat: string;
     colorScale: never[];
     sentinelValues: never[];
     transitions: boolean;
@@ -161,7 +165,8 @@ declare const defaultOptions: {
     multiplierE: number;
     multiplierF: number;
     hillshadeType: string;
-    hsElevationScale: number;
+    hsValueScale: number;
+    hsPixelScale: string;
     hsSimpleZoomdelta: number;
     hsSimpleSlopescale: number;
     hsSimpleAzimuth: number;
@@ -171,6 +176,7 @@ declare const defaultOptions: {
     hsAdvSunRadiusMultiplier: number;
     hsAdvFinalSoftMultiplier: number;
     hsAdvFinalAmbientMultiplier: number;
+    hsAdvBaselayerUrl: string;
     hsPregenUrl: string;
     _hillshadeOptions: {
         hillshadeType: string;
@@ -203,6 +209,7 @@ declare const defaultOptions: {
 export declare type InternalOptions = Options & typeof defaultOptions;
 export default class GLOperations extends L.GridLayer {
     static readonly defaultOptions: {
+        tileFormat: string;
         colorScale: never[];
         sentinelValues: never[];
         transitions: boolean;
@@ -247,7 +254,8 @@ export default class GLOperations extends L.GridLayer {
         multiplierE: number;
         multiplierF: number;
         hillshadeType: string;
-        hsElevationScale: number;
+        hsValueScale: number;
+        hsPixelScale: string;
         hsSimpleZoomdelta: number;
         hsSimpleSlopescale: number;
         hsSimpleAzimuth: number;
@@ -257,6 +265,7 @@ export default class GLOperations extends L.GridLayer {
         hsAdvSunRadiusMultiplier: number;
         hsAdvFinalSoftMultiplier: number;
         hsAdvFinalAmbientMultiplier: number;
+        hsAdvBaselayerUrl: string;
         hsPregenUrl: string;
         _hillshadeOptions: {
             hillshadeType: string;
@@ -319,16 +328,16 @@ export default class GLOperations extends L.GridLayer {
     protected _getActiveTiles(): GridLayerTile[];
     protected _getTilesData(tiles: GridLayerTile[], url?: string): Promise<TileDatum[]>;
     protected _fetchTilesData(tiles: GridLayerTile[], url: string): Promise<TileDatum[]>;
-    protected _fetchTileData(coords: TileCoordinates, url: string): Promise<Uint8Array>;
+    protected _fetchTileData(coords: TileCoordinates, url: string, tileFormat?: string): Promise<Uint8Array>;
     protected _tileSizeAsNumber(): number;
     protected _copyToTileCanvas(tile: TileElement, sourceX: number, sourceY: number): void;
     protected _getActivetilesBounds(): Promise<ActiveTilesBounds>;
     protected _mergePixelData(activeTilesBounds: ActiveTilesBounds, tileSize: number): Promise<void>;
     protected _maybeUpdateMergedArrayAndDrawContours(): Promise<void>;
-    protected _smoothContourInput(): Promise<void>;
+    protected _smoothContourInput(): void;
     protected _calculateAndDrawContours(): Promise<void>;
     protected _addlabel(context: CanvasRenderingContext2D, label: ContourLabel, labelColor: string, labelFont: string): void;
-    protected _calculateContours(): Promise<void>;
+    protected _calculateContours(): void;
     protected _clearContours(): Promise<void>;
     protected _moveContourCanvas(activeTilesBounds: ActiveTilesBounds): Promise<void>;
     protected _drawContours(): Promise<void>;
@@ -337,5 +346,6 @@ export default class GLOperations extends L.GridLayer {
     protected _tileBounds(tile: GridLayerTile): L.Bounds;
     protected _getCoordsInTile(tile: GridLayerTile, pixelCoords: L.Point): L.Point;
     protected _getPixelValue(pixelData: Uint8Array | Float32Array | undefined, byteIndex: number): number | SentinelValue | undefined;
+    protected _getPixelScale(): number;
 }
 export {};

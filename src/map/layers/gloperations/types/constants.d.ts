@@ -1,3 +1,10 @@
 import REGL from 'regl';
 export declare const CLEAR_COLOR: REGL.Vec4;
 export declare const MAX_TEXTURE_DIMENSION = 1024;
+export declare const EARTH_SUN_DISTANCE = 149600000000;
+export declare const EARTH_CIRCUMFERENCE = 40075016.686;
+export declare const SUN_RADIUS = 695508000;
+export declare const DEG2RAD = 0.017453292519943295;
+export declare const SLOPEFACTOR = 0.0333334;
+export declare const RGB_REGEX: RegExp;
+export declare const HEX_REGEX: RegExp;

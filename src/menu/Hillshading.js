@@ -15,34 +15,76 @@ const Hillshading = ({tilelayer}) => {
 
   const hillshadingRadioChange = e => {
     setHillshadeType(e.target.value);
-    if (e.target.value === 'simple') {
-      setHillshadeSlopescaleDisabled(false);
-    } else {
-      setHillshadeSlopescaleDisabled(true);
-    }
     tilelayer.updateOptions({hillshadeType: e.target.value})
   };
 
   function slopescaleChange(value) {
     tilelayer.updateOptions({hsSimpleSlopescale: value})
   }
+  function sunAzimuthChange(value) {
+    tilelayer.updateOptions({hsSimpleAzimuth: value})
+  }
+  function sunAltitudeChange(value) {
+    tilelayer.updateOptions({hsSimpleAltitude: value})
+  }
+  function softShadowIterationsChange(value) {
+    tilelayer.updateOptions({hsAdvSoftIterations: value})
+  }
+  function ambientLightingIterationsChange(value) {
+    tilelayer.updateOptions({hsAdvAmbientIterations: value})
+  }
+  function elevationScaleChange(value) {
+    tilelayer.updateOptions({hsValueScale: value})
+  }
+  function sunRadiusChange(value) {
+    tilelayer.updateOptions({hsAdvSunRadiusMultiplier: value})
+  }
+  function softMultiplierChange(value) {
+    tilelayer.updateOptions({hsAdvFinalSoftMultiplier: value})
+  }
+  function ambientMultiplierChange(value) {
+    tilelayer.updateOptions({hsAdvFinalAmbientMultiplier: value})
+  }
 
   return (
     <div>
-      <p>Hillshading on-the-fly or from pre-generated tiles. Hillshading is currently only implemented with glOperation="none". The surfaces are from a reservoir model, so resolution is much lower than normal map tiles, hence the "jagged" edges. On-the-fly hillshading is a work in progress.</p>
+      <p>The custom tiles used here have low resolution and will show some limitation of the hillshading. For a demo with high resolution data check out the world map.</p>
       <Radio.Group onChange={hillshadingRadioChange} value={hillshadeType}>
         <Radio style={radioStyle} value='none'>
           None
         </Radio>
         <Radio style={radioStyle} value='simple'>
-          On-the-fly
+          Simple
+        </Radio>
+        <Radio style={radioStyle} value='advanced'>
+          Advanced
         </Radio>
         <Radio style={radioStyle} value='pregen'>
           Pre-generated
         </Radio>
       </Radio.Group>
       <br></br><br></br>
-      Slopescale: <Slider defaultValue={5} min={0} max={10} disabled={hillshadeSlopescaleDisabled} onChange={slopescaleChange}/>
+      {hillshadeType === 'simple' &&
+        <div>
+          Slopescale: <Slider defaultValue={5} min={0} max={10} onAfterChange={slopescaleChange}/>
+          Sun azimuth: <Slider defaultValue={315} min={0} max={360} onAfterChange={sunAzimuthChange}/>
+          Sun altitude: <Slider defaultValue={70} min={0} max={200} onAfterChange={sunAltitudeChange}/>
+        </div>
+      }
+      {hillshadeType === 'advanced' &&
+        <div>
+          <p>
+            Advanced hillshading requires heavy ray tracing computations. If you increase the iterations too much it <i>will</i> crash your browser. The limit will depend on your device.
+            Check the <a href="https://github.com/equinor/leaflet.tilelayer.gloperations/wiki/Hillshading">wiki</a> to find out what all the options do.
+           </p>
+          Elevation scale: <Slider defaultValue={-1.0} min={-5.0} max={0.0} step={0.1} onAfterChange={elevationScaleChange}/>
+          Soft shadow iterations: <Slider defaultValue={10} min={0} max={150} onAfterChange={softShadowIterationsChange}/>
+          Ambient lighting iterations: <Slider defaultValue={10} min={0} max={150} onAfterChange={ambientLightingIterationsChange}/>
+          Sun radius multiplier: <Slider defaultValue={100} min={0} max={1000} onAfterChange={sunRadiusChange}/>
+          Soft shadow multiplier: <Slider defaultValue={1.1} min={0} max={10} step={0.05} onAfterChange={softMultiplierChange}/>
+          Ambient lighting multiplier: <Slider defaultValue={0.25} min={0} max={2.0} step={0.05} onAfterChange={ambientMultiplierChange}/>
+        </div>
+      }
     </div>
   )
 }

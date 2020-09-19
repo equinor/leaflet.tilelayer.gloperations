@@ -1,3 +1,5 @@
+// import L from 'leaflet'
+
 import '../../map/common/leaflet-messagebox.js';
 
 export default function initContourLayer(map) {
@@ -5,8 +7,6 @@ export default function initContourLayer(map) {
   map.getPane('contourPane').style.zIndex = 210;
 
   let contourCanvas = document.createElement('canvas');
-  // contourPaneRef.current = contourPane;
-  // contourCanvasRef.current = contourCanvas;
   contourCanvas.id='contours';
   contourCanvas.width = contourCanvas.width;
   contourPane.appendChild(contourCanvas);
@@ -26,6 +26,6 @@ export default function initContourLayer(map) {
         contourLoadingMessage.show('Calculating contours...done');
     }
   });
-  
+
 	return [contourPane, contourCanvas];
 }

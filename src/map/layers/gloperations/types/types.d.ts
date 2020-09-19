@@ -1,6 +1,6 @@
 import REGL from 'regl';
-import { Contours, ContourMultiPolygon } from 'd3-contour';
-import { Point } from 'leaflet'
+import { ContourMultiPolygon } from 'd3-contour';
+import { vec3 } from "gl-matrix";
 
 export interface Color {
   color: string;
@@ -33,7 +33,8 @@ export interface TextureCoordinates {
 
 export interface HillshadeOptions {
   hillshadeType: string;
-  hsElevationScale?: number;
+  hsValueScale?: number | Dictionary<number>;
+  hsPixelScale?: number | string;
   hsSimpleZoomdelta?: number;
   hsSimpleSlopescale?: number;
   hsSimpleAzimuth?: number;
@@ -43,6 +44,7 @@ export interface HillshadeOptions {
   hsAdvSunRadiusMultiplier?: number;
   hsAdvFinalSoftMultiplier?: number;
   hsAdvFinalAmbientMultiplier?: number;
+  hsAdvBaselayerUrl?: string;
   hsPregenUrl?: string;
 }
 
@@ -245,6 +247,218 @@ export namespace DrawTileHsPregen {
   }
 }
 
+export namespace HsAdvScaleFloats {
+  export interface Props extends DrawCommon.Props {
+    texture: REGL.Texture2D | REGL.Framebuffer2D;
+    // canvasSize: Pair<number>;
+    // fbo: REGL.Framebuffer2D;
+    // resolution: number;
+    // textureBounds: TextureBounds;
+    // pixelScale: number;
+    // onePixel: number;
+    // floatScale: number;
+  }
+  export interface Uniforms {
+    // textureBounds: REGL.Vec4;
+    texture: REGL.Texture2D | REGL.Framebuffer2D;
+    // pixelScale: number;
+    // resolution: number;
+    // onePixel: number;
+    // floatScale: number;
+  }
+  export interface Attributes {
+    texCoord: REGL.Vec2[];
+    position: number[] | number[][];
+  }
+}
+
+export namespace HsAdvMergeAndScaleTiles {
+  export interface Props {
+    canvasSize: Pair<number>;
+    texture: REGL.Texture2D;
+    fbo: REGL.Framebuffer2D;
+    floatScale: number;
+    nodataValue: number;
+    texCoord: number[][];
+  }
+  export interface Uniforms {
+    texture: REGL.Texture2D;
+    floatScale: number;
+    nodataValue: number;
+    littleEndian: boolean;
+  }
+  export interface Attributes {
+    texCoord: number[];
+    position: number[] | number[][];
+  }
+}
+
+export namespace HsAdvCalcNormals {
+  export interface Props extends DrawCommon.Props {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    fbo?: REGL.Framebuffer2D;
+    // resolution: number;
+    // textureBounds: TextureBounds;
+    pixelScale: number;
+    onePixel: number;
+    // elevationScale: number;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    // textureBounds: REGL.Vec4;
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    pixelScale: number;
+    // resolution: number;
+    onePixel: number;
+    // elevationScale: number;
+  }
+  export interface Attributes {
+    texCoord: REGL.Vec2[] | number[];
+    position: REGL.Vec2[] | number[];
+  }
+}
+
+export namespace HsAdvDirectLightning {
+  export interface Props extends DrawCommon.Props {
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    // fbo: REGL.Framebuffer2D;
+    // resolution: number;
+    textureBounds: TextureBounds;
+    floatScale: number;
+    // pixelScale: number;
+    sunDirection: number[] | Float32Array | vec3;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
+    // textureBounds: REGL.Vec4;
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    floatScale: number;
+    // pixelScale: number;
+    sunDirection: number[] | Float32Array | vec3;
+    // resolution: number;
+  }
+  export interface Attributes {
+    texCoord: REGL.Vec2[] | number[];
+    position: REGL.Vec2[] | number[];
+  }
+}
+
+export namespace HsAdvSoftShadows {
+  export interface Props extends DrawCommon.Props {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    tSrc: REGL.Framebuffer2D;
+    fbo: REGL.Framebuffer2D;
+    softIterations: number;
+    resolution:  number[] | REGL.Vec2;
+    textureBounds: TextureBounds;
+    pixelScale: number;
+    sunDirection: number[] | Float32Array | vec3;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    tSrc: REGL.Framebuffer2D;
+    softIterations: number;
+    pixelScale: number;
+    sunDirection: number[] | Float32Array | vec3;
+    resolution: number[] | REGL.Vec2;
+  }
+  export interface Attributes {
+    texCoord: REGL.Vec2[] | number[];
+    position: REGL.Vec2[] | number[];
+  }
+}
+
+export namespace HsAdvAmbientShadows {
+  export interface Props extends DrawCommon.Props {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    tSrc: REGL.Framebuffer2D;
+    fbo: REGL.Framebuffer2D;
+    ambientIterations: number;
+    resolution:  number[] | REGL.Vec2;
+    textureBounds: TextureBounds;
+    pixelScale: number;
+    direction: number[] | Float32Array | vec3;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tNormal: REGL.Texture2D | REGL.Framebuffer2D;
+    tSrc: REGL.Framebuffer2D;
+    ambientIterations: number;
+    pixelScale: number;
+    direction: number[] | Float32Array | vec3;
+    resolution: number[] | REGL.Vec2;
+  }
+  export interface Attributes {
+    texCoord: REGL.Vec2[] | number[];
+    position: REGL.Vec2[] | number[];
+  }
+}
+
+export namespace HsAdvFinalColorscale {
+  export interface Props extends DrawCommon.Props {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tSoftShadow: REGL.Texture2D | REGL.Framebuffer2D;
+    tAmbient: REGL.Texture2D | REGL.Framebuffer2D;
+    floatScale: number;
+    finalSoftMultiplier: number;
+    finalAmbientMultiplier: number;
+    textureBounds: TextureBounds;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    tSoftShadow: REGL.Texture2D | REGL.Framebuffer2D;
+    tAmbient: REGL.Texture2D | REGL.Framebuffer2D;
+    floatScale: number;
+    finalSoftMultiplier: number;
+    finalAmbientMultiplier: number;
+    scaleColormap: REGL.Texture2D;
+    sentinelColormap: REGL.Texture2D;
+    scaleLength: number;
+    sentinelLength: number;
+  }
+  export interface Attributes extends DrawCommon.Attributes {
+    texCoordA: REGL.Vec2[] | number[];
+    texCoordB: REGL.Vec2[] | number[];
+  }
+}
+
+export namespace HsAdvFinalBaselayer {
+  export interface Props extends DrawCommon.Props {
+    tBase: REGL.Texture2D | REGL.Framebuffer2D;
+    tSoftShadow: REGL.Texture2D | REGL.Framebuffer2D;
+    tAmbient: REGL.Texture2D | REGL.Framebuffer2D;
+    finalSoftMultiplier: number;
+    finalAmbientMultiplier: number;
+    baseTexCoords: REGL.Vec2[] | number[] | number[][];
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    tBase: REGL.Texture2D | REGL.Framebuffer2D;
+    tSoftShadow: REGL.Texture2D | REGL.Framebuffer2D;
+    tAmbient: REGL.Texture2D | REGL.Framebuffer2D;
+    finalSoftMultiplier: number;
+    finalAmbientMultiplier: number;
+  }
+  export interface Attributes extends DrawCommon.Attributes {
+    texCoordA: REGL.Vec2[] | number[] | number[][];
+    texCoordB: REGL.Vec2[] | number[];
+  }
+}
+
 export namespace DrawTileInterpolateValue {
   export interface Props extends DrawCommon.Props {
     scaleColormap: REGL.Texture2D;
@@ -272,33 +486,6 @@ export namespace DrawTileInterpolateValue {
   }
 }
 
-export namespace DrawTileMultiAnalyze1 {
-  export interface Props extends DrawCommon.Props {
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    scaleLength: number;
-    sentinelLength: number;
-    textureA: REGL.Texture2D;
-    textureBoundsA: TextureBounds;
-    filterLowA: number;
-    filterHighA: number;
-    multiplierA: number;
-  }
-  export interface Uniforms extends DrawCommon.Uniforms {
-    scaleLength: number;
-    sentinelLength: number;
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    textureA: REGL.Texture2D;
-    filterLowA : number;
-    filterHighA : number;
-    multiplierA: number;
-  }
-  export interface Attributes extends DrawCommon.Attributes {
-    texCoord: REGL.Vec2[];
-  }
-}
-
 export namespace CalcTileMultiAnalyze1 {
   export interface Props extends DrawCommon.Props {
     textureA: REGL.Texture2D;
@@ -306,6 +493,7 @@ export namespace CalcTileMultiAnalyze1 {
     filterLowA: number;
     filterHighA: number;
     multiplierA: number;
+    fbo: REGL.Framebuffer2D;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
     textureA: REGL.Texture2D;
@@ -315,43 +503,6 @@ export namespace CalcTileMultiAnalyze1 {
   }
   export interface Attributes extends DrawCommon.Attributes {
     texCoord: REGL.Vec2[];
-  }
-}
-
-export namespace DrawTileMultiAnalyze2 {
-  export interface Props extends DrawCommon.Props {
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    scaleLength: number;
-    sentinelLength: number;
-    textureA: REGL.Texture2D;
-    textureB: REGL.Texture2D;
-    textureBoundsA: TextureBounds;
-    textureBoundsB: TextureBounds;
-    filterLowA: number;
-    filterHighA: number;
-    filterLowB: number;
-    filterHighB: number;
-    multiplierA: number;
-    multiplierB: number;
-  }
-  export interface Uniforms extends DrawCommon.Uniforms {
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    scaleLength: number;
-    sentinelLength: number;
-    textureA: REGL.Texture2D;
-    textureB: REGL.Texture2D;
-    filterLowA : number;
-    filterHighA : number;
-    filterLowB : number;
-    filterHighB : number;
-    multiplierA: number;
-    multiplierB: number;
-  }
-  export interface Attributes extends DrawCommon.Attributes {
-    texCoordA: REGL.Vec2[];
-    texCoordB: REGL.Vec2[];
   }
 }
 
@@ -367,6 +518,7 @@ export namespace CalcTileMultiAnalyze2 {
     filterHighB: number;
     multiplierA: number;
     multiplierB: number;
+    fbo: REGL.Framebuffer2D;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
     textureA: REGL.Texture2D;
@@ -381,53 +533,6 @@ export namespace CalcTileMultiAnalyze2 {
   export interface Attributes extends DrawCommon.Attributes {
     texCoordA: REGL.Vec2[];
     texCoordB: REGL.Vec2[];
-  }
-}
-
-export namespace DrawTileMultiAnalyze3 {
-  export interface Props extends DrawCommon.Props {
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    scaleLength: number;
-    sentinelLength: number;
-    textureA: REGL.Texture2D;
-    textureB: REGL.Texture2D;
-    textureC: REGL.Texture2D;
-    textureBoundsA: TextureBounds;
-    textureBoundsB: TextureBounds;
-    textureBoundsC: TextureBounds;
-    filterLowA: number;
-    filterHighA: number;
-    filterLowB: number;
-    filterHighB: number;
-    filterLowC: number;
-    filterHighC: number;
-    multiplierA: number;
-    multiplierB: number;
-    multiplierC: number;
-  }
-  export interface Uniforms extends DrawCommon.Uniforms {
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    scaleLength: number;
-    sentinelLength: number;
-    textureA: REGL.Texture2D;
-    textureB: REGL.Texture2D;
-    textureC: REGL.Texture2D;
-    filterLowA : number;
-    filterHighA : number;
-    filterLowB : number;
-    filterHighB : number;
-    filterLowC : number;
-    filterHighC : number;
-    multiplierA: number;
-    multiplierB: number;
-    multiplierC: number;
-  }
-  export interface Attributes extends DrawCommon.Attributes {
-    texCoordA: REGL.Vec2[];
-    texCoordB: REGL.Vec2[];
-    texCoordC: REGL.Vec2[];
   }
 }
 
@@ -448,6 +553,7 @@ export namespace CalcTileMultiAnalyze3 {
     multiplierA: number;
     multiplierB: number;
     multiplierC: number;
+    fbo: REGL.Framebuffer2D;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
     textureA: REGL.Texture2D;
@@ -467,63 +573,6 @@ export namespace CalcTileMultiAnalyze3 {
     texCoordA: REGL.Vec2[];
     texCoordB: REGL.Vec2[];
     texCoordC: REGL.Vec2[];
-  }
-}
-
-export namespace DrawTileMultiAnalyze4 {
-  export interface Props extends DrawCommon.Props {
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    scaleLength: number;
-    sentinelLength: number;
-    textureA: REGL.Texture2D;
-    textureB: REGL.Texture2D;
-    textureC: REGL.Texture2D;
-    textureD: REGL.Texture2D;
-    textureBoundsA: TextureBounds;
-    textureBoundsB: TextureBounds;
-    textureBoundsC: TextureBounds;
-    textureBoundsD: TextureBounds;
-    filterLowA: number;
-    filterHighA: number;
-    filterLowB: number;
-    filterHighB: number;
-    filterLowC: number;
-    filterHighC: number;
-    filterLowD: number;
-    filterHighD: number;
-    multiplierA: number;
-    multiplierB: number;
-    multiplierC: number;
-    multiplierD: number;
-  }
-  export interface Uniforms extends DrawCommon.Uniforms {
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    scaleLength: number;
-    sentinelLength: number;
-    textureA: REGL.Texture2D;
-    textureB: REGL.Texture2D;
-    textureC: REGL.Texture2D;
-    textureD: REGL.Texture2D;
-    filterLowA : number;
-    filterHighA : number;
-    filterLowB : number;
-    filterHighB : number;
-    filterLowC : number;
-    filterHighC : number;
-    filterLowD : number;
-    filterHighD : number;
-    multiplierA: number;
-    multiplierB: number;
-    multiplierC: number;
-    multiplierD: number;
-  }
-  export interface Attributes extends DrawCommon.Attributes {
-    texCoordA: REGL.Vec2[];
-    texCoordB: REGL.Vec2[];
-    texCoordC: REGL.Vec2[];
-    texCoordD: REGL.Vec2[];
   }
 }
 
@@ -549,6 +598,7 @@ export namespace CalcTileMultiAnalyze4 {
     multiplierB: number;
     multiplierC: number;
     multiplierD: number;
+    fbo: REGL.Framebuffer2D;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
     textureA: REGL.Texture2D;
@@ -573,74 +623,6 @@ export namespace CalcTileMultiAnalyze4 {
     texCoordB: REGL.Vec2[];
     texCoordC: REGL.Vec2[];
     texCoordD: REGL.Vec2[];
-  }
-}
-
-
-export namespace DrawTileMultiAnalyze5 {
-  export interface Props extends DrawCommon.Props {
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    scaleLength: number;
-    sentinelLength: number;
-    textureA: REGL.Texture2D;
-    textureB: REGL.Texture2D;
-    textureC: REGL.Texture2D;
-    textureD: REGL.Texture2D;
-    textureE: REGL.Texture2D;
-    textureBoundsA: TextureBounds;
-    textureBoundsB: TextureBounds;
-    textureBoundsC: TextureBounds;
-    textureBoundsD: TextureBounds;
-    textureBoundsE: TextureBounds;
-    filterLowA: number;
-    filterHighA: number;
-    filterLowB: number;
-    filterHighB: number;
-    filterLowC: number;
-    filterHighC: number;
-    filterLowD: number;
-    filterHighD: number;
-    filterLowE: number;
-    filterHighE: number;
-    multiplierA: number;
-    multiplierB: number;
-    multiplierC: number;
-    multiplierD: number;
-    multiplierE: number;
-  }
-  export interface Uniforms extends DrawCommon.Uniforms {
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    scaleLength: number;
-    sentinelLength: number;
-    textureA: REGL.Texture2D;
-    textureB: REGL.Texture2D;
-    textureC: REGL.Texture2D;
-    textureD: REGL.Texture2D;
-    textureE: REGL.Texture2D;
-    filterLowA : number;
-    filterHighA : number;
-    filterLowB : number;
-    filterHighB : number;
-    filterLowC : number;
-    filterHighC : number;
-    filterLowD : number;
-    filterHighD : number;
-    filterLowE: number;
-    filterHighE: number;
-    multiplierA: number;
-    multiplierB: number;
-    multiplierC: number;
-    multiplierD: number;
-    multiplierE: number;
-  }
-  export interface Attributes extends DrawCommon.Attributes {
-    texCoordA: REGL.Vec2[];
-    texCoordB: REGL.Vec2[];
-    texCoordC: REGL.Vec2[];
-    texCoordD: REGL.Vec2[];
-    texCoordE: REGL.Vec2[];
   }
 }
 
@@ -671,6 +653,7 @@ export namespace CalcTileMultiAnalyze5 {
     multiplierC: number;
     multiplierD: number;
     multiplierE: number;
+    fbo: REGL.Framebuffer2D;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
     textureA: REGL.Texture2D;
@@ -700,83 +683,6 @@ export namespace CalcTileMultiAnalyze5 {
     texCoordC: REGL.Vec2[];
     texCoordD: REGL.Vec2[];
     texCoordE: REGL.Vec2[];
-  }
-}
-
-export namespace DrawTileMultiAnalyze6 {
-  export interface Props extends DrawCommon.Props {
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    scaleLength: number;
-    sentinelLength: number;
-    textureA: REGL.Texture2D;
-    textureB: REGL.Texture2D;
-    textureC: REGL.Texture2D;
-    textureD: REGL.Texture2D;
-    textureE: REGL.Texture2D;
-    textureF: REGL.Texture2D;
-    textureBoundsA: TextureBounds;
-    textureBoundsB: TextureBounds;
-    textureBoundsC: TextureBounds;
-    textureBoundsD: TextureBounds;
-    textureBoundsE: TextureBounds;
-    textureBoundsF: TextureBounds;
-    filterLowA: number;
-    filterHighA: number;
-    filterLowB: number;
-    filterHighB: number;
-    filterLowC: number;
-    filterHighC: number;
-    filterLowD: number;
-    filterHighD: number;
-    filterLowE: number;
-    filterHighE: number;
-    filterLowF: number;
-    filterHighF: number;
-    multiplierA: number;
-    multiplierB: number;
-    multiplierC: number;
-    multiplierD: number;
-    multiplierE: number;
-    multiplierF: number;
-  }
-  export interface Uniforms extends DrawCommon.Uniforms {
-    scaleColormap: REGL.Texture2D;
-    sentinelColormap: REGL.Texture2D;
-    scaleLength: number;
-    sentinelLength: number;
-    textureA: REGL.Texture2D;
-    textureB: REGL.Texture2D;
-    textureC: REGL.Texture2D;
-    textureD: REGL.Texture2D;
-    textureE: REGL.Texture2D;
-    textureF: REGL.Texture2D;
-    filterLowA : number;
-    filterHighA : number;
-    filterLowB : number;
-    filterHighB : number;
-    filterLowC : number;
-    filterHighC : number;
-    filterLowD : number;
-    filterHighD : number;
-    filterLowE: number;
-    filterHighE: number;
-    filterLowF: number;
-    filterHighF: number;
-    multiplierA: number;
-    multiplierB: number;
-    multiplierC: number;
-    multiplierD: number;
-    multiplierE: number;
-    multiplierF: number;
-  }
-  export interface Attributes extends DrawCommon.Attributes {
-    texCoordA: REGL.Vec2[];
-    texCoordB: REGL.Vec2[];
-    texCoordC: REGL.Vec2[];
-    texCoordD: REGL.Vec2[];
-    texCoordE: REGL.Vec2[];
-    texCoordF: REGL.Vec2[];
   }
 }
 
@@ -812,6 +718,7 @@ export namespace CalcTileMultiAnalyze6 {
     multiplierD: number;
     multiplierE: number;
     multiplierF: number;
+    fbo: REGL.Framebuffer2D;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
     textureA: REGL.Texture2D;
@@ -855,8 +762,7 @@ export namespace CalcTileDiff {
     textureB: REGL.Texture2D;
     textureBoundsA: TextureBounds;
     textureBoundsB: TextureBounds;
-    // framebuffer: REGL.Framebuffer2D,
-    // fboRgbaTile: WebGLBuffer,
+    fbo: REGL.Framebuffer2D;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
     textureA: REGL.Texture2D;
@@ -868,30 +774,36 @@ export namespace CalcTileDiff {
   }
 }
 
-export namespace DrawTileDiff {
+export namespace ConvertDem {
+  export interface Props extends DrawCommon.Props {
+    texture: REGL.Texture2D;
+    fbo: REGL.Framebuffer2D;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    texture: REGL.Texture2D;
+  }
+  export interface Attributes extends DrawCommon.Attributes {
+    texCoord: REGL.Vec2[];
+  }
+}
+
+export namespace DrawTileResult {
   export interface Props extends DrawCommon.Props {
     scaleColormap: REGL.Texture2D;
     sentinelColormap: REGL.Texture2D;
     scaleLength: number;
     sentinelLength: number;
-    // texture: REGL.Framebuffer2D | REGL.Texture2D;
-    // textureBounds: TextureBounds;
-    textureA: REGL.Texture2D;
-    textureB: REGL.Texture2D;
-    textureBoundsA: TextureBounds;
-    textureBoundsB: TextureBounds;
+    texture: REGL.Framebuffer2D | REGL.Texture2D;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
     scaleColormap: REGL.Texture2D;
     sentinelColormap: REGL.Texture2D;
     scaleLength: number;
     sentinelLength: number;
-    textureA: REGL.Framebuffer2D;
-    textureB: REGL.Framebuffer2D;
+    texture: REGL.Framebuffer2D | REGL.Texture2D;
   }
   export interface Attributes extends DrawCommon.Attributes {
-    texCoordA: REGL.Vec2[];
-    texCoordB: REGL.Vec2[];
+    texCoord: REGL.Vec2[];
   }
 }
 

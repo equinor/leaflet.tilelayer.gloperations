@@ -1,10 +1,13 @@
 import REGL from 'regl';
 import { Color, SentinelValue, TextureBounds, TileCoordinates } from './types';
+import TextureManager from './TextureManager';
 export declare function machineIsLittleEndian(): boolean;
 export declare function range(...args: number[]): number[];
 export declare function fetchPNGData(url: string, nodataValue: number, tileDimension: number): Promise<Uint8Array>;
+export declare function typedArraysAreEqual(a: Uint8Array, b: Uint8Array): boolean;
 export declare function getTransformMatrix(drawingBufferWidth: number, drawingBufferHeight: number): REGL.Mat4;
-export declare function getTexCoordVertices(textureBounds: TextureBounds): REGL.Vec2[];
+export declare function getTexCoordVerticesTriangleStripQuad(textureBounds: TextureBounds): REGL.Vec2[];
+export declare function getTexCoordVerticesTriangleQuad(textureBounds: TextureBounds): REGL.Vec2[];
 export declare function Timer(duration: number): Promise<void>;
 export declare function compareTileCoordinates(a: TileCoordinates, b: TileCoordinates): number;
 export declare function sameTiles(a: TileCoordinates[], b: TileCoordinates[]): boolean;
@@ -17,8 +20,11 @@ export declare function PingPong(regl: REGL.Regl, opts: REGL.FramebufferOptions)
     ping: () => REGL.Framebuffer2D;
     pong: () => REGL.Framebuffer2D;
     swap: () => void;
+    destroy: () => void;
 };
 export declare const hexToRGB: (hex: string) => number[];
 export declare function colorStringToInts(colorstring: string): number[];
 export declare const colormapToFlatArray: (colormap: Color[]) => number[];
 export declare function createColormapTexture(colormapInput: Color[] | SentinelValue[], regl: REGL.Regl): REGL.Texture2D;
+export declare function getAdjacentTilesTexCoords(gloperations: any, textureManager: TextureManager, coords: TileCoordinates, url: string): Promise<number[][]>;
+export declare function delay(ms: number): Promise<unknown>;
