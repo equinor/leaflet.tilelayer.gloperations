@@ -1438,11 +1438,11 @@ var Renderer = (function () {
             colorType: "float",
         });
         var hsValueScale = 1.0;
-        if (typeof _hillshadeOptions.hsValueScale === "number") {
-            hsValueScale = _hillshadeOptions.hsValueScale;
+        if (typeof _hillshadeOptions.hsAdvValueScale === "number") {
+            hsValueScale = _hillshadeOptions.hsAdvValueScale;
         }
-        else if (_hillshadeOptions.hsValueScale.constructor === Object) {
-            hsValueScale = _hillshadeOptions.hsValueScale[zoom];
+        else if (_hillshadeOptions.hsAdvValueScale.constructor === Object) {
+            hsValueScale = _hillshadeOptions.hsAdvValueScale[zoom];
         }
         this.HsAdvMergeAndScaleTiles({
             canvasSize: [tileSize * 3, tileSize * 3],
@@ -1969,11 +1969,11 @@ var Renderer = (function () {
         var chunks = chunk(tilesWithCanvasCoordinates, textureManager.tileCapacity);
         var nodataTile = createNoDataTile(nodataValue, tileSize);
         var hsValueScale = 1.0;
-        if (typeof _hillshadeOptions.hsValueScale === "number") {
-            hsValueScale = _hillshadeOptions.hsValueScale;
+        if (typeof _hillshadeOptions.hsAdvValueScale === "number") {
+            hsValueScale = _hillshadeOptions.hsAdvValueScale;
         }
-        else if (_hillshadeOptions.hsValueScale.constructor === Object) {
-            hsValueScale = _hillshadeOptions.hsValueScale[zoom];
+        else if (_hillshadeOptions.hsAdvValueScale.constructor === Object) {
+            hsValueScale = _hillshadeOptions.hsAdvValueScale[zoom];
         }
         (function () { return __awaiter(_this, void 0, void 0, function () {
             var _i, chunks_3, chunk_4, _a, chunk_3, tile, coords, pixelData, canvasCoords, textureCoords, fboFloats, fboNormals, fboSoftShadowPP, fboAmbientShadowPP, i, i;
@@ -3095,12 +3095,12 @@ var defaultOptions = {
     multiplierE: 1,
     multiplierF: 1,
     hillshadeType: 'none',
-    hsValueScale: 1.0,
-    hsPixelScale: 'auto',
     hsSimpleZoomdelta: 0,
     hsSimpleSlopescale: 3.0,
     hsSimpleAzimuth: 315,
     hsSimpleAltitude: 70,
+    hsAdvValueScale: 1.0,
+    hsAdvPixelScale: 'auto',
     hsAdvSoftIterations: 10,
     hsAdvAmbientIterations: 10,
     hsAdvSunRadiusMultiplier: 100,
@@ -3184,7 +3184,7 @@ var GLOperations = (function (_super) {
     }
     GLOperations.prototype.updateOptions = function (options) {
         var _this = this;
-        var _a = this.options, prevUrl = _a.url, prevGlOperation = _a.glOperation, prevUrlA = _a.operationUrlA, prevUrlB = _a.operationUrlB, prevUrlC = _a.operationUrlC, prevUrlD = _a.operationUrlD, prevUrlE = _a.operationUrlE, prevUrlF = _a.operationUrlF, prevColorScale = _a.colorScale, prevSentinelValues = _a.sentinelValues, prevFilterLowA = _a.filterLowA, prevFilterHighA = _a.filterHighA, prevFilterLowB = _a.filterLowB, prevFilterHighB = _a.filterHighB, prevFilterLowC = _a.filterLowC, prevFilterHighC = _a.filterHighC, prevFilterLowD = _a.filterLowD, prevFilterHighD = _a.filterHighD, prevFilterLowE = _a.filterLowE, prevFilterHighE = _a.filterHighE, prevFilterLowF = _a.filterLowF, prevFilterHighF = _a.filterHighF, prevMultiplierA = _a.multiplierA, prevMultiplierB = _a.multiplierB, prevMultiplierC = _a.multiplierC, prevMultiplierD = _a.multiplierD, prevMultiplierE = _a.multiplierE, prevMultiplierF = _a.multiplierF, prevMultiLayers = _a.multiLayers, prevHsPregenUrl = _a.hsPregenUrl, prevHillshadeType = _a.hillshadeType, prevHsValueScale = _a.hsValueScale, prevHsPixelScale = _a.hsPixelScale, prevHsSimpleSlopescale = _a.hsSimpleSlopescale, prevHsSimpleAzimuth = _a.hsSimpleAzimuth, prevHsSimpleAltitude = _a.hsSimpleAltitude, prevHsAdvSoftIterations = _a.hsAdvSoftIterations, prevHsAdvAmbientIterations = _a.hsAdvAmbientIterations, prevHsAdvSunRadiusMultiplier = _a.hsAdvSunRadiusMultiplier, prevHsAdvFinalSoftMultiplier = _a.hsAdvFinalSoftMultiplier, prevHsAdvFinalAmbientMultiplier = _a.hsAdvFinalAmbientMultiplier, prevHsAdvBaselayerUrl = _a.hsAdvBaselayerUrl, prevContourInterval = _a.contourInterval, prevContourIndexInterval = _a.contourIndexInterval, prevContourLineColor = _a.contourLineColor, prevContourLineWeight = _a.contourLineWeight, prevContourLineIndexWeight = _a.contourLineIndexWeight, prevContourType = _a.contourType, prevContourSmoothLines = _a.contourSmoothLines, prevContourSmoothInput = _a.contourSmoothInput, prevContourSmoothInputKernel = _a.contourSmoothInputKernel, prevContourIlluminatedHighlightColor = _a.contourIlluminatedHighlightColor, prevContourIlluminatedShadowColor = _a.contourIlluminatedShadowColor, prevContourIlluminatedShadowSize = _a.contourIlluminatedShadowSize, prevContourHypso = _a.contourHypso, prevContourHypsoDomain = _a.contourHypsoDomain, prevContourHypsoColors = _a.contourHypsoColors, prevContourBathy = _a.contourBathy, prevContourBathyDomain = _a.contourBathyDomain, prevContourBathyColors = _a.contourBathyColors, prevContourBathyShadowColor = _a.contourBathyShadowColor, prevContourBathyHighlightColor = _a.contourBathyHighlightColor, prevContourIndexLabels = _a.contourIndexLabels, prevContourLabelFont = _a.contourLabelFont, prevContourLabelDistance = _a.contourLabelDistance, prevScaleMaxLength = _a.colorscaleMaxLength, prevSentinelMaxLength = _a.sentinelMaxLength;
+        var _a = this.options, prevUrl = _a.url, prevGlOperation = _a.glOperation, prevUrlA = _a.operationUrlA, prevUrlB = _a.operationUrlB, prevUrlC = _a.operationUrlC, prevUrlD = _a.operationUrlD, prevUrlE = _a.operationUrlE, prevUrlF = _a.operationUrlF, prevColorScale = _a.colorScale, prevSentinelValues = _a.sentinelValues, prevFilterLowA = _a.filterLowA, prevFilterHighA = _a.filterHighA, prevFilterLowB = _a.filterLowB, prevFilterHighB = _a.filterHighB, prevFilterLowC = _a.filterLowC, prevFilterHighC = _a.filterHighC, prevFilterLowD = _a.filterLowD, prevFilterHighD = _a.filterHighD, prevFilterLowE = _a.filterLowE, prevFilterHighE = _a.filterHighE, prevFilterLowF = _a.filterLowF, prevFilterHighF = _a.filterHighF, prevMultiplierA = _a.multiplierA, prevMultiplierB = _a.multiplierB, prevMultiplierC = _a.multiplierC, prevMultiplierD = _a.multiplierD, prevMultiplierE = _a.multiplierE, prevMultiplierF = _a.multiplierF, prevMultiLayers = _a.multiLayers, prevHsPregenUrl = _a.hsPregenUrl, prevHillshadeType = _a.hillshadeType, prevHsAdvValueScale = _a.hsAdvValueScale, prevHsAdvPixelScale = _a.hsAdvPixelScale, prevHsSimpleSlopescale = _a.hsSimpleSlopescale, prevHsSimpleAzimuth = _a.hsSimpleAzimuth, prevHsSimpleAltitude = _a.hsSimpleAltitude, prevHsAdvSoftIterations = _a.hsAdvSoftIterations, prevHsAdvAmbientIterations = _a.hsAdvAmbientIterations, prevHsAdvSunRadiusMultiplier = _a.hsAdvSunRadiusMultiplier, prevHsAdvFinalSoftMultiplier = _a.hsAdvFinalSoftMultiplier, prevHsAdvFinalAmbientMultiplier = _a.hsAdvFinalAmbientMultiplier, prevHsAdvBaselayerUrl = _a.hsAdvBaselayerUrl, prevContourInterval = _a.contourInterval, prevContourIndexInterval = _a.contourIndexInterval, prevContourLineColor = _a.contourLineColor, prevContourLineWeight = _a.contourLineWeight, prevContourLineIndexWeight = _a.contourLineIndexWeight, prevContourType = _a.contourType, prevContourSmoothLines = _a.contourSmoothLines, prevContourSmoothInput = _a.contourSmoothInput, prevContourSmoothInputKernel = _a.contourSmoothInputKernel, prevContourIlluminatedHighlightColor = _a.contourIlluminatedHighlightColor, prevContourIlluminatedShadowColor = _a.contourIlluminatedShadowColor, prevContourIlluminatedShadowSize = _a.contourIlluminatedShadowSize, prevContourHypso = _a.contourHypso, prevContourHypsoDomain = _a.contourHypsoDomain, prevContourHypsoColors = _a.contourHypsoColors, prevContourBathy = _a.contourBathy, prevContourBathyDomain = _a.contourBathyDomain, prevContourBathyColors = _a.contourBathyColors, prevContourBathyShadowColor = _a.contourBathyShadowColor, prevContourBathyHighlightColor = _a.contourBathyHighlightColor, prevContourIndexLabels = _a.contourIndexLabels, prevContourLabelFont = _a.contourLabelFont, prevContourLabelDistance = _a.contourLabelDistance, prevScaleMaxLength = _a.colorscaleMaxLength, prevSentinelMaxLength = _a.sentinelMaxLength;
         Util.setOptions(this, options);
         if (this.options.colorscaleMaxLength !== prevScaleMaxLength || this.options.sentinelMaxLength !== prevSentinelMaxLength) {
             if (this.options.debug)
@@ -3214,8 +3214,8 @@ var GLOperations = (function (_super) {
         this._maybePreload(this.options.preloadUrl);
         this.options._hillshadeOptions = {
             hillshadeType: this.options.hillshadeType,
-            hsValueScale: this.options.hsValueScale,
-            hsPixelScale: this.options.hsPixelScale,
+            hsAdvValueScale: this.options.hsAdvValueScale,
+            hsAdvPixelScale: this.options.hsAdvPixelScale,
             hsSimpleSlopescale: this.options.hsSimpleSlopescale,
             hsSimpleAzimuth: this.options.hsSimpleAzimuth,
             hsSimpleAltitude: this.options.hsSimpleAltitude,
@@ -3270,8 +3270,8 @@ var GLOperations = (function (_super) {
                     this.options.hsAdvFinalAmbientMultiplier !== prevHsAdvFinalAmbientMultiplier ||
                     this.options.hsAdvSoftIterations !== prevHsAdvSoftIterations ||
                     this.options.hsAdvAmbientIterations !== prevHsAdvAmbientIterations ||
-                    this.options.hsValueScale !== prevHsValueScale ||
-                    this.options.hsPixelScale !== prevHsPixelScale ||
+                    this.options.hsAdvValueScale !== prevHsAdvValueScale ||
+                    this.options.hsAdvPixelScale !== prevHsAdvPixelScale ||
                     this.options.hsAdvBaselayerUrl !== prevHsAdvBaselayerUrl) {
                     this._updateTiles();
                     if (this.options.debug)
@@ -5468,11 +5468,11 @@ var GLOperations = (function (_super) {
     GLOperations.prototype._getPixelScale = function () {
         var pixelScale = 1;
         var zoom = this._getZoomForUrl();
-        if (this.options.hsPixelScale === 'auto') {
+        if (this.options.hsAdvPixelScale === 'auto') {
             pixelScale = EARTH_CIRCUMFERENCE * Math.abs(Math.cos(this._map.getCenter().lat / 180 * Math.PI)) / Math.pow(2, zoom + 8);
         }
-        else if (typeof this.options.hsPixelScale === 'number') {
-            pixelScale = this.options.hsPixelScale
+        else if (typeof this.options.hsAdvPixelScale === 'number') {
+            pixelScale = this.options.hsAdvPixelScale
                 / (this._tileSizeAsNumber() * (Math.pow(2, zoom)));
         }
         return pixelScale;

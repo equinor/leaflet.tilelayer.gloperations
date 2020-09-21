@@ -98,7 +98,7 @@ let optionsHillshading = {
   sentinelValues: [],
   extraPixelLayers: 0,
   hillshadeType: 'pregen',
-  hsValueScale: -1.0,
+  hsAdvValueScale: -1.0,
   hsPregenUrl: './tiles/hillshade/top/topupperreek/{z}/{x}/{y}.png',
   hsSimpleSlopescale: 5,
   hsSimpleZoomdelta: 10,

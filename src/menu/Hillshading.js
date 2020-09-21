@@ -34,7 +34,7 @@ const Hillshading = ({tilelayer}) => {
     tilelayer.updateOptions({hsAdvAmbientIterations: value})
   }
   function elevationScaleChange(value) {
-    tilelayer.updateOptions({hsValueScale: value})
+    tilelayer.updateOptions({hsAdvValueScale: value})
   }
   function sunRadiusChange(value) {
     tilelayer.updateOptions({hsAdvSunRadiusMultiplier: value})
