@@ -125,12 +125,12 @@ export interface Options extends L.GridLayerOptions {
 
   // Hillshading
   hillshadeType: string;
-  hsValueScale?: number | Dictionary<number>;
-  hsPixelScale?: number | string;
+  hsAdvValueScale?: number | Dictionary<number>;
   hsSimpleZoomdelta?: number;
   hsSimpleSlopescale?: number;
   hsSimpleAzimuth?: number;
   hsSimpleAltitude?: number;
+  hsAdvPixelScale?: number | string;
   hsAdvSoftIterations?: number;
   hsAdvAmbientIterations?: number;
   hsAdvSunRadiusMultiplier?: number;
@@ -247,12 +247,12 @@ const defaultOptions = {
 
   // Hillshading default options
   hillshadeType: 'none', // none, simple or pregen
-  hsValueScale: 1.0,
-  hsPixelScale: 'auto',
   hsSimpleZoomdelta: 0,
   hsSimpleSlopescale: 3.0,
   hsSimpleAzimuth: 315,
   hsSimpleAltitude: 70,
+  hsAdvValueScale: 1.0,
+  hsAdvPixelScale: 'auto',
   hsAdvSoftIterations: 10,
   hsAdvAmbientIterations: 10,
   hsAdvSunRadiusMultiplier: 100,
@@ -415,8 +415,8 @@ export default class GLOperations extends L.GridLayer {
       multiLayers: prevMultiLayers,
       hsPregenUrl: prevHsPregenUrl,
       hillshadeType: prevHillshadeType,
-      hsValueScale: prevHsValueScale,
-      hsPixelScale: prevHsPixelScale,
+      hsAdvValueScale: prevHsAdvValueScale,
+      hsAdvPixelScale: prevHsAdvPixelScale,
       hsSimpleSlopescale: prevHsSimpleSlopescale,
       hsSimpleAzimuth: prevHsSimpleAzimuth,
       hsSimpleAltitude: prevHsSimpleAltitude,
@@ -494,8 +494,8 @@ export default class GLOperations extends L.GridLayer {
     this._maybePreload(this.options.preloadUrl);
     this.options._hillshadeOptions = {
       hillshadeType: this.options.hillshadeType,
-      hsValueScale: this.options.hsValueScale,
-      hsPixelScale: this.options.hsPixelScale,
+      hsAdvValueScale: this.options.hsAdvValueScale,
+      hsAdvPixelScale: this.options.hsAdvPixelScale,
       hsSimpleSlopescale: this.options.hsSimpleSlopescale,
       hsSimpleAzimuth: this.options.hsSimpleAzimuth,
       hsSimpleAltitude: this.options.hsSimpleAltitude,
@@ -555,8 +555,8 @@ export default class GLOperations extends L.GridLayer {
             this.options.hsAdvFinalAmbientMultiplier !== prevHsAdvFinalAmbientMultiplier ||
             this.options.hsAdvSoftIterations !== prevHsAdvSoftIterations ||
             this.options.hsAdvAmbientIterations !== prevHsAdvAmbientIterations ||
-            this.options.hsValueScale !== prevHsValueScale ||
-            this.options.hsPixelScale !== prevHsPixelScale ||
+            this.options.hsAdvValueScale !== prevHsAdvValueScale ||
+            this.options.hsAdvPixelScale !== prevHsAdvPixelScale ||
             this.options.hsAdvBaselayerUrl !== prevHsAdvBaselayerUrl
           ) {
             this._updateTiles();
@@ -3313,12 +3313,12 @@ export default class GLOperations extends L.GridLayer {
   protected _getPixelScale(): number {
     let pixelScale = 1;
     const zoom = this._getZoomForUrl();
-    if (this.options.hsPixelScale === 'auto') {
+    if (this.options.hsAdvPixelScale === 'auto') {
       pixelScale = EARTH_CIRCUMFERENCE * Math.abs(
           Math.cos(this._map.getCenter().lat / 180 * Math.PI
         )) / Math.pow(2, zoom + 8);
-    } else if (typeof this.options.hsPixelScale === 'number') {
-      pixelScale = this.options.hsPixelScale as unknown as number
+    } else if (typeof this.options.hsAdvPixelScale === 'number') {
+      pixelScale = this.options.hsAdvPixelScale as unknown as number
                     / (this._tileSizeAsNumber() * (2**zoom));
     }
     return pixelScale;

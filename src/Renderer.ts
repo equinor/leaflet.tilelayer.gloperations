@@ -530,10 +530,10 @@ export default class Renderer {
     });
 
     let hsValueScale = 1.0;
-    if (typeof _hillshadeOptions.hsValueScale === "number") {
-      hsValueScale = _hillshadeOptions.hsValueScale;
-    } else if (_hillshadeOptions.hsValueScale!.constructor === Object) {
-      hsValueScale = _hillshadeOptions.hsValueScale![zoom];
+    if (typeof _hillshadeOptions.hsAdvValueScale === "number") {
+      hsValueScale = _hillshadeOptions.hsAdvValueScale;
+    } else if (_hillshadeOptions.hsAdvValueScale!.constructor === Object) {
+      hsValueScale = _hillshadeOptions.hsAdvValueScale![zoom];
     }
 
     this.HsAdvMergeAndScaleTiles({
@@ -1380,10 +1380,10 @@ export default class Renderer {
     const nodataTile = util.createNoDataTile(nodataValue, tileSize);
     // const pixelScale = _hillshadeOptions.hsPixelScale! / (tileSize * (2**zoom));
     let hsValueScale = 1.0;
-    if (typeof _hillshadeOptions.hsValueScale === "number") {
-      hsValueScale = _hillshadeOptions.hsValueScale;
-    } else if (_hillshadeOptions.hsValueScale!.constructor === Object) {
-      hsValueScale = _hillshadeOptions.hsValueScale![zoom];
+    if (typeof _hillshadeOptions.hsAdvValueScale === "number") {
+      hsValueScale = _hillshadeOptions.hsAdvValueScale;
+    } else if (_hillshadeOptions.hsAdvValueScale!.constructor === Object) {
+      hsValueScale = _hillshadeOptions.hsAdvValueScale![zoom];
     }
 
     // Render chunk by chunk.
