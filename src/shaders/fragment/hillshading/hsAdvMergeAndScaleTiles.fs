@@ -4,8 +4,8 @@ precision highp float;
 precision mediump float;
 #endif
 
-#pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
-#pragma glslify: getTexelValue = require(./util/getTexelValue.glsl)
+#pragma glslify: isCloseEnough = require(../util/isCloseEnough.glsl)
+#pragma glslify: getTexelValue = require(../util/getTexelValue.glsl)
 
 uniform float nodataValue;
 uniform bool littleEndian;
@@ -14,7 +14,7 @@ uniform float floatScale;
 varying vec2 vTexCoord;
 
 void main() {
-  float f = getTexelValue(vTexCoord, texture, littleEndian);
+  float f = getTexelValue(texture, vTexCoord, littleEndian);
 
   if (isCloseEnough(f, nodataValue)) {
     gl_FragColor = vec4(nodataValue);

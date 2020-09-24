@@ -4,9 +4,8 @@ precision highp float;
 precision mediump float;
 #endif
 
-#pragma glslify: computeColor = require(./util/computeColor.glsl)
-#pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
-
+#pragma glslify: computeColor = require(../util/computeColor.glsl)
+#pragma glslify: isCloseEnough = require(../util/isCloseEnough.glsl)
 
 uniform sampler2D tInput;
 uniform sampler2D tNormal;

@@ -4,9 +4,9 @@ precision highp float;
 precision mediump float;
 #endif
 
-#pragma glslify: computeColor = require(./util/computeColor.glsl)
-#pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
-#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
+#pragma glslify: computeColor = require(../util/computeColor.glsl)
+#pragma glslify: isCloseEnough = require(../util/isCloseEnough.glsl)
+#pragma glslify: getTexelValue = require(../util/getTexelValue.glsl)
 
 uniform sampler2D texture;
 
@@ -27,8 +27,7 @@ uniform float interpolationFraction;
 varying vec2 vTexCoord;
 
 void main() {
-  vec4 texelRgba = texture2D(texture, vTexCoord);
-  float texelFloat = rgbaToFloat(texelRgba, littleEndian);
+  float texelFloat = getTexelValue(texture, vTexCoord, littleEndian);
 
   if (isCloseEnough(texelFloat, nodataValue)) {
     discard;

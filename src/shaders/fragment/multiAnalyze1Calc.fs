@@ -4,11 +4,9 @@ precision highp float;
 precision mediump float;
 #endif
 
-precision highp sampler2D;
-
-#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
+#pragma glslify: getTexelValue = require(../util/getTexelValue.glsl)
 #pragma glslify: floatToRgba = require(glsl-float-to-rgba)
-#pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
+#pragma glslify: isCloseEnough = require(../util/isCloseEnough.glsl)
 
 uniform sampler2D textureA;
 
@@ -22,8 +20,7 @@ uniform float multiplierA;
 varying vec2 vTexCoord;
 
 void main() {
-  vec4 texelRgbaA = texture2D(textureA, vTexCoord);
-  float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);
+  float texelFloatA = getTexelValue(textureA, vTexCoord, littleEndian);
 
   bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);
 

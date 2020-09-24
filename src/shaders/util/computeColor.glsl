@@ -1,5 +1,5 @@
 #pragma glslify: isCloseEnough = require(./isCloseEnough.glsl)
-#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
+#pragma glslify: getTexelValue = require(./getTexelValue.glsl)
 
 #ifndef DEFAULT_COLOR
 #define DEFAULT_COLOR vec4(0.0)
@@ -36,8 +36,7 @@ vec4 computeColor(
       float i_f = float(i);
       float sentinelLengthFloat = float(sentinelLength);
       // retrieve the offset from the colormap
-      vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow));
-      float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);
+      float sentinelOffset = getTexelValue(sentinelColormap, vec2((i_f + 0.5) / sentinelLengthFloat, offsetRow), littleEndian);
       if (isCloseEnough(inputVal, sentinelOffset)) {
         // retrieve the color from the colormap
         vec2 colormapCoord = vec2((i_f + 0.5) / sentinelLengthFloat, colorRow);
@@ -49,10 +48,8 @@ vec4 computeColor(
   // Do linear interpolation using the color scale, if defined.
   if (scaleLength > 0) {
     // If value below color scale range, clamp to lowest color stop.
-    vec4 scaleOffsetLowestRgba = texture2D(scaleColormap, vec2(0.0, offsetRow));
-    float scaleOffsetLowest = rgbaToFloat(scaleOffsetLowestRgba, littleEndian);
-    vec4 scaleOffsetHighestRgba = texture2D(scaleColormap, vec2(1.0, offsetRow));
-    float scaleOffsetHighest = rgbaToFloat(scaleOffsetHighestRgba, littleEndian);
+    float scaleOffsetLowest = getTexelValue(scaleColormap, vec2(0.0, offsetRow), littleEndian);
+    float scaleOffsetHighest = getTexelValue(scaleColormap, vec2(1.0, offsetRow), littleEndian);
     if (inputVal < scaleOffsetLowest) {
       return texture2D(scaleColormap, vec2(0.0, colorRow));
     } else if (inputVal > scaleOffsetHighest) {
@@ -66,19 +63,17 @@ vec4 computeColor(
         if (i == scaleLength) {
           return texture2D(sentinelColormap, vec2((scaleLengthFloat - 0.5) / scaleLengthFloat, colorRow));
         }
-        
-        vec4 scaleOffsetNextRgba = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow));
-        float scaleOffsetNext = rgbaToFloat(scaleOffsetNextRgba, littleEndian);
+
+        float scaleOffsetNext = getTexelValue(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, offsetRow), littleEndian);
 
         if (inputVal <= scaleOffsetNext) {
-          vec4 scaleOffsetRgba = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow));
-          float scaleOffset = rgbaToFloat(scaleOffsetRgba, littleEndian);
+          float scaleOffset = getTexelValue(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, offsetRow), littleEndian);
           float percent = (inputVal - scaleOffset)
             / (scaleOffsetNext - scaleOffset);
           vec4 colorLow = texture2D(scaleColormap, vec2((i_f + 0.5) / scaleLengthFloat, colorRow));
           vec4 colorHigh = texture2D(scaleColormap, vec2((i_f + 1.0 + 0.5) / scaleLengthFloat, colorRow));
           return mix(colorLow, colorHigh, percent);
-        } 
+        }
       }
     }
   }

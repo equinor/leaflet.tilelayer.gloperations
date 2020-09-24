@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0]
+
 ### Added
 
 - Added advanced hillshading option. See [Wiki](https://github.com/equinor/leaflet.tilelayer.gloperations/wiki/Hillshading) for available options.
@@ -11,6 +13,10 @@
 ### Changed
 
 - Send colormaps as textures to webgl. Reduces the number of fragment uniforms used.
+
+### Fixed
+
+- Plugin now works on mobile devices. Advanced hillshading does not yet work on iOS devices, but works fine on Android.
 
 ## [0.3.0]
 
@@ -43,7 +49,8 @@
 
 - Initial release
 
-[unreleased]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/equinor/leaflet.tilelayer.gloperations/releases/tag/v0.1.1

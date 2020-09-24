@@ -26,7 +26,7 @@ export default class TextureManager {
   // (key is hash string of tile coordinates: 'x:y:z')
   contents: Map<string, TextureCoordinates>;
   // texture coordinates positions that are currently available
-  protected available: TextureCoordinates[];
+  available: TextureCoordinates[];
 
   constructor(
     regl: REGL.Regl,

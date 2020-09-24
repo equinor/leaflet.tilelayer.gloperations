@@ -33,12 +33,12 @@ export interface TextureCoordinates {
 
 export interface HillshadeOptions {
   hillshadeType: string;
-  hsValueScale?: number | Dictionary<number>;
-  hsPixelScale?: number | string;
   hsSimpleZoomdelta?: number;
   hsSimpleSlopescale?: number;
   hsSimpleAzimuth?: number;
   hsSimpleAltitude?: number;
+  hsAdvValueScale?: number | Dictionary<number>;
+  hsAdvPixelScale?: number | string;
   hsAdvSoftIterations?: number;
   hsAdvAmbientIterations?: number;
   hsAdvSunRadiusMultiplier?: number;
@@ -139,7 +139,7 @@ export interface DrawCommonColors {
 export namespace DrawCommon {
   export interface Props {
     canvasSize: Pair<number>;
-    canvasCoordinates: REGL.Vec2;
+    canvasCoordinates: REGL.Vec2 | number[];
   }
   export interface Uniforms {
     nodataValue: number;

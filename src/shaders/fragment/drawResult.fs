@@ -6,9 +6,9 @@ precision mediump float;
 
 #define TRANSPARENT vec4(0.0)
 
-#pragma glslify: computeColor = require(./util/computeColor.glsl)
-#pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
-#pragma glslify: getTexelValue = require(./util/getTexelValue.glsl)
+#pragma glslify: computeColor = require(../util/computeColor.glsl)
+#pragma glslify: isCloseEnough = require(../util/isCloseEnough.glsl)
+#pragma glslify: getTexelValue = require(../util/getTexelValue.glsl)
 
 uniform int scaleLength;
 uniform int sentinelLength;
@@ -22,7 +22,7 @@ uniform bool littleEndian;
 varying vec2 vTexCoord;
 
 void main() {
-  float f = getTexelValue(vTexCoord, texture, littleEndian);
+  float f = getTexelValue(texture, vTexCoord, littleEndian);
 
   if (isCloseEnough(f, nodataValue)) {
     gl_FragColor = TRANSPARENT;
