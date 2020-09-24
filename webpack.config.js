@@ -11,7 +11,9 @@ module.exports = {
     devServer: {
       headers: {
           'Access-Control-Allow-Origin': '*'
-      }
+      },
+      port: 4444,
+      disableHostCheck: true
     },
     // mode: 'production',
     stats: 'minimal',

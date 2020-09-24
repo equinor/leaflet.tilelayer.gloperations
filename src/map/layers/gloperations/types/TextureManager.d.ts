@@ -7,7 +7,7 @@ export default class TextureManager {
     readonly tileCapacity: number;
     readonly texture: REGL.Texture2D;
     contents: Map<string, TextureCoordinates>;
-    protected available: TextureCoordinates[];
+    available: TextureCoordinates[];
     constructor(regl: REGL.Regl, tileSize: number | undefined, maxTextureDimension: number, flipY?: boolean, textureFormat?: REGL.TextureFormatType, textureType?: REGL.TextureDataType);
     addTile(tileCoordinates: TileCoordinates, data: ArrayBufferView): [TextureCoordinates, TextureCoordinates];
     removeTile(tileCoordinates: TileCoordinates): void;

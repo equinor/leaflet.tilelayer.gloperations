@@ -76,8 +76,8 @@ let optionsTransitions = {
   hillshadeType: 'none',
   glOperation: 'none',
   contourType: 'none',
-  transitions: true,
-  transitionTimeMs: 1500,
+  // transitions: true,
+  transitionTimeMs: 2000,
 }
 
 let optionsHillshading = {

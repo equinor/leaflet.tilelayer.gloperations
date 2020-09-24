@@ -32,7 +32,7 @@ const Multi = ({tilelayer}) => {
 
   return (
     <div>
-      <p>{`Do operations on multiple layers. High/low filter for each surface, and optionally multiply each layer with a value (after filtering). The result is then calculated after filtering with: Layer1*Mult1 + Layer2*Mult2... Using mult=1 for all layers here. MouseEvents can return the result as well as values from all the input layers.`}</p>
+      <p>Do operations on multiple layers. Filter the individual input layers to find the area you are interested in. MouseEvents can return the result as well as values from all the input layers. See <a href="https://github.com/equinor/leaflet.tilelayer.gloperations/wiki/Multiple-layers-operation" target="_blank">wiki</a> for more information.</p>
       Oil-thickness: <Slider range defaultValue={[0, 5.8]} step={0.1} min={0} max={5.8} onAfterChange={onMultiOilChange}/>
       <br></br>
       STOIIP: <Slider range defaultValue={[0, 3.75]} step={0.05} min={0} max={3.75} onAfterChange={onMultiStoiipChange}/>

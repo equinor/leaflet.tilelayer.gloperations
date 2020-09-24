@@ -106,16 +106,17 @@ const WorldMenu = ({tilelayer}) => {
         <div>
           <p>
             Advanced hillshading requires heavy ray tracing computations. If you increase the iterations too much it <i>will</i> crash your browser. The limit will depend on your device.
-            Check the <a href="https://github.com/equinor/leaflet.tilelayer.gloperations/wiki/Hillshading">wiki</a> to find out what all the options do.
+            Check the <a href="https://github.com/equinor/leaflet.tilelayer.gloperations/wiki/Hillshading">wiki</a> to find out what all the options do. (Currently does not work on iOS).
            </p>
            {"Base layer: "}
            <Select defaultValue="colorscale" style={{ width: 190 }} onChange={baselayerChange}>
             <Option value="colorscale">None (colorscale)</Option>
-            <Option value="satellite">Satellite</Option>
             <Option value="streets">Streets</Option>
+            <Option value="outdoors">Outdoors</Option>
+            <Option value="satellite">Satellite</Option>
             <Option value="darkstreets">Dark streets</Option>
             <Option value="lightstreets">Light streets</Option>
-            <Option value="outdoors">Outdoors</Option>
+
           </Select>
           <br></br>
           Elevation scale: <Slider defaultValue={1.0} min={0} max={5.0} step={0.1} onAfterChange={elevationScaleChange}/>

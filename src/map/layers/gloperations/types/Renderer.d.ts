@@ -24,6 +24,7 @@ export default class Renderer {
     scaleInputPrevious: Color[];
     sentinelInput: SentinelValue[];
     sentinelInputPrevious: SentinelValue[];
+    normalTextureDimension: number;
     maxTextureDimension: number;
     sunDirections: vec3[];
     ambientDirections: vec3[];
@@ -70,7 +71,7 @@ export default class Renderer {
     renderTileMulti6(tileDatumA: TileDatum, tileDatumB: TileDatum, tileDatumC: TileDatum, tileDatumD: TileDatum, tileDatumE: TileDatum, tileDatumF: TileDatum, filterLowA: number, filterHighA: number, filterLowB: number, filterHighB: number, filterLowC: number, filterHighC: number, filterLowD: number, filterHighD: number, filterLowE: number, filterHighE: number, filterLowF: number, filterHighF: number, multiplierA: number, multiplierB: number, multiplierC: number, multiplierD: number, multiplierE: number, multiplierF: number): calcResult;
     renderTiles(tiles: TileDatum[], _hillshadeOptions: HillshadeOptions, zoom: number): Array<Pair<number>>;
     renderTilesHsPregen(tiles: TileDatum[], tilesHs: TileDatum[]): Array<Pair<number>>;
-    renderTilesHsAdvanced(tiles: TileDatum[], _hillshadeOptions: HillshadeOptions, url: string, zoom: number, pixelScale: number): Array<Pair<number>>;
+    renderTilesHsAdvanced(tiles: TileDatum[], _hillshadeOptions: HillshadeOptions, url: string, zoom: number, pixelScale: number): Promise<Pair<number>[]>;
     renderTilesWithDiff(tilesA: TileDatum[], tilesB: TileDatum[], onFrameRendered: (canvasCoordinates: Array<Pair<number>>) => void): Uint8Array[];
     renderTilesWithMultiAnalyze1(tilesA: TileDatum[], filterLowA: number, filterHighA: number, multiplierA: number, onFrameRendered: (canvasCoordinates: Array<Pair<number>>) => void): Uint8Array[];
     renderTilesWithMultiAnalyze2(tilesA: TileDatum[], tilesB: TileDatum[], filterLowA: number, filterHighA: number, filterLowB: number, filterHighB: number, multiplierA: number, multiplierB: number, onFrameRendered: (canvasCoordinates: Array<Pair<number>>) => void): Uint8Array[];

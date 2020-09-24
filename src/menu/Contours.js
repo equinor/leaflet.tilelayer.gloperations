@@ -93,7 +93,7 @@ const Contours = ({tilelayer}) => {
 
   return (
     <div>
-      <p>{`Contours is a work in progress. It is not using WebGL and the tiles have to be merged to a single canvas before calculating contours. This means it is slower than the other operations of this plugin. Contours are currently only implemented with glOperation="none". Labels are only implemented for contourType='lines'. Index interval needs to be a multiple of contour interval.`}</p>
+      <p>Contours is an experimental feature. It is not using WebGL and the tiles have to be merged to a single canvas before calculating contours. This means it is slower than the other operations of this plugin. See <a href="https://github.com/equinor/leaflet.tilelayer.gloperations/wiki/Contours" target="_blank">wiki</a> for more information.</p>
       <Radio.Group onChange={contourRadioChange} value={contourType}>
         <Radio style={radioStyle} value='none'>
           None

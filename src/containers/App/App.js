@@ -25,7 +25,10 @@ function App() {
     setLayerType(e.target.value);
   }
 
-  useEventListener('click', e => document.getElementById("nav").classList.toggle('menuClosed'), burgerEl);
+  useEventListener('click', e => {
+    document.getElementById("nav").classList.toggle('menuClosed');
+    setTimeout(function(){ tilelayer._map.invalidateSize()}, 400);
+  }, burgerEl);
 
   return (
     <div id="container">

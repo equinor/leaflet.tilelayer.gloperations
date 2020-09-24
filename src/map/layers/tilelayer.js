@@ -86,4 +86,5 @@ export default function addGLOperations(mapType, map, bounds, contourPane, conto
 
     return tilelayer;
   }
+
 }

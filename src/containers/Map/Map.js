@@ -7,6 +7,7 @@ import { addValueDisplay } from '../../map/common/valuedisplay.js';
 import addGLOperations from '../../map/layers/tilelayer.js';
 import { createMap } from '../../map'
 import initContourLayer from '../../map/layers/contours.js';
+import '../../map/common/leaflet-messagebox.js';
 
 function Map(props) {
   const [map, setMap] = useState();
@@ -34,6 +35,22 @@ function Map(props) {
       );
       props.setTilelayer(tilelayer)
       window.tilelayer = tilelayer;
+
+      // set up messagebox
+      const hsAdvLoadingMessage = L.control.messagebox({
+        position: 'topleft',
+        timeout: 1200000,
+      }).addTo(map);
+
+      map.on("calcHsAdvanced", function(data) {
+        if (data.status) {
+          hsAdvLoadingMessage.options.timeout = 1200000;
+          hsAdvLoadingMessage.show('Calculating hillshading...');
+        } else {
+          hsAdvLoadingMessage.options.timeout = 2000;
+          hsAdvLoadingMessage.show('Calculating hillshading...done');
+        }
+      });
     }
   }, [map]);
 

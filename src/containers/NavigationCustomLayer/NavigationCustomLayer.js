@@ -15,9 +15,8 @@ const { Panel } = Collapse;
 
 const NavigationCustomLayer = ({tilelayer}) => {
   const [surfaceUrl, setSurfaceUrl] = useState(`./tiles/top/topupperreek/{z}/{x}/{y}.png`);
-  const [transitions, setTransitions] = useState(true);
+  const [transitions, setTransitions] = useState(false);
   const [scaleMinMax, setScaleMinMax] = useState(surfaceOptions.minmax.top);
-  const [transitionSurface, setTransitionSurface] = useState('pressure_20030101');
   const [showColorscalePicker, setShowColorscalePicker] = useState(false);
 
   function handleUrlChange(value) {
@@ -26,7 +25,6 @@ const NavigationCustomLayer = ({tilelayer}) => {
   }
 
   function handleSurfaceUrlChange(value) {
-    setTransitionSurface(value);
     handleUrlChange(value);
   }
 
@@ -40,7 +38,6 @@ const NavigationCustomLayer = ({tilelayer}) => {
       setShowColorscalePicker(false);
     }
     if (key === 'transitions') {
-      setTransitions(true);
       handleSurfaceUrlChange('pressure_20030101')
     }
     tilelayer.updateOptions(surfaceOptions.accordion[key])
@@ -54,11 +51,11 @@ const NavigationCustomLayer = ({tilelayer}) => {
         </Panel>
 
         <Panel header="Transitions" key="transitions">
-          <Transitions tilelayer={tilelayer} transitions={transitions} handleTransitionChange={handleTransitionChange} transitionSurface={transitionSurface} handleSurfaceUrlChange={handleSurfaceUrlChange} />
+          <Transitions tilelayer={tilelayer} transitions={transitions} handleTransitionChange={handleTransitionChange} handleSurfaceUrlChange={handleSurfaceUrlChange} />
         </Panel>
 
         <Panel header="Sentinel values" key="sentinels">
-          <p>In addition to linear color scales, it's possible to specify "sentinel values," which map discrete values to colors. You can set a label for each value which will be returned in mouseEvents. The example here shows reservoir facies at a certain depth.</p>
+          <p>In addition to color scales, it's possible to specify "sentinel values," which map discrete values to colors. You can set a label for each value which will be returned in mouseEvents. The example here shows geological facies at a specified depth.</p>
         </Panel>
 
         <Panel header="Contours" key="contours">
@@ -66,7 +63,7 @@ const NavigationCustomLayer = ({tilelayer}) => {
         </Panel>
 
         <Panel header="Diff" key="diff">
-          <p>Give two tile layers as input and calculate the difference between them. Pixel values are returned for both the input layers as well as the result. Demo here is showing the pressure difference from 2000 to 2003.</p>
+          <p>Give two tile layers as input and calculate the difference between them. Pixel values are returned for both the input layers as well as the result. Demo here is showing the pressure difference from year 2000 to 2003.</p>
         </Panel>
 
         <Panel header="Multiple surfaces" key="multi">

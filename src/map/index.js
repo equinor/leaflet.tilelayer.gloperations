@@ -7,7 +7,7 @@ export function createMap(elm, mapType) {
       maxZoom: 4,
       noWrap: true,
       attributionControl: false,
-      zoom: 2,
+      zoom: 1,
       zoomDelta: 0.5,
       zoomSnap: 0.5,
       wheelPxPerZoomLevel : 200,
@@ -19,7 +19,7 @@ export function createMap(elm, mapType) {
     var northEast = map.unproject([15*256, 0*256], map.getMaxZoom());
     let bounds = new L.LatLngBounds(southWest, northEast)
     map.setMaxBounds(bounds);
-    map.setView([0, 0], 2);
+    map.setView([0, 0], 0);
     return map;
 
   } else if (mapType === 'world') {
@@ -36,7 +36,7 @@ export function createMap(elm, mapType) {
       crs: L.CRS.EPSG3857,
     });
     L.control.attribution({prefix:false})
-    map.setView([40.006, -122.21], 9);
+    map.setView([41.0, -122.7], 8);
     return map;
   }
 }
