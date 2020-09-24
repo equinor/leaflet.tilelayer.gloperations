@@ -36,7 +36,7 @@ export function createMap(elm, mapType) {
       crs: L.CRS.EPSG3857,
     });
     L.control.attribution({prefix:false})
-    map.setView([41.0, -122.7], 8);
+    map.setView([41.0, -122.7], 9);
     return map;
   }
 }
