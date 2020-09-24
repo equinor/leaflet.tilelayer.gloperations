@@ -2,12 +2,12 @@
 precision highp float;
 #else
 precision mediump float;
-#define GLSLIFY 1
 #endif
 
 #pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
 #pragma glslify: floatToRgba = require(glsl-float-to-rgba)
-#pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
+#pragma glslify: isCloseEnough = require(../util/isCloseEnough.glsl)
+#pragma glslify: getTexelValue = require(../util/getTexelValue.glsl)
 
 uniform sampler2D texture;
 uniform float textureSize;
@@ -19,12 +19,6 @@ uniform int kernelSize;
 int kernelEnd = int(kernelSize/2);
 int kernelStart = kernelEnd * -1;
 
-float getTexelValue(vec2 pos) {
-  vec4 texelRgba = texture2D(texture, pos);
-  float texelFloat = rgbaToFloat(texelRgba, littleEndian);
-  return texelFloat;
-}
-
 float runConvKernel(vec2 pos, vec2 onePixel) {
   float convKernelWeight = 0.0;
   float sum = 0.0;
@@ -35,7 +29,7 @@ float runConvKernel(vec2 pos, vec2 onePixel) {
     for (int j = -20; j < 20; j ++) {
       if (j < kernelStart) continue;
       if (j > kernelEnd) break;
-      float texelValue = getTexelValue(pos + onePixel * vec2(i, j));
+      float texelValue = getTexelValue(texture, pos + onePixel * vec2(i, j), littleEndian);
       if (!isCloseEnough(texelValue, nodataValue)) {
         sum = sum + texelValue;
         convKernelWeight = convKernelWeight + 1.0;
@@ -47,7 +41,7 @@ float runConvKernel(vec2 pos, vec2 onePixel) {
 
 
 void main() {
-  float texelFloat = getTexelValue(vTexCoord);
+  float texelFloat = getTexelValue(texture, vTexCoord, littleEndian);
   if (isCloseEnough(texelFloat, nodataValue)) {
     gl_FragColor = floatToRgba(nodataValue, littleEndian);
   } else {

@@ -6,9 +6,9 @@ precision mediump float;
 
 #define TRANSPARENT vec4(0.0)
 
-#pragma glslify: computeColor = require(./util/computeColor.glsl)
-#pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
-#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
+#pragma glslify: computeColor = require(../util/computeColor.glsl)
+#pragma glslify: isCloseEnough = require(../util/isCloseEnough.glsl)
+#pragma glslify: getTexelValue = require(../util/getTexelValue.glsl)
 
 uniform sampler2D textureA;
 uniform sampler2D textureB;
@@ -32,24 +32,20 @@ varying vec2 vTexCoordB;
 
 void main() {
   if (interpolationFraction <= 0.0) {
-    vec4 texelRgba = texture2D(textureA, vTexCoordA);
-    float texelFloat = rgbaToFloat(texelRgba, littleEndian);
+    float texelFloat = getTexelValue(textureA, vTexCoordA, littleEndian);
     if (isCloseEnough(texelFloat, nodataValue)) {
       discard;
     }
     gl_FragColor = computeColor(texelFloat, scaleColormapA, sentinelColormapA, scaleLengthA, sentinelLengthA, littleEndian);
   } else if (interpolationFraction >= 1.0) {
-    vec4 texelRgba = texture2D(textureB, vTexCoordB);
-    float texelFloat = rgbaToFloat(texelRgba, littleEndian);
+    float texelFloat = getTexelValue(textureB, vTexCoordB, littleEndian);
     if (isCloseEnough(texelFloat, nodataValue)) {
       discard;
     }
     gl_FragColor = computeColor(texelFloat, scaleColormapB, sentinelColormapB, scaleLengthB, sentinelLengthB, littleEndian);
   } else {
-    vec4 texelRgbaA = texture2D(textureA, vTexCoordA);
-    float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);
-    vec4 texelRgbaB = texture2D(textureB, vTexCoordB);
-    float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);
+    float texelFloatA = getTexelValue(textureA, vTexCoordA, littleEndian);
+    float texelFloatB = getTexelValue(textureB, vTexCoordB, littleEndian);
     vec4 colorA = (
       isCloseEnough(texelFloatA, nodataValue)
       ? TRANSPARENT

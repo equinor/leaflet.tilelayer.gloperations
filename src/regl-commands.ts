@@ -1,35 +1,36 @@
 import REGL from 'regl';
 
-import vertDouble from './shaders/double.vs';
-import vertSingle from './shaders/single.vs';
-import vertMulti3 from './shaders/multi3.vs';
-import vertMulti4 from './shaders/multi4.vs';
-import vertMulti5 from './shaders/multi5.vs';
-import vertMulti6 from './shaders/multi6.vs';
-import vertSingleNotTransformed from './shaders/singleNotTransformed.vs';
+import vertDouble from './shaders/vertex/double.vs';
+import vertSingle from './shaders/vertex/single.vs';
+import vertMulti3 from './shaders/vertex/multi3.vs';
+import vertMulti4 from './shaders/vertex/multi4.vs';
+import vertMulti5 from './shaders/vertex/multi5.vs';
+import vertMulti6 from './shaders/vertex/multi6.vs';
+import vertSingleNotTransformed from './shaders/vertex/singleNotTransformed.vs';
 
-import fragInterpolateColor from './shaders/interpolateColor.fs';
-import fragInterpolateColorOnly from './shaders/interpolateColorOnly.fs';
-import fragInterpolateValue from './shaders/interpolateValue.fs';
-import fragSingle from './shaders/single.fs';
-import fragHsPregen from './shaders/hillshading/hsPregen.fs';
-import fragMulti1Calc from './shaders/multiAnalyze1Calc.fs';
-import fragMulti2Calc from './shaders/multiAnalyze2Calc.fs';
-import fragMulti3Calc from './shaders/multiAnalyze3Calc.fs';
-import fragMulti4Calc from './shaders/multiAnalyze4Calc.fs';
-import fragMulti5Calc from './shaders/multiAnalyze5Calc.fs';
-import fragMulti6Calc from './shaders/multiAnalyze6Calc.fs';
-import fragDiffCalc from './shaders/diffCalc.fs';
-import fragConvertDem from './shaders/convertDem.fs';
-import fragDrawResult from './shaders/drawResult.fs';
-import fragConvolutionSmooth from './shaders/convolutionSmooth.fs';
-import fragHsAdvMergeAndScaleTiles from './shaders/hillshading/hsAdvMergeAndScaleTiles.fs';
-import fragHsAdvNormals from './shaders/hillshading/hsAdvNormals.fs';
-import fragHsAdvDirectLight from './shaders/hillshading/hsAdvDirect.fs';
-import fragHsAdvSoftShadows from './shaders/hillshading/hsAdvSoftShadows.fs';
-import fragHsAdvAmbientShadows from './shaders/hillshading/hsAdvAmbientShadows.fs';
-import fragHsAdvFinalColorscale from './shaders/hillshading/hsAdvFinalColorscale.fs';
-import fragHsAdvFinalBaselayer from './shaders/hillshading/hsAdvFinalBaselayer.fs';
+import fragInterpolateColor from './shaders/fragment/interpolateColor.fs';
+import fragInterpolateColorOnly from './shaders/fragment/interpolateColorOnly.fs';
+import fragInterpolateValue from './shaders/fragment/interpolateValue.fs';
+import fragSingle from './shaders/fragment/single.fs';
+import fragHsPregen from './shaders/fragment/hillshading/hsPregen.fs';
+import fragMulti1Calc from './shaders/fragment/multiAnalyze1Calc.fs';
+import fragMulti2Calc from './shaders/fragment/multiAnalyze2Calc.fs';
+import fragMulti3Calc from './shaders/fragment/multiAnalyze3Calc.fs';
+import fragMulti4Calc from './shaders/fragment/multiAnalyze4Calc.fs';
+import fragMulti5Calc from './shaders/fragment/multiAnalyze5Calc.fs';
+import fragMulti6Calc from './shaders/fragment/multiAnalyze6Calc.fs';
+import fragDiffCalc from './shaders/fragment/diffCalc.fs';
+import fragConvertDem from './shaders/fragment/convertDem.fs';
+import fragDrawResult from './shaders/fragment/drawResult.fs';
+import fragConvolutionSmooth from './shaders/fragment/convolutionSmooth.fs';
+
+import fragHsAdvMergeAndScaleTiles from './shaders/fragment/hillshading/hsAdvMergeAndScaleTiles.fs';
+import fragHsAdvNormals from './shaders/fragment/hillshading/hsAdvNormals.fs';
+import fragHsAdvDirectLight from './shaders/fragment/hillshading/hsAdvDirect.fs';
+import fragHsAdvSoftShadows from './shaders/fragment/hillshading/hsAdvSoftShadows.fs';
+import fragHsAdvAmbientShadows from './shaders/fragment/hillshading/hsAdvAmbientShadows.fs';
+import fragHsAdvFinalColorscale from './shaders/fragment/hillshading/hsAdvFinalColorscale.fs';
+import fragHsAdvFinalBaselayer from './shaders/fragment/hillshading/hsAdvFinalBaselayer.fs';
 
 import {
   Dictionary,

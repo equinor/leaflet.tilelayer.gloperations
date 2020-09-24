@@ -6,9 +6,9 @@ precision mediump float;
 
 #define TRANSPARENT vec4(0.0)
 
-#pragma glslify: computeColor = require(./util/computeColor.glsl)
-#pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
-#pragma glslify: rgbaToFloat = require(glsl-rgba-to-float)
+#pragma glslify: computeColor = require(../util/computeColor.glsl)
+#pragma glslify: isCloseEnough = require(../util/isCloseEnough.glsl)
+#pragma glslify: getTexelValue = require(../util/getTexelValue.glsl)
 
 uniform int scaleLength;
 uniform int sentinelLength;
@@ -31,8 +31,7 @@ bool isSentinelValue(sampler2D sentinelColormap, int len, float value) {
     }
     float i_f = float(i);
     float lenFloat = float(len);
-    vec4 offsetRgba = texture2D(sentinelColormap, vec2((i_f + 0.5) / lenFloat, 0.75));
-    float sentinelOffset = rgbaToFloat(offsetRgba, littleEndian);
+    float sentinelOffset = getTexelValue(sentinelColormap, vec2((i_f + 0.5) / lenFloat, 0.75), littleEndian);
     if (isCloseEnough(sentinelOffset, value)) {
       return true;
     }
@@ -42,8 +41,7 @@ bool isSentinelValue(sampler2D sentinelColormap, int len, float value) {
 
 void main() {
   if (interpolationFraction <= 0.0) {
-    vec4 texelRgba = texture2D(textureA, vTexCoordA);
-    float texelFloat = rgbaToFloat(texelRgba, littleEndian);
+    float texelFloat = getTexelValue(textureA, vTexCoordA, littleEndian);
     if (isCloseEnough(texelFloat, nodataValue)) {
       discard;
     }
@@ -56,8 +54,7 @@ void main() {
       littleEndian
     );
   } else if (interpolationFraction >= 1.0) {
-    vec4 texelRgba = texture2D(textureB, vTexCoordB);
-    float texelFloat = rgbaToFloat(texelRgba, littleEndian);
+    float texelFloat = getTexelValue(textureB, vTexCoordB, littleEndian);
     if (isCloseEnough(texelFloat, nodataValue)) {
       discard;
     }
@@ -71,10 +68,8 @@ void main() {
     );
   } else {
     // retrieve and decode pixel value from both tiles
-    vec4 texelRgbaA = texture2D(textureA, vTexCoordA);
-    float texelFloatA = rgbaToFloat(texelRgbaA, littleEndian);
-    vec4 texelRgbaB = texture2D(textureB, vTexCoordB);
-    float texelFloatB = rgbaToFloat(texelRgbaB, littleEndian);
+    float texelFloatA = getTexelValue(textureA, vTexCoordA, littleEndian);
+    float texelFloatB = getTexelValue(textureB, vTexCoordB, littleEndian);
     bool aIsNodata = isCloseEnough(texelFloatA, nodataValue);
     bool bIsNodata = isCloseEnough(texelFloatB, nodataValue);
     if (aIsNodata && bIsNodata) {

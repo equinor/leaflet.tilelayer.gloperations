@@ -4,8 +4,8 @@ precision highp float;
 precision mediump float;
 #endif
 
-#pragma glslify: computeColor = require(./util/computeColor.glsl)
-#pragma glslify: isCloseEnough = require(./util/isCloseEnough.glsl)
+#pragma glslify: computeColor = require(../util/computeColor.glsl)
+#pragma glslify: isCloseEnough = require(../util/isCloseEnough.glsl)
 
 uniform sampler2D tInput;
 uniform sampler2D tSoftShadow;
@@ -27,6 +27,7 @@ void main() {
 
   if (isCloseEnough(f, nodataValue)) {
     gl_FragColor = vec4(0.0);
+    return;
   } else {
     vec4 clr = computeColor(
       f / floatScale,
@@ -41,10 +42,13 @@ void main() {
     float ambient = texture2D(tAmbient, vTexCoordB).r;
     // Add up the lighting
     float light = finalSoftMultiplier * softShadow + finalAmbientMultiplier * ambient;
-    //Deepen the original color a bit by applying a curve, and multiply it by the light
+    // Deepen the original color a bit by applying a curve, and multiply it by the light
     vec3 color = light * pow(clr.rgb, vec3(2.0));
     // apply gamma correction
     color = pow(color, vec3(1.0/2.2));
     gl_FragColor = vec4(color, 1.0);
+    // gl_FragColor = vec4(clr.rgb, 1.0);
   }
+  // vec3 n = texture2D(tInput, vTexCoordA).rgb;
+  // gl_FragColor = vec4((0.5 * n + 0.5)*0.1, 1.0);
 }

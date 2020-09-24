@@ -354,8 +354,16 @@ export default class GLOperations extends L.GridLayer {
     // Listen for all visible tiles loaded. If using contours then run update
     this.on("load", (_) =>
       setTimeout(() => {
-        if (this.options.debug) console.log("all tiles loaded. Updating contours if enabled.");
         this._maybeUpdateMergedArrayAndDrawContours();
+
+        // if hs==adv and more than 50% of textureManager capacity used, cleartiles.
+        // TODO: Find a better cache system for adv.hs.
+        if (
+          this.options.hillshadeType === 'advanced' &&
+          this._renderer.textureManager.available.length < this._renderer.textureManager.contents.size
+        ) {
+          this._renderer.textureManager.clearTiles();
+        }
         // delay due to: https://github.com/Leaflet/Leaflet/blob/master/src/map/Map.js#L1696
       }, 300)
     );
@@ -376,7 +384,7 @@ export default class GLOperations extends L.GridLayer {
   }
 
   /**
-   * The GLTileLayerComponent exposes a declarative interface. Changes should be triggered by
+   * The component exposes a declarative interface. Changes should be triggered by
    * calling this method to update the options. Figuring out how to reconcile the layer's current
    * state with the updated options is the responsibility of the component. Unlike many other
    * Leaflet components, no other public methods are provided for imperatively changing the
@@ -845,6 +853,7 @@ export default class GLOperations extends L.GridLayer {
               let baselayerTexCoords: number[][] = [];
               // download baselayer tile if url specified
               if (this.options.hsAdvBaselayerUrl) {
+                // TODO: Cache tiles and check if url has changed before fetching
                 const basePixelData = await this._fetchTileData(
                   coords,
                   this.options.hsAdvBaselayerUrl,
@@ -1236,17 +1245,15 @@ export default class GLOperations extends L.GridLayer {
         tilesDataHs,
       );
     } else if (this.options._hillshadeOptions.hillshadeType === 'advanced') {
-      // canvasCoordinates = this._renderer.renderTilesHsAdvanced(
-      //   tilesData,
-      //   this.options._hillshadeOptions,
-      //   this.options.url,
-      //   this._getZoomForUrl(),
-        // this._getPixelScale(),
-      // );
-      // TODO: make this work without redraw?
-      if (this.options.debug) console.log("_updateTiles() with advanced hs");
-      this.redraw();
-      return;
+      this._map.fire('calcHsAdvanced', {status: true});
+      canvasCoordinates = await this._renderer.renderTilesHsAdvanced(
+        tilesData,
+        this.options._hillshadeOptions,
+        this.options.url,
+        this._getZoomForUrl(),
+        this._getPixelScale(),
+      );
+      this._map.fire('calcHsAdvanced', {status: false});
     } else {
       canvasCoordinates = this._renderer.renderTiles(
         tilesData,

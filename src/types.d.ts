@@ -139,7 +139,7 @@ export interface DrawCommonColors {
 export namespace DrawCommon {
   export interface Props {
     canvasSize: Pair<number>;
-    canvasCoordinates: REGL.Vec2;
+    canvasCoordinates: REGL.Vec2 | number[];
   }
   export interface Uniforms {
     nodataValue: number;
