@@ -35,7 +35,6 @@ export function createMap(elm, mapType) {
       maxBoundsViscosity: 0.8,
       crs: L.CRS.EPSG3857,
     });
-    L.control.attribution({prefix:false})
     map.setView([41.0, -122.7], 9);
     return map;
   }

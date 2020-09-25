@@ -62,6 +62,7 @@ export default function addGLOperations(mapType, map, bounds, contourPane, conto
         {color: "rgb(238, 216, 212)", offset: 2070},
         {color: "rgb(255, 241, 239)", offset: 2300},
       ],
+      // attribution: 'Mapbox',
       tileFormat: 'dem',
       nodataValue: -999999,
       noWrap: false,
@@ -83,6 +84,9 @@ export default function addGLOperations(mapType, map, bounds, contourPane, conto
       contourCanvas: contourCanvas,
       onmousemove: onmousemove,
     }).addTo(map);
+
+    let credits = L.control.attribution({prefix:false}).addTo(map);
+    credits.addAttribution('© <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> <strong><a href="https://www.mapbox.com/map-feedback/" target="_blank">Improve this map</a></strong>');
 
     return tilelayer;
   }
