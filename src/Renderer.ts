@@ -13,7 +13,7 @@ import {
   SUN_RADIUS,
 } from './constants';
 
-import * as commands from './regl-commands';
+import * as reglCommands from './reglCommands';
 import TextureManager from './TextureManager';
 import {
   Color,
@@ -152,7 +152,7 @@ export default class Renderer {
       }
     });
 
-    const commonDrawConfig = commands.getCommonDrawConfiguration(tileSize, nodataValue);
+    const commonDrawConfig = reglCommands.getCommonDrawConfiguration(tileSize, nodataValue);
     const fragMacros = {
       SCALE_MAX_LENGTH: colorscaleMaxLength,
       SENTINEL_MAX_LENGTH: sentinelMaxLength,
@@ -179,29 +179,29 @@ export default class Renderer {
       textureManagerE: new TextureManager(regl, tileSize, normalTextureDimension, false),
       textureManagerF: new TextureManager(regl, tileSize, normalTextureDimension, false),
       textureManagerHillshade: new TextureManager(regl, tileSize, maxTextureDimension, false),
-      drawTile: commands.createDrawTileCommand(regl, commonDrawConfig, fragMacros),
-      drawTileHsSimple: commands.createDrawTileHsSimpleCommand(regl, commonDrawConfig, fragMacros),
-      drawTileHsPregen: commands.createDrawTileHsPregenCommand(regl, commonDrawConfig, fragMacros),
-      drawTileInterpolateColor: commands.createDrawTileInterpolateColorCommand(regl, commonDrawConfig, fragMacros),
-      drawTileInterpolateColorOnly: commands.createDrawTileInterpolateColorOnlyCommand(regl, commonDrawConfig, fragMacros),
-      drawTileInterpolateValue: commands.createDrawTileInterpolateValueCommand(regl, commonDrawConfig, fragMacros),
-      calcTileMultiAnalyze1: commands.createCalcTileMultiAnalyze1Command(regl, commonDrawConfig),
-      calcTileMultiAnalyze2: commands.createCalcTileMultiAnalyze2Command(regl, commonDrawConfig),
-      calcTileMultiAnalyze3: commands.createCalcTileMultiAnalyze3Command(regl, commonDrawConfig),
-      calcTileMultiAnalyze4: commands.createCalcTileMultiAnalyze4Command(regl, commonDrawConfig),
-      calcTileMultiAnalyze5: commands.createCalcTileMultiAnalyze5Command(regl, commonDrawConfig),
-      calcTileMultiAnalyze6: commands.createCalcTileMultiAnalyze6Command(regl, commonDrawConfig),
-      drawTileResult: commands.createDrawResultCommand(regl, commonDrawConfig, fragMacros),
-      calcTileDiff: commands.createCalcTileDiffCommand(regl, commonDrawConfig),
-      convertDem: commands.createConvertDemCommand(regl, commonDrawConfig),
-      convolutionSmooth: commands.createConvolutionSmoothCommand(regl, commonDrawConfig),
-      HsAdvMergeAndScaleTiles: commands.createHsAdvMergeAndScaleTiles(regl),
-      HsAdvCalcNormals: commands.createHsAdvCalcNormals(regl, commonDrawConfig),
-      HsAdvDirectLightning: commands.createHsAdvDirectLightning(regl, commonDrawConfig),
-      HsAdvSoftShadows: commands.createHsAdvSoftShadows(regl, commonDrawConfig),
-      HsAdvAmbientShadows: commands.createHsAdvAmbientShadows(regl, commonDrawConfig),
-      HsAdvFinalColorscale: commands.createHsAdvFinalColorscale(regl, commonDrawConfig),
-      HsAdvFinalBaselayer: commands.createHsAdvFinalBaselayer(regl, commonDrawConfig),
+      drawTile: reglCommands.createDrawTileCommand(regl, commonDrawConfig, fragMacros),
+      drawTileHsSimple: reglCommands.createDrawTileHsSimpleCommand(regl, commonDrawConfig, fragMacros),
+      drawTileHsPregen: reglCommands.createDrawTileHsPregenCommand(regl, commonDrawConfig, fragMacros),
+      drawTileInterpolateColor: reglCommands.createDrawTileInterpolateColorCommand(regl, commonDrawConfig, fragMacros),
+      drawTileInterpolateColorOnly: reglCommands.createDrawTileInterpolateColorOnlyCommand(regl, commonDrawConfig, fragMacros),
+      drawTileInterpolateValue: reglCommands.createDrawTileInterpolateValueCommand(regl, commonDrawConfig, fragMacros),
+      calcTileMultiAnalyze1: reglCommands.createCalcTileMultiAnalyze1Command(regl, commonDrawConfig),
+      calcTileMultiAnalyze2: reglCommands.createCalcTileMultiAnalyze2Command(regl, commonDrawConfig),
+      calcTileMultiAnalyze3: reglCommands.createCalcTileMultiAnalyze3Command(regl, commonDrawConfig),
+      calcTileMultiAnalyze4: reglCommands.createCalcTileMultiAnalyze4Command(regl, commonDrawConfig),
+      calcTileMultiAnalyze5: reglCommands.createCalcTileMultiAnalyze5Command(regl, commonDrawConfig),
+      calcTileMultiAnalyze6: reglCommands.createCalcTileMultiAnalyze6Command(regl, commonDrawConfig),
+      drawTileResult: reglCommands.createDrawResultCommand(regl, commonDrawConfig, fragMacros),
+      calcTileDiff: reglCommands.createCalcTileDiffCommand(regl, commonDrawConfig),
+      convertDem: reglCommands.createConvertDemCommand(regl, commonDrawConfig),
+      convolutionSmooth: reglCommands.createConvolutionSmoothCommand(regl, commonDrawConfig),
+      HsAdvMergeAndScaleTiles: reglCommands.createHsAdvMergeAndScaleTiles(regl),
+      HsAdvCalcNormals: reglCommands.createHsAdvCalcNormals(regl, commonDrawConfig),
+      HsAdvDirectLightning: reglCommands.createHsAdvDirectLightning(regl, commonDrawConfig),
+      HsAdvSoftShadows: reglCommands.createHsAdvSoftShadows(regl, commonDrawConfig),
+      HsAdvAmbientShadows: reglCommands.createHsAdvAmbientShadows(regl, commonDrawConfig),
+      HsAdvFinalColorscale: reglCommands.createHsAdvFinalColorscale(regl, commonDrawConfig),
+      HsAdvFinalBaselayer: reglCommands.createHsAdvFinalBaselayer(regl, commonDrawConfig),
     });
   }
 
