@@ -316,6 +316,7 @@ export default class GLOperations extends L.GridLayer {
     super(Object.assign({}, defaultOptions, options));
 
     this._checkColorScaleAndSentinels();
+    this.setHillshadeOptions();
 
     const {
       nodataValue,
@@ -500,22 +501,7 @@ export default class GLOperations extends L.GridLayer {
       this._renderer.generateSunDirections(this.options.hsAdvSoftIterations, this.options.hsAdvSunRadiusMultiplier);
     }
     this._maybePreload(this.options.preloadUrl);
-    this.options._hillshadeOptions = {
-      hillshadeType: this.options.hillshadeType,
-      hsAdvValueScale: this.options.hsAdvValueScale,
-      hsAdvPixelScale: this.options.hsAdvPixelScale,
-      hsSimpleSlopescale: this.options.hsSimpleSlopescale,
-      hsSimpleAzimuth: this.options.hsSimpleAzimuth,
-      hsSimpleAltitude: this.options.hsSimpleAltitude,
-      hsSimpleZoomdelta: this.options.hsSimpleZoomdelta,
-      hsAdvSoftIterations: this.options.hsAdvSoftIterations,
-      hsAdvAmbientIterations: this.options.hsAdvAmbientIterations,
-      hsAdvSunRadiusMultiplier: this.options.hsAdvSunRadiusMultiplier,
-      hsAdvFinalSoftMultiplier: this.options.hsAdvFinalSoftMultiplier,
-      hsAdvFinalAmbientMultiplier: this.options.hsAdvFinalAmbientMultiplier,
-      hsAdvBaselayerUrl: this.options.hsAdvBaselayerUrl,
-      hsPregenUrl: this.options.hsPregenUrl,
-    };
+    this.setHillshadeOptions();
 
     if (this.options.extraPixelLayers > 0 && this.options.glOperation === 'none') {
       this._maybeLoadExtraLayers(prevUrlA, prevUrlB, prevUrlC, prevUrlD);
@@ -2712,6 +2698,25 @@ export default class GLOperations extends L.GridLayer {
     };
 
     return activeTilesBounds;
+  }
+
+  protected setHillshadeOptions() {
+    this.options._hillshadeOptions = {
+      hillshadeType: this.options.hillshadeType,
+      hsAdvValueScale: this.options.hsAdvValueScale,
+      hsAdvPixelScale: this.options.hsAdvPixelScale,
+      hsSimpleSlopescale: this.options.hsSimpleSlopescale,
+      hsSimpleAzimuth: this.options.hsSimpleAzimuth,
+      hsSimpleAltitude: this.options.hsSimpleAltitude,
+      hsSimpleZoomdelta: this.options.hsSimpleZoomdelta,
+      hsAdvSoftIterations: this.options.hsAdvSoftIterations,
+      hsAdvAmbientIterations: this.options.hsAdvAmbientIterations,
+      hsAdvSunRadiusMultiplier: this.options.hsAdvSunRadiusMultiplier,
+      hsAdvFinalSoftMultiplier: this.options.hsAdvFinalSoftMultiplier,
+      hsAdvFinalAmbientMultiplier: this.options.hsAdvFinalAmbientMultiplier,
+      hsAdvBaselayerUrl: this.options.hsAdvBaselayerUrl,
+      hsPregenUrl: this.options.hsPregenUrl,
+    };
   }
 
   /**

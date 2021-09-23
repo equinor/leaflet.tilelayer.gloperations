@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.4.1]
+
+### Fixed
+
+- Hillshading options set correctly if used in initial options.
+
 ## [0.4.0]
 
 ### Added
