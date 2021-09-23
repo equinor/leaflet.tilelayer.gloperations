@@ -1,6 +1,6 @@
 {
   "name": "leaflet.tilelayer.gloperations",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Custom Leaflet TileLayer using WebGL to do operations on and colorize floating-point pixels.",
   "main": "dist/index.js",
   "module": "dist/index.es.js",
