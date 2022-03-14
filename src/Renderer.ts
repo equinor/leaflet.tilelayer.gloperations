@@ -46,6 +46,7 @@ import {
   HsAdvAmbientShadows,
   HsAdvFinalColorscale,
   HsAdvFinalBaselayer,
+  HsAdvSmooth,
 } from './types';
 
 import * as util from './util';
@@ -103,6 +104,7 @@ export default class Renderer {
   HsAdvAmbientShadows: REGL.DrawCommand<REGL.DefaultContext, HsAdvAmbientShadows.Props>;
   HsAdvFinalColorscale: REGL.DrawCommand<REGL.DefaultContext, HsAdvFinalColorscale.Props>;
   HsAdvFinalBaselayer: REGL.DrawCommand<REGL.DefaultContext, HsAdvFinalBaselayer.Props>;
+  HsAdvSmooth: REGL.DrawCommand<REGL.DefaultContext, HsAdvSmooth.Props>;
 
   constructor(
     gloperations: any,
@@ -202,6 +204,7 @@ export default class Renderer {
       HsAdvAmbientShadows: reglCommands.createHsAdvAmbientShadows(regl, commonDrawConfig),
       HsAdvFinalColorscale: reglCommands.createHsAdvFinalColorscale(regl, commonDrawConfig),
       HsAdvFinalBaselayer: reglCommands.createHsAdvFinalBaselayer(regl, commonDrawConfig),
+      HsAdvSmooth: reglCommands.createHsAdvSmoothCommand(regl, commonDrawConfig),
     });
   }
 
@@ -534,6 +537,13 @@ export default class Renderer {
       colorType: "float",
     });
 
+    let fboSmoothed = regl.framebuffer({
+      width: tileSize * 3,
+      height: tileSize * 3,
+      depth: false,
+      colorType: "float",
+    });
+
     const fboNormals = regl.framebuffer({
       width: tileSize * 3,
       height: tileSize * 3,
@@ -569,10 +579,23 @@ export default class Renderer {
       nodataValue: this.nodataValue,
     });
 
+    if (_hillshadeOptions.hsAdvSmoothInput && _hillshadeOptions.hsAdvSmoothInputKernel > 0) {
+      this.HsAdvSmooth({
+        canvasSize: [tileSize * 3, tileSize * 3],
+        canvasCoordinates: [0, 0],
+        tInput: fboFloats,
+        textureSize: tileSize * 3,
+        kernelSize: _hillshadeOptions.hsAdvSmoothInputKernel,
+        fbo: fboSmoothed,
+      });
+    } else {
+      fboSmoothed = fboFloats;
+    }
+
     this.HsAdvCalcNormals({
       canvasSize: [tileSize * 3, tileSize * 3],
       canvasCoordinates: [0, 0],
-      tInput: fboFloats,
+      tInput: fboSmoothed,
       pixelScale: pixelScale,
       onePixel: 1 / (tileSize * 3),
       fbo: fboNormals,
@@ -597,7 +620,7 @@ export default class Renderer {
       this.HsAdvSoftShadows({
         canvasSize: [tileSize, tileSize],
         canvasCoordinates: [0, 0],
-        tInput: fboFloats,
+        tInput: fboSmoothed,
         tNormal: fboNormals,
         tSrc: fboSoftShadowPP.ping(),
         softIterations: _hillshadeOptions.hsAdvSoftIterations,
@@ -614,7 +637,7 @@ export default class Renderer {
       this.HsAdvAmbientShadows({
         canvasSize: [tileSize, tileSize],
         canvasCoordinates: [0, 0],
-        tInput: fboFloats,
+        tInput: fboSmoothed,
         tNormal: fboNormals,
         tSrc: fboAmbientShadowPP.ping(),
         ambientIterations: _hillshadeOptions.hsAdvAmbientIterations,
@@ -1451,6 +1474,13 @@ export default class Renderer {
             colorType: "float",
           });
 
+          let fboSmoothed = regl.framebuffer({
+            width: tileSize * 3,
+            height: tileSize * 3,
+            depth: false,
+            colorType: "float",
+          });
+
           const fboNormals = regl.framebuffer({
             width: tileSize * 3,
             height: tileSize * 3,
@@ -1479,10 +1509,23 @@ export default class Renderer {
             nodataValue: nodataValue,
           });
 
+          if (_hillshadeOptions.hsAdvSmoothInput && _hillshadeOptions.hsAdvSmoothInputKernel > 0) {
+            this.HsAdvSmooth({
+              canvasSize: [tileSize * 3, tileSize * 3],
+              canvasCoordinates: [0, 0],
+              tInput: fboFloats,
+              textureSize: tileSize * 3,
+              kernelSize: _hillshadeOptions.hsAdvSmoothInputKernel,
+              fbo: fboSmoothed,
+            });
+          } else {
+            fboSmoothed = fboFloats;
+          }
+
           this.HsAdvCalcNormals({
             canvasSize: [tileSize * 3, tileSize * 3],
             canvasCoordinates: [0, 0],
-            tInput: fboFloats,
+            tInput: fboSmoothed,
             pixelScale: pixelScale,
             onePixel: 1 / (tileSize * 3),
             fbo: fboNormals,
@@ -1493,7 +1536,7 @@ export default class Renderer {
             this.HsAdvSoftShadows({
               canvasSize: [tileSize, tileSize],
               canvasCoordinates: [0, 0],
-              tInput: fboFloats,
+              tInput: fboSmoothed,
               tNormal: fboNormals,
               tSrc: fboSoftShadowPP.ping(),
               softIterations: _hillshadeOptions.hsAdvSoftIterations,
@@ -1510,7 +1553,7 @@ export default class Renderer {
             this.HsAdvAmbientShadows({
               canvasSize: [tileSize, tileSize],
               canvasCoordinates: [0, 0],
-              tInput: fboFloats,
+              tInput: fboSmoothed,
               tNormal: fboNormals,
               tSrc: fboAmbientShadowPP.ping(),
               ambientIterations: _hillshadeOptions.hsAdvAmbientIterations,

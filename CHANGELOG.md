@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.4.2]
+
+### Added
+
+- Added optional smoothing of input data for advanced hillshading:
+  - `hsAdvSmoothInput` (default: false)
+  - `hsAdvSmoothInputKernel` (default: 3)
+
 ## [0.4.1]
 
 ### Fixed
@@ -55,7 +63,8 @@
 
 - Initial release
 
-[unreleased]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.4.1...HEAD
+[unreleased]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/equinor/leaflet.tilelayer.gloperations/compare/v0.2.0...v0.3.0

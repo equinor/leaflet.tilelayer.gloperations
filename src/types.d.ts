@@ -46,6 +46,8 @@ export interface HillshadeOptions {
   hsAdvFinalAmbientMultiplier?: number;
   hsAdvBaselayerUrl?: string;
   hsPregenUrl?: string;
+  hsAdvSmoothInput: boolean;
+  hsAdvSmoothInputKernel: number;
 }
 
 // [topLeft, bottomRight]
@@ -310,6 +312,26 @@ export namespace HsAdvCalcNormals {
     // resolution: number;
     onePixel: number;
     // elevationScale: number;
+  }
+  export interface Attributes {
+    texCoord: REGL.Vec2[] | number[];
+    position: REGL.Vec2[] | number[];
+  }
+}
+
+export namespace HsAdvSmooth {
+  export interface Props extends DrawCommon.Props {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    textureSize?: number;
+    kernelSize: number;
+    onePixel?: number;
+    fbo?: REGL.Framebuffer2D;
+  }
+  export interface Uniforms extends DrawCommon.Uniforms {
+    tInput: REGL.Texture2D | REGL.Framebuffer2D;
+    textureSize?: number;
+    kernelSize: number;
+    onePixel?: number;
   }
   export interface Attributes {
     texCoord: REGL.Vec2[] | number[];
@@ -809,11 +831,12 @@ export namespace DrawTileResult {
 
 export namespace ConvolutionSmooth {
   export interface Props {
-    texture: REGL.Texture2D;
+    texture: REGL.Texture2D | REGL.Framebuffer2D;
     textureSize: number;
     kernelSize: number;
     nodataValue: number;
     littleEndian: boolean;
+    fbo?: REGL.Framebuffer2D;
   }
   export interface Uniforms extends DrawCommon.Uniforms {
     texture: REGL.Texture2D;

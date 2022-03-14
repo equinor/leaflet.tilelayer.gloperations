@@ -137,6 +137,8 @@ export interface Options extends L.GridLayerOptions {
   hsAdvFinalSoftMultiplier?: number;
   hsAdvFinalAmbientMultiplier?: number;
   hsAdvBaselayerUrl?: string;
+  hsAdvSmoothInput: boolean;
+  hsAdvSmoothInputKernel: number;
   hsPregenUrl?: string;
   _hillshadeOptions?: HillshadeOptions;
 
@@ -259,6 +261,8 @@ const defaultOptions = {
   hsAdvFinalSoftMultiplier: 1.0,
   hsAdvFinalAmbientMultiplier: 0.25,
   hsAdvBaselayerUrl: '',
+  hsAdvSmoothInput: false,
+  hsAdvSmoothInputKernel: 3,
   hsPregenUrl: '',
   _hillshadeOptions: { hillshadeType: 'none' },
 
@@ -435,6 +439,8 @@ export default class GLOperations extends L.GridLayer {
       hsAdvFinalSoftMultiplier: prevHsAdvFinalSoftMultiplier,
       hsAdvFinalAmbientMultiplier: prevHsAdvFinalAmbientMultiplier,
       hsAdvBaselayerUrl: prevHsAdvBaselayerUrl,
+      hsAdvSmoothInput: prevHsAdvSmoothInput,
+      hsAdvSmoothInputKernel: prevHsAdvSmoothInputKernel,
       contourInterval: prevContourInterval,
       contourIndexInterval: prevContourIndexInterval,
       contourLineColor: prevContourLineColor,
@@ -551,7 +557,9 @@ export default class GLOperations extends L.GridLayer {
             this.options.hsAdvAmbientIterations !== prevHsAdvAmbientIterations ||
             this.options.hsAdvValueScale !== prevHsAdvValueScale ||
             this.options.hsAdvPixelScale !== prevHsAdvPixelScale ||
-            this.options.hsAdvBaselayerUrl !== prevHsAdvBaselayerUrl
+            this.options.hsAdvBaselayerUrl !== prevHsAdvBaselayerUrl ||
+            this.options.hsAdvSmoothInput !== prevHsAdvSmoothInput ||
+            this.options.hsAdvSmoothInputKernel !== prevHsAdvSmoothInputKernel
           ) {
             this._updateTiles();
             if (this.options.debug) console.log("Running GLOperations with new url, no transition and no operation");
@@ -2715,6 +2723,8 @@ export default class GLOperations extends L.GridLayer {
       hsAdvFinalSoftMultiplier: this.options.hsAdvFinalSoftMultiplier,
       hsAdvFinalAmbientMultiplier: this.options.hsAdvFinalAmbientMultiplier,
       hsAdvBaselayerUrl: this.options.hsAdvBaselayerUrl,
+      hsAdvSmoothInput: this.options.hsAdvSmoothInput,
+      hsAdvSmoothInputKernel: this.options.hsAdvSmoothInputKernel,
       hsPregenUrl: this.options.hsPregenUrl,
     };
   }
