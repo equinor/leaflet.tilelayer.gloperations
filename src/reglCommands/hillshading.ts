@@ -13,6 +13,7 @@ import fragHsAdvSoftShadows from '../shaders/fragment/hillshading/hsAdvSoftShado
 import fragHsAdvAmbientShadows from '../shaders/fragment/hillshading/hsAdvAmbientShadows.fs';
 import fragHsAdvFinalColorscale from '../shaders/fragment/hillshading/hsAdvFinalColorscale.fs';
 import fragHsAdvFinalBaselayer from '../shaders/fragment/hillshading/hsAdvFinalBaselayer.fs';
+import fragHsAdvSmooth from '../shaders/fragment/hillshading/hsAdvSmooth.fs';
 
 import {
   Dictionary,
@@ -26,6 +27,7 @@ import {
   HsAdvAmbientShadows,
   HsAdvFinalColorscale,
   HsAdvFinalBaselayer,
+  HsAdvSmooth,
 } from '../types';
 
 import {
@@ -154,6 +156,35 @@ export function createHsAdvMergeAndScaleTiles(
     framebuffer: regl.prop<HsAdvMergeAndScaleTiles.Props, 'fbo'>("fbo"),
   });
 }
+
+
+/**
+ * The resulting Regl DrawCommand is for using a convolution kernel to smooth the input data.
+ * Currently hard-coded the kernel and positions in the shader to reduce number of uniforms.
+ * TODO: Merge with contours function
+ */
+ export function createHsAdvSmoothCommand(
+  regl: REGL.Regl,
+  commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>,
+) {
+  return regl<HsAdvSmooth.Uniforms, HsAdvSmooth.Attributes, HsAdvSmooth.Props>({
+    ...commonConfig,
+    vert: vertSingleNotTransformed,
+    frag: fragHsAdvSmooth,
+    uniforms: {
+      ...commonConfig.uniforms as DrawCommon.Uniforms,
+      tInput: regl.prop<HsAdvSmooth.Props, 'tInput'>("tInput"),
+      textureSize: regl.prop<HsAdvSmooth.Props, 'textureSize'>("textureSize"),
+      kernelSize: regl.prop<HsAdvSmooth.Props, 'kernelSize'>("kernelSize"),
+    },
+    attributes: {
+      position: [[-1, 1], [1, 1], [-1, -1], [1, -1]],
+      texCoord: [[0, 1], [1, 1], [0, 0], [1, 0]],
+    },
+    framebuffer: regl.prop<HsAdvSmooth.Props, 'fbo'>("fbo"),
+  });
+}
+
 
 /**
  * The resulting Regl DrawCommand is used to calculate the normals.
