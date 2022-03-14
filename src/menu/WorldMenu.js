@@ -119,7 +119,7 @@ const WorldMenu = ({tilelayer}) => {
 
           </Select>
           <br></br>
-          Elevation scale: <Slider defaultValue={1.0} min={0} max={5.0} step={0.1} onAfterChange={elevationScaleChange}/>
+          Elevation scale: <Slider defaultValue={2.0} min={0} max={10.0} step={0.1} onAfterChange={elevationScaleChange}/>
           Soft shadow iterations: <Slider defaultValue={5} min={0} max={150} onAfterChange={softShadowIterationsChange}/>
           Ambient lighting iterations: <Slider defaultValue={5} min={0} max={150} onAfterChange={ambientLightingIterationsChange}/>
           Sun radius multiplier: <Slider defaultValue={100} min={0} max={1000} onAfterChange={sunRadiusChange}/>

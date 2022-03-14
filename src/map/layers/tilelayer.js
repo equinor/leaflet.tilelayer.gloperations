@@ -30,6 +30,8 @@ export default function addGLOperations(mapType, map, bounds, contourPane, conto
       hsAdvAmbientIterations: 10,
       hsAdvFinalSoftMultiplier: 1.1,
       hsAdvFinalAmbientMultiplier: 0.25,
+      hsAdvSmoothInput: true,
+      hsAdvSmoothInputKernel: 5,
       bounds: bounds,
       contourType: 'none',
       contourPane: contourPane,
@@ -41,12 +43,15 @@ export default function addGLOperations(mapType, map, bounds, contourPane, conto
 
   } else if (mapType === 'world') {
     let mapboxToken = 'pk.eyJ1IjoiaGVyamFyIiwiYSI6ImNrZjl6MjUwYTBxeWYyeXFncHI0NjN2bngifQ.-e2mdgWyalWaosKYPzGXow';
-    let privateToken = '';
+    const mapboxSkuToken = '101vM3j3nQixx';
+    let privateToken = 'pk.eyJ1IjoiaGVyamFyIiwiYSI6ImNrZjZrNzNiYjBlenIyeHFnbnNvOGd4cHYifQ.Ix7LIxVcLUpLC5c6TxYNfA';
+    https://api.mapbox.com/raster/v1/mapbox.mapbox-terrain-dem-v1/9/80/189.png?sku=101vM3j3nQixx&access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY5YzJzczA2ejIzM29hNGQ3emFsMXgifQ.az9JUrQP7klCgD3W-ueILQ
     if (privateToken) {
       mapboxToken = privateToken;
     }
     let tilelayer = new GLOperations({
       url: `https://api.mapbox.com/v4/mapbox.terrain-rgb/{z}/{x}/{y}.pngraw?access_token=${mapboxToken}`,
+      // url: `https://api.mapbox.com/raster/v1/mapbox.mapbox-terrain-dem-v1/{z}/{x}/{y}.png?sku=${mapboxSkuToken}&access_token=${mapboxToken}`,
       colorScale: [
         {color: "rgb(8, 48, 107)", offset: -1100},
 		    {color: "rgb(8, 81, 156)", offset: 0.0},
@@ -64,13 +69,16 @@ export default function addGLOperations(mapType, map, bounds, contourPane, conto
       ],
       // attribution: 'Mapbox',
       tileFormat: 'dem',
+      tileSize: 256,
+      // tileSize: 514,
+      // zoomOffset: -1,
       nodataValue: -999999,
       noWrap: false,
       transitions: false,
       colorscaleMaxLength: 25,
       sentinelMaxLength: 3,
       hillshadeType: 'none',
-      hsAdvValueScale: 1.0,
+      hsAdvValueScale: 2.0,
       hsSimpleSlopescale: 0.85,
       hsSimpleZoomdelta: 0,
       hsAdvPixelScale: 'auto',
@@ -79,6 +87,7 @@ export default function addGLOperations(mapType, map, bounds, contourPane, conto
       hsAdvAmbientIterations: 5,
       hsAdvFinalSoftMultiplier: 1.2,
       hsAdvFinalAmbientMultiplier: 0.30,
+      hsAdvSmoothInput: false,
       contourType: 'none',
       contourPane: contourPane,
       contourCanvas: contourCanvas,

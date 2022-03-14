@@ -68,6 +68,8 @@ export interface Options extends L.GridLayerOptions {
     hsAdvFinalSoftMultiplier?: number;
     hsAdvFinalAmbientMultiplier?: number;
     hsAdvBaselayerUrl?: string;
+    hsAdvSmoothInput: boolean;
+    hsAdvSmoothInputKernel: number;
     hsPregenUrl?: string;
     _hillshadeOptions?: HillshadeOptions;
     contourPane?: HTMLElement;
@@ -177,6 +179,8 @@ declare const defaultOptions: {
     hsAdvFinalSoftMultiplier: number;
     hsAdvFinalAmbientMultiplier: number;
     hsAdvBaselayerUrl: string;
+    hsAdvSmoothInput: boolean;
+    hsAdvSmoothInputKernel: number;
     hsPregenUrl: string;
     _hillshadeOptions: {
         hillshadeType: string;
@@ -266,6 +270,8 @@ export default class GLOperations extends L.GridLayer {
         hsAdvFinalSoftMultiplier: number;
         hsAdvFinalAmbientMultiplier: number;
         hsAdvBaselayerUrl: string;
+        hsAdvSmoothInput: boolean;
+        hsAdvSmoothInputKernel: number;
         hsPregenUrl: string;
         _hillshadeOptions: {
             hillshadeType: string;
@@ -332,6 +338,7 @@ export default class GLOperations extends L.GridLayer {
     protected _tileSizeAsNumber(): number;
     protected _copyToTileCanvas(tile: TileElement, sourceX: number, sourceY: number): void;
     protected _getActivetilesBounds(): Promise<ActiveTilesBounds>;
+    protected setHillshadeOptions(): void;
     protected _mergePixelData(activeTilesBounds: ActiveTilesBounds, tileSize: number): Promise<void>;
     protected _maybeUpdateMergedArrayAndDrawContours(): Promise<void>;
     protected _smoothContourInput(): void;

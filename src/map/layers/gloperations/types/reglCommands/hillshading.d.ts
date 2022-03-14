@@ -1,0 +1,12 @@
+import REGL from 'regl';
+import { Dictionary, DrawCommon, DrawTileHsSimple, DrawTileHsPregen, HsAdvMergeAndScaleTiles, HsAdvCalcNormals, HsAdvDirectLightning, HsAdvSoftShadows, HsAdvAmbientShadows, HsAdvFinalColorscale, HsAdvFinalBaselayer, HsAdvSmooth } from '../types';
+export declare function createDrawTileHsSimpleCommand(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>, fragMacros: Dictionary<any>): REGL.DrawCommand<REGL.DefaultContext, DrawTileHsSimple.Props>;
+export declare function createDrawTileHsPregenCommand(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>, fragMacros: Dictionary<any>): REGL.DrawCommand<REGL.DefaultContext, DrawTileHsPregen.Props>;
+export declare function createHsAdvMergeAndScaleTiles(regl: REGL.Regl): REGL.DrawCommand<REGL.DefaultContext, HsAdvMergeAndScaleTiles.Props>;
+export declare function createHsAdvSmoothCommand(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, HsAdvSmooth.Props>;
+export declare function createHsAdvCalcNormals(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, HsAdvCalcNormals.Props>;
+export declare function createHsAdvDirectLightning(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, HsAdvDirectLightning.Props>;
+export declare function createHsAdvSoftShadows(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, HsAdvSoftShadows.Props>;
+export declare function createHsAdvAmbientShadows(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, HsAdvAmbientShadows.Props>;
+export declare function createHsAdvFinalColorscale(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, HsAdvFinalColorscale.Props>;
+export declare function createHsAdvFinalBaselayer(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, HsAdvFinalBaselayer.Props>;

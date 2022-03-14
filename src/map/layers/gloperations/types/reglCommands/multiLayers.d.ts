@@ -1,0 +1,10 @@
+import REGL from 'regl';
+import { Dictionary, DrawCommon, CalcTileMultiAnalyze1, CalcTileMultiAnalyze2, CalcTileMultiAnalyze3, CalcTileMultiAnalyze4, CalcTileMultiAnalyze5, CalcTileMultiAnalyze6, DrawTileResult, CalcTileDiff } from '../types';
+export declare function createCalcTileMultiAnalyze1Command(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze1.Props>;
+export declare function createCalcTileMultiAnalyze2Command(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze2.Props>;
+export declare function createCalcTileMultiAnalyze3Command(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze3.Props>;
+export declare function createCalcTileMultiAnalyze4Command(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze4.Props>;
+export declare function createCalcTileMultiAnalyze5Command(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze5.Props>;
+export declare function createCalcTileMultiAnalyze6Command(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, CalcTileMultiAnalyze6.Props>;
+export declare function createCalcTileDiffCommand(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>): REGL.DrawCommand<REGL.DefaultContext, CalcTileDiff.Props>;
+export declare function createDrawResultCommand(regl: REGL.Regl, commonConfig: REGL.DrawConfig<DrawCommon.Uniforms, DrawCommon.Attributes, DrawCommon.Props>, fragMacros: Dictionary<any>): REGL.DrawCommand<REGL.DefaultContext, DrawTileResult.Props>;

@@ -1,6 +1,6 @@
 import REGL from 'regl';
 import TextureManager from './TextureManager';
-import { Color, SentinelValue, DrawTile, DrawTileHsSimple, DrawTileHsPregen, DrawTileInterpolateColor, DrawTileInterpolateColorOnly, DrawTileInterpolateValue, CalcTileMultiAnalyze1, CalcTileMultiAnalyze2, CalcTileMultiAnalyze3, CalcTileMultiAnalyze4, CalcTileMultiAnalyze5, CalcTileMultiAnalyze6, CalcTileDiff, ConvertDem, DrawTileResult, ConvolutionSmooth, Pair, calcResult, TileCoordinates, TileDatum, HillshadeOptions, HsAdvMergeAndScaleTiles, HsAdvCalcNormals, HsAdvDirectLightning, HsAdvSoftShadows, HsAdvAmbientShadows, HsAdvFinalColorscale, HsAdvFinalBaselayer } from './types';
+import { Color, SentinelValue, DrawTile, DrawTileHsSimple, DrawTileHsPregen, DrawTileInterpolateColor, DrawTileInterpolateColorOnly, DrawTileInterpolateValue, CalcTileMultiAnalyze1, CalcTileMultiAnalyze2, CalcTileMultiAnalyze3, CalcTileMultiAnalyze4, CalcTileMultiAnalyze5, CalcTileMultiAnalyze6, CalcTileDiff, ConvertDem, DrawTileResult, ConvolutionSmooth, Pair, calcResult, TileCoordinates, TileDatum, HillshadeOptions, HsAdvMergeAndScaleTiles, HsAdvCalcNormals, HsAdvDirectLightning, HsAdvSoftShadows, HsAdvAmbientShadows, HsAdvFinalColorscale, HsAdvFinalBaselayer, HsAdvSmooth } from './types';
 import { vec3 } from "gl-matrix";
 export default class Renderer {
     gloperations: any;
@@ -51,6 +51,7 @@ export default class Renderer {
     HsAdvAmbientShadows: REGL.DrawCommand<REGL.DefaultContext, HsAdvAmbientShadows.Props>;
     HsAdvFinalColorscale: REGL.DrawCommand<REGL.DefaultContext, HsAdvFinalColorscale.Props>;
     HsAdvFinalBaselayer: REGL.DrawCommand<REGL.DefaultContext, HsAdvFinalBaselayer.Props>;
+    HsAdvSmooth: REGL.DrawCommand<REGL.DefaultContext, HsAdvSmooth.Props>;
     constructor(gloperations: any, tileSize: number, nodataValue: number, scaleInput: Color[], sentinelInput: SentinelValue[], colorscaleMaxLength: number, sentinelMaxLength: number);
     findMaxTextureDimension(): number;
     setMaxTextureDimension(newMaxTextureDimension: number): void;
