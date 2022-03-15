@@ -44,13 +44,14 @@ export default function addGLOperations(mapType, map, bounds, contourPane, conto
   } else if (mapType === 'world') {
     let mapboxToken = 'pk.eyJ1IjoiaGVyamFyIiwiYSI6ImNrZjl6MjUwYTBxeWYyeXFncHI0NjN2bngifQ.-e2mdgWyalWaosKYPzGXow';
     const mapboxSkuToken = '101vM3j3nQixx';
-    let privateToken = 'pk.eyJ1IjoiaGVyamFyIiwiYSI6ImNrZjZrNzNiYjBlenIyeHFnbnNvOGd4cHYifQ.Ix7LIxVcLUpLC5c6TxYNfA';
+    let privateToken = '';
     https://api.mapbox.com/raster/v1/mapbox.mapbox-terrain-dem-v1/9/80/189.png?sku=101vM3j3nQixx&access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY5YzJzczA2ejIzM29hNGQ3emFsMXgifQ.az9JUrQP7klCgD3W-ueILQ
     if (privateToken) {
       mapboxToken = privateToken;
     }
     let tilelayer = new GLOperations({
-      url: `https://api.mapbox.com/v4/mapbox.terrain-rgb/{z}/{x}/{y}.pngraw?access_token=${mapboxToken}`,
+      // url: `https://api.mapbox.com/v4/mapbox.terrain-rgb/{z}/{x}/{y}.pngraw?access_token=${mapboxToken}`,
+      url: `https://api.mapbox.com/v4/mapbox.terrain-rgb/{z}/{x}/{y}@2x.pngraw?access_token=${mapboxToken}`,
       // url: `https://api.mapbox.com/raster/v1/mapbox.mapbox-terrain-dem-v1/{z}/{x}/{y}.png?sku=${mapboxSkuToken}&access_token=${mapboxToken}`,
       colorScale: [
         {color: "rgb(8, 48, 107)", offset: -1100},
@@ -69,9 +70,10 @@ export default function addGLOperations(mapType, map, bounds, contourPane, conto
       ],
       // attribution: 'Mapbox',
       tileFormat: 'dem',
-      tileSize: 256,
+      // tileSize: 256,
+      tileSize: 512,
       // tileSize: 514,
-      // zoomOffset: -1,
+      zoomOffset: -1,
       nodataValue: -999999,
       noWrap: false,
       transitions: false,

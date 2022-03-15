@@ -17,11 +17,16 @@ if (privateToken) {
 
 const baselayerUrls = {
   colorscale: '',
-  satellite: `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}.pngraw?access_token=${mapboxToken}`,
-  streets: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/256/{z}/{x}/{y}?access_token=${mapboxToken}`,
-  darkstreets: `https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/256/{z}/{x}/{y}?access_token=${mapboxToken}`,
-  lightstreets: `https://api.mapbox.com/styles/v1/mapbox/light-v10/tiles/256/{z}/{x}/{y}?access_token=${mapboxToken}`,
-  outdoors: `https://api.mapbox.com/styles/v1/mapbox/outdoors-v10/tiles/256/{z}/{x}/{y}?access_token=${mapboxToken}`,
+  // satellite: `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}.pngraw?access_token=${mapboxToken}`,
+  // streets: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/256/{z}/{x}/{y}?access_token=${mapboxToken}`,
+  // darkstreets: `https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/256/{z}/{x}/{y}?access_token=${mapboxToken}`,
+  // lightstreets: `https://api.mapbox.com/styles/v1/mapbox/light-v10/tiles/256/{z}/{x}/{y}?access_token=${mapboxToken}`,
+  // outdoors: `https://api.mapbox.com/styles/v1/mapbox/outdoors-v10/tiles/256/{z}/{x}/{y}?access_token=${mapboxToken}`,
+  satellite: `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.pngraw?access_token=${mapboxToken}`,
+  streets: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/512/{z}/{x}/{y}?access_token=${mapboxToken}`,
+  darkstreets: `https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/512/{z}/{x}/{y}?access_token=${mapboxToken}`,
+  lightstreets: `https://api.mapbox.com/styles/v1/mapbox/light-v10/tiles/512/{z}/{x}/{y}?access_token=${mapboxToken}`,
+  outdoors: `https://api.mapbox.com/styles/v1/mapbox/outdoors-v10/tiles/512/{z}/{x}/{y}?access_token=${mapboxToken}`,
 }
 
 const WorldMenu = ({tilelayer}) => {
