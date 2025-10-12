@@ -76,7 +76,7 @@
     "typescript": "~4.0.2"
   },
   "dependencies": {
-    "d3-array": "^2.6.0",
+    "d3-array": "^2.12.1",
     "d3-contour": "^2.0.0",
     "d3-geo": "^2.0.1",
     "d3-interpolate": "^3.0.1",
