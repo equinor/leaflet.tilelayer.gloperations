@@ -81,7 +81,7 @@
     "d3-geo": "^2.0.1",
     "d3-interpolate": "^3.0.1",
     "d3-request": "^1.0.6",
-    "d3-scale": "^4.0.1",
+    "d3-scale": "^4.0.2",
     "d3-selection": "^2.0.0",
     "gl-matrix": "^3.3.0",
     "glsl-float-to-rgba": "^1.0.0",
