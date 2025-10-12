@@ -86,7 +86,7 @@
     "gl-matrix": "^3.3.0",
     "glsl-float-to-rgba": "^1.0.0",
     "glsl-rgba-to-float": "^1.0.0",
-    "lodash-es": "^4.17.14",
+    "lodash-es": "^4.17.21",
     "native-promise-only": "^0.8.1",
     "pako": "^1.0.11",
     "regl": "^1.6.1",
